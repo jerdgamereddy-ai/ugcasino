@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { insertUserSchema, insertVoucherSchema, redeemVoucherSchema, users, vouchers, transactions } from './schema';
+import { insertUserSchema, insertVoucherSchema, redeemVoucherSchema, updateGameSettingsSchema, users, vouchers, transactions, gameSettings } from './schema';
 
 // ============================================
 // SHARED ERROR SCHEMAS
@@ -92,6 +92,25 @@ export const api = {
     },
   },
   games: {
+    settings: {
+      get: {
+        method: 'GET' as const,
+        path: '/api/games/settings',
+        responses: {
+          200: z.array(z.custom<typeof gameSettings.$inferSelect>()),
+          403: errorSchemas.forbidden,
+        },
+      },
+      update: {
+        method: 'POST' as const,
+        path: '/api/games/settings',
+        input: updateGameSettingsSchema,
+        responses: {
+          200: z.custom<typeof gameSettings.$inferSelect>(),
+          403: errorSchemas.forbidden,
+        },
+      },
+    },
     slots: {
       spin: {
         method: 'POST' as const,
@@ -135,6 +154,21 @@ export const api = {
       path: '/api/admin/users',
       responses: {
         200: z.array(z.custom<typeof users.$inferSelect>()),
+        403: errorSchemas.forbidden,
+      },
+    },
+    reports: {
+      method: 'GET' as const,
+      path: '/api/admin/reports',
+      responses: {
+        200: z.object({
+          totalDeposits: z.number(),
+          totalWithdrawals: z.number(),
+          totalBets: z.number(),
+          totalWins: z.number(),
+          netRevenue: z.number(),
+          transactions: z.array(z.custom<typeof transactions.$inferSelect>()),
+        }),
         403: errorSchemas.forbidden,
       },
     },

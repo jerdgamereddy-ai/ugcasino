@@ -1,4 +1,4 @@
-import { pgTable, text, serial, integer, boolean, timestamp, varchar } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, boolean, timestamp, varchar, doublePrecision } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 import { relations } from "drizzle-orm";
@@ -31,6 +31,14 @@ export const transactions = pgTable("transactions", {
   type: text("type", { enum: ["deposit", "withdrawal", "bet", "win", "voucher_redemption"] }).notNull(),
   description: text("description"),
   createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const gameSettings = pgTable("game_settings", {
+  id: serial("id").primaryKey(),
+  gameType: text("game_type", { enum: ["slots", "roulette"] }).notNull().unique(),
+  winChance: doublePrecision("win_chance").default(0.3).notNull(), // 0.0 to 1.0 (30% default)
+  updatedBy: integer("updated_by").notNull(),
+  updatedAt: timestamp("updated_at").defaultNow(),
 });
 
 // === RELATIONS ===
@@ -71,6 +79,11 @@ export const redeemVoucherSchema = z.object({
   code: z.string().min(1, "Voucher code is required"),
 });
 
+export const updateGameSettingsSchema = z.object({
+  gameType: z.enum(["slots", "roulette"]),
+  winChance: z.number().min(0).max(100), // Percent
+});
+
 // === API TYPES ===
 
 export type User = typeof users.$inferSelect;
@@ -80,6 +93,7 @@ export type Voucher = typeof vouchers.$inferSelect;
 export type InsertVoucher = z.infer<typeof insertVoucherSchema>;
 
 export type Transaction = typeof transactions.$inferSelect;
+export type GameSetting = typeof gameSettings.$inferSelect;
 
 export interface GameResult {
   won: boolean;
@@ -95,4 +109,13 @@ export interface SpinResult extends GameResult {
 export interface RouletteResult extends GameResult {
   number: number;
   color: 'red' | 'black' | 'green';
+}
+
+export interface ReportsResponse {
+  totalDeposits: number;
+  totalWithdrawals: number;
+  totalBets: number;
+  totalWins: number;
+  netRevenue: number;
+  transactions: Transaction[];
 }
