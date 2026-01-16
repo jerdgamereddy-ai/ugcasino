@@ -1,18 +1,98 @@
-import { sql } from "drizzle-orm";
-import { pgTable, text, varchar } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, boolean, timestamp, varchar } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
+import { relations } from "drizzle-orm";
+
+// === TABLE DEFINITIONS ===
 
 export const users = pgTable("users", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  id: serial("id").primaryKey(),
   username: text("username").notNull().unique(),
   password: text("password").notNull(),
+  role: text("role", { enum: ["admin", "manager", "user"] }).default("user").notNull(),
+  balance: integer("balance").default(0).notNull(), // In UGX
+  createdAt: timestamp("created_at").defaultNow(),
 });
+
+export const vouchers = pgTable("vouchers", {
+  id: serial("id").primaryKey(),
+  code: text("code").notNull().unique(),
+  amount: integer("amount").notNull(),
+  createdBy: integer("created_by").notNull(), // Admin or Manager ID
+  redeemedBy: integer("redeemed_by"), // User ID who redeemed it
+  isRedeemed: boolean("is_redeemed").default(false).notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const transactions = pgTable("transactions", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull(),
+  amount: integer("amount").notNull(), // Positive for win/deposit, negative for bet/withdraw
+  type: text("type", { enum: ["deposit", "withdrawal", "bet", "win", "voucher_redemption"] }).notNull(),
+  description: text("description"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// === RELATIONS ===
+
+export const vouchersRelations = relations(vouchers, ({ one }) => ({
+  creator: one(users, {
+    fields: [vouchers.createdBy],
+    references: [users.id],
+    relationName: "voucher_creator",
+  }),
+  redeemer: one(users, {
+    fields: [vouchers.redeemedBy],
+    references: [users.id],
+    relationName: "voucher_redeemer",
+  }),
+}));
+
+export const transactionsRelations = relations(transactions, ({ one }) => ({
+  user: one(users, {
+    fields: [transactions.userId],
+    references: [users.id],
+  }),
+}));
+
+// === SCHEMAS ===
 
 export const insertUserSchema = createInsertSchema(users).pick({
   username: true,
   password: true,
+  role: true,
 });
 
-export type InsertUser = z.infer<typeof insertUserSchema>;
+export const insertVoucherSchema = createInsertSchema(vouchers).pick({
+  amount: true,
+});
+
+export const redeemVoucherSchema = z.object({
+  code: z.string().min(1, "Voucher code is required"),
+});
+
+// === API TYPES ===
+
 export type User = typeof users.$inferSelect;
+export type InsertUser = z.infer<typeof insertUserSchema>;
+
+export type Voucher = typeof vouchers.$inferSelect;
+export type InsertVoucher = z.infer<typeof insertVoucherSchema>;
+
+export type Transaction = typeof transactions.$inferSelect;
+
+export interface GameResult {
+  won: boolean;
+  payout: number;
+  balance: number;
+  details: string;
+}
+
+export interface SpinResult extends GameResult {
+  reels: [string, string, string];
+}
+
+export interface RouletteResult extends GameResult {
+  number: number;
+  color: 'red' | 'black' | 'green';
+}
