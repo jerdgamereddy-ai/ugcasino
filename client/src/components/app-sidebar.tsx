@@ -30,7 +30,12 @@ export function AppSidebar() {
     { title: "Dashboard", url: "/admin", icon: Users },
     { title: "Game Control", url: "/game-control", icon: Settings },
     { title: "Reports", url: "/reports", icon: FileText },
-  ];
+  ].filter(item => {
+    if (user?.role === 'manager') {
+      return item.title !== "Game Control";
+    }
+    return true;
+  });
 
   return (
     <Sidebar>

@@ -57,7 +57,19 @@ export async function registerRoutes(
   // === GAME SETTINGS ===
   app.get(api.games.settings.get.path, async (req, res) => {
     if (!req.isAuthenticated() || req.user.role === 'user') return res.status(403).send("Forbidden");
-    const settings = await storage.getAllGameSettings();
+    
+    let settings = await storage.getAllGameSettings();
+    const gameTypes = ["slots", "roulette"] as const;
+    const existingTypes = settings.map(s => s.gameType);
+    
+    // Seed missing settings on the fly
+    for (const type of gameTypes) {
+      if (!existingTypes.includes(type)) {
+        const newSetting = await storage.updateGameSettings(type, type === "slots" ? 0.3 : 0.45, req.user.id);
+        settings.push(newSetting);
+      }
+    }
+    
     res.json(settings);
   });
 
