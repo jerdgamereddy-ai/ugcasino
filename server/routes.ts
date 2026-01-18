@@ -59,18 +59,96 @@ export async function registerRoutes(
     if (!req.isAuthenticated() || req.user.role === 'user') return res.status(403).send("Forbidden");
     
     let settings = await storage.getAllGameSettings();
-    const gameTypes = ["slots", "roulette"] as const;
+    const gameTypes = ["slots", "roulette", "dice", "hilo"] as const;
     const existingTypes = settings.map(s => s.gameType);
     
     // Seed missing settings on the fly
     for (const type of gameTypes) {
       if (!existingTypes.includes(type)) {
-        const newSetting = await storage.updateGameSettings(type, type === "slots" ? 0.3 : 0.45, req.user.id);
+        const newSetting = await storage.updateGameSettings(type as any, type === "dice" || type === "hilo" ? 0.48 : 0.3, req.user.id);
         settings.push(newSetting);
       }
     }
     
     res.json(settings);
+  });
+
+  // ... rest of game settings ...
+
+  // === HILO GAME ===
+  app.post("/api/games/hilo/play", async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+
+    try {
+      const { bet, prediction, lastCard } = z.object({ 
+        bet: z.number().min(100),
+        prediction: z.enum(["higher", "lower"]),
+        lastCard: z.number().nullable()
+      }).parse(req.body);
+
+      if (req.user.balance < bet) return res.status(400).json({ message: "Insufficient balance" });
+
+      const settings = await storage.getGameSettings("hilo");
+      const winChance = settings?.winChance ?? 0.48;
+
+      await storage.updateUserBalance(req.user.id, -bet);
+      await storage.createTransaction({ userId: req.user.id, amount: -bet, type: "bet", description: "HiLo play" });
+
+      const won = Math.random() < winChance;
+      const nextCard = won 
+        ? (prediction === "higher" 
+            ? Math.floor(Math.random() * (13 - (lastCard || 7))) + (lastCard || 7) + 1
+            : Math.floor(Math.random() * ((lastCard || 7) - 1)) + 1)
+        : (prediction === "higher"
+            ? Math.floor(Math.random() * ((lastCard || 7) - 1)) + 1
+            : Math.floor(Math.random() * (13 - (lastCard || 7))) + (lastCard || 7) + 1);
+      
+      // Clamp card between 1 and 13
+      const card = Math.max(1, Math.min(13, nextCard));
+      
+      const payout = won ? bet * 2 : 0;
+      const user = won ? await storage.updateUserBalance(req.user.id, payout) : await storage.getUser(req.user.id);
+      
+      if (won) await storage.createTransaction({ userId: req.user.id, amount: payout, type: "win", description: "HiLo win" });
+
+      res.json({ won, payout, balance: user?.balance ?? 0, card });
+    } catch (err) {
+      res.status(500).json({ message: "Internal Server Error" });
+    }
+  });
+
+  // === DICE GAME ===
+  app.post("/api/games/dice/roll", async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+
+    try {
+      const { bet, choice } = z.object({ 
+        bet: z.number().min(100),
+        choice: z.enum(["low", "high"]) // low: 1-3, high: 4-6
+      }).parse(req.body);
+
+      if (req.user.balance < bet) return res.status(400).json({ message: "Insufficient balance" });
+
+      const settings = await storage.getGameSettings("dice");
+      const winChance = settings?.winChance ?? 0.48;
+
+      await storage.updateUserBalance(req.user.id, -bet);
+      await storage.createTransaction({ userId: req.user.id, amount: -bet, type: "bet", description: "Dice roll" });
+
+      const won = Math.random() < winChance;
+      const roll = won 
+        ? (choice === "low" ? Math.floor(Math.random() * 3) + 1 : Math.floor(Math.random() * 3) + 4)
+        : (choice === "low" ? Math.floor(Math.random() * 3) + 4 : Math.floor(Math.random() * 3) + 1);
+      
+      const payout = won ? bet * 2 : 0;
+      const user = won ? await storage.updateUserBalance(req.user.id, payout) : await storage.getUser(req.user.id);
+      
+      if (won) await storage.createTransaction({ userId: req.user.id, amount: payout, type: "win", description: "Dice win" });
+
+      res.json({ won, payout, balance: user?.balance ?? 0, roll });
+    } catch (err) {
+      res.status(500).json({ message: "Internal Server Error" });
+    }
   });
 
   app.post(api.games.settings.update.path, async (req, res) => {

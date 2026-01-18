@@ -79,6 +79,8 @@ export default function GameControl() {
     queryKey: [api.games.settings.get.path],
   });
 
+  const diceSetting = settings?.find(s => s.gameType === 'dice');
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-full">
@@ -94,7 +96,7 @@ export default function GameControl() {
         <h1 className="text-3xl font-bold text-primary">Game Control</h1>
       </div>
       
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {settings?.map((s) => (
           <GameSettingForm key={s.id} setting={s} />
         ))}

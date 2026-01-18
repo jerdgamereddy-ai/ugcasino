@@ -12,6 +12,8 @@ import Lobby from "@/pages/Lobby";
 import AdminDashboard from "@/pages/AdminDashboard";
 import GameSlots from "@/pages/GameSlots";
 import GameRoulette from "@/pages/GameRoulette";
+import GameDice from "@/pages/GameDice";
+import GameHiLo from "@/pages/GameHiLo";
 import Reports from "@/pages/Reports";
 import GameControl from "@/pages/GameControl";
 import NotFound from "@/pages/not-found";
@@ -24,6 +26,8 @@ function Router() {
       <Route path="/admin" component={AdminDashboard} />
       <Route path="/slots" component={GameSlots} />
       <Route path="/roulette" component={GameRoulette} />
+      <Route path="/dice" component={GameDice} />
+      <Route path="/hilo" component={GameHiLo} />
       <Route path="/reports" component={Reports} />
       <Route path="/game-control" component={GameControl} />
       <Route component={NotFound} />

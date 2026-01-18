@@ -1,5 +1,5 @@
 import { Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarGroupLabel, SidebarMenu, SidebarMenuButton, SidebarMenuItem } from "@/components/ui/sidebar"
-import { Home, Dice5, Target, History, Settings, FileText, Users, LogOut } from "lucide-react"
+import { Home, Dice5, Target, History, Settings, FileText, Users, LogOut, Club } from "lucide-react"
 import { Link, useLocation } from "wouter"
 import { useQuery, useMutation } from "@tanstack/react-query"
 import { User } from "@shared/schema"
@@ -24,6 +24,8 @@ export function AppSidebar() {
     { title: "Lobby", url: "/", icon: Home },
     { title: "Slots", url: "/slots", icon: Dice5 },
     { title: "Roulette", url: "/roulette", icon: Target },
+    { title: "Dice", url: "/dice", icon: History },
+    { title: "Hi-Lo", url: "/hilo", icon: Club },
   ];
 
   const adminItems = [
