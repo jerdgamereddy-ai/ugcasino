@@ -19,22 +19,38 @@ export async function registerRoutes(
     const transactions = await storage.getAllTransactions();
     
     const report = transactions.reduce((acc, tx) => {
-      if (tx.type === 'deposit' || tx.type === 'voucher_redemption') acc.totalDeposits += tx.amount;
+      const date = tx.createdAt ? new Date(tx.createdAt).toISOString().split('T')[0] : 'unknown';
+      if (!acc.dailyStats[date]) {
+        acc.dailyStats[date] = { date, bets: 0, wins: 0, deposits: 0 };
+      }
+
+      if (tx.type === 'deposit' || tx.type === 'voucher_redemption') {
+        acc.totalDeposits += tx.amount;
+        acc.dailyStats[date].deposits += tx.amount;
+      }
       if (tx.type === 'withdrawal') acc.totalWithdrawals += Math.abs(tx.amount);
-      if (tx.type === 'bet') acc.totalBets += Math.abs(tx.amount);
-      if (tx.type === 'win') acc.totalWins += tx.amount;
+      if (tx.type === 'bet') {
+        acc.totalBets += Math.abs(tx.amount);
+        acc.dailyStats[date].bets += Math.abs(tx.amount);
+      }
+      if (tx.type === 'win') {
+        acc.totalWins += tx.amount;
+        acc.dailyStats[date].wins += tx.amount;
+      }
       return acc;
     }, {
       totalDeposits: 0,
       totalWithdrawals: 0,
       totalBets: 0,
       totalWins: 0,
+      dailyStats: {} as Record<string, { date: string; bets: number; wins: number; deposits: number }>,
     });
 
     res.json({
       ...report,
       netRevenue: report.totalBets - report.totalWins,
-      transactions: transactions.slice(0, 100) // Last 100 for display
+      transactions: transactions.slice(0, 100),
+      dailyStats: Object.values(report.dailyStats).sort((a, b) => b.date.localeCompare(a.date)),
     });
   });
 
@@ -219,9 +235,32 @@ export async function registerRoutes(
 
   // === ADMIN USERS ===
   app.get(api.admin.users.path, async (req, res) => {
-    if (!req.isAuthenticated() || req.user.role !== 'admin') return res.status(403).send("Forbidden");
+    if (!req.isAuthenticated() || (req.user.role !== 'admin' && req.user.role !== 'manager')) return res.status(403).send("Forbidden");
     const users = await storage.getAllUsers();
     res.json(users);
+  });
+
+  app.post(api.admin.withdraw.path, async (req, res) => {
+    if (!req.isAuthenticated() || req.user.role !== 'admin') return res.status(403).send("Forbidden");
+    
+    try {
+      const { userId, amount } = api.admin.withdraw.input.parse(req.body);
+      const user = await storage.getUser(userId);
+      if (!user) return res.status(404).json({ message: "User not found" });
+      if (user.balance < amount) return res.status(400).json({ message: "Insufficient user balance" });
+
+      const updatedUser = await storage.updateUserBalance(userId, -amount);
+      await storage.createTransaction({
+        userId,
+        amount: -amount,
+        type: "withdrawal",
+        description: `Admin withdrawal: ${req.user.username}`,
+      });
+
+      res.json({ balance: updatedUser.balance, message: "Withdrawal successful" });
+    } catch (err) {
+      res.status(400).json({ message: "Invalid input" });
+    }
   });
 
   return httpServer;

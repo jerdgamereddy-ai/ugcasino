@@ -3,7 +3,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ReportsResponse } from "@shared/schema";
 import { api } from "@shared/routes";
-import { Loader2, TrendingUp, TrendingDown, Wallet, Dice5, Trophy } from "lucide-react";
+import { Loader2, TrendingUp, TrendingDown, Wallet, Dice5, Trophy, BarChart3 } from "lucide-react";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 
 export default function Reports() {
   const { data: reports, isLoading } = useQuery<ReportsResponse>({
@@ -45,6 +46,32 @@ export default function Reports() {
           </Card>
         ))}
       </div>
+
+      <Card className="p-6 bg-card">
+        <CardHeader className="px-0">
+          <CardTitle className="flex items-center gap-2">
+            <BarChart3 className="h-5 w-5" />
+            Daily Activity
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="h-[300px] px-0">
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart data={reports.dailyStats}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#333" />
+              <XAxis dataKey="date" stroke="#888" />
+              <YAxis stroke="#888" />
+              <Tooltip 
+                contentStyle={{ backgroundColor: '#1a1a1a', border: '1px solid #333' }}
+                itemStyle={{ color: '#fff' }}
+              />
+              <Legend />
+              <Bar dataKey="bets" name="Total Bets" fill="#3b82f6" />
+              <Bar dataKey="wins" name="Total Wins" fill="#eab308" />
+              <Bar dataKey="deposits" name="Total Deposits" fill="#22c55e" />
+            </BarChart>
+          </ResponsiveContainer>
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader>

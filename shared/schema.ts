@@ -118,4 +118,10 @@ export interface ReportsResponse {
   totalWins: number;
   netRevenue: number;
   transactions: Transaction[];
+  dailyStats: {
+    date: string;
+    bets: number;
+    wins: number;
+    deposits: number;
+  }[];
 }

@@ -9,7 +9,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
-import { Shield, Plus, Users, Ticket, Copy } from "lucide-react";
+import { Shield, Plus, Users, Ticket, Copy, Banknote } from "lucide-react";
+import { api } from "@shared/routes";
+import { queryClient } from "@/lib/queryClient";
 
 export default function AdminDashboard() {
   const { data: user } = useUser();
@@ -19,16 +21,15 @@ export default function AdminDashboard() {
   const { toast } = useToast();
   
   const [amount, setAmount] = useState("");
+  const [withdrawAmount, setWithdrawAmount] = useState<Record<number, string>>({});
 
   if (user?.role !== "admin" && user?.role !== "manager") {
     return (
-      <ProtectedLayout>
-        <div className="text-center py-20">
-          <Shield className="w-16 h-16 text-destructive mx-auto mb-4" />
-          <h1 className="text-2xl font-bold">Access Denied</h1>
-          <p className="text-muted-foreground">You do not have permission to view this page.</p>
-        </div>
-      </ProtectedLayout>
+      <div className="text-center py-20">
+        <Shield className="w-16 h-16 text-destructive mx-auto mb-4" />
+        <h1 className="text-2xl font-bold">Access Denied</h1>
+        <p className="text-muted-foreground">You do not have permission to view this page.</p>
+      </div>
     );
   }
 
@@ -45,6 +46,28 @@ export default function AdminDashboard() {
         toast({ title: "Error", description: err.message, variant: "destructive" });
       }
     });
+  };
+
+  const handleWithdraw = async (userId: number) => {
+    const val = withdrawAmount[userId];
+    if (!val) return;
+    
+    try {
+      const res = await fetch(api.admin.withdraw.path, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId, amount: parseInt(val) }),
+      });
+      
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message);
+      
+      toast({ title: "Success", description: data.message });
+      setWithdrawAmount({ ...withdrawAmount, [userId]: "" });
+      queryClient.invalidateQueries({ queryKey: [api.admin.users.path] });
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    }
   };
 
   const copyToClipboard = (code: string) => {
@@ -73,7 +96,6 @@ export default function AdminDashboard() {
 
           <TabsContent value="vouchers" className="mt-6 space-y-6">
             <div className="grid md:grid-cols-3 gap-6">
-              {/* Create Voucher Form */}
               <Card className="md:col-span-1 glass-card">
                 <CardHeader>
                   <CardTitle>Create Voucher</CardTitle>
@@ -98,7 +120,6 @@ export default function AdminDashboard() {
                 </CardContent>
               </Card>
 
-              {/* Vouchers List */}
               <Card className="md:col-span-2 glass-card">
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
@@ -158,12 +179,13 @@ export default function AdminDashboard() {
                         <TableHead>Username</TableHead>
                         <TableHead>Role</TableHead>
                         <TableHead>Balance</TableHead>
+                        <TableHead>Action</TableHead>
                         <TableHead>Joined</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                         {usersLoading ? (
-                            <TableRow><TableCell colSpan={5} className="text-center">Loading...</TableCell></TableRow>
+                            <TableRow><TableCell colSpan={6} className="text-center">Loading...</TableCell></TableRow>
                         ) : (
                             users?.map((u) => (
                                 <TableRow key={u.id} className="border-white/10 hover:bg-white/5">
@@ -171,6 +193,22 @@ export default function AdminDashboard() {
                                     <TableCell className="font-medium">{u.username}</TableCell>
                                     <TableCell className="capitalize">{u.role}</TableCell>
                                     <TableCell className="font-mono">UGX {u.balance.toLocaleString()}</TableCell>
+                                    <TableCell>
+                                      {user?.role === 'admin' && u.role === 'user' && (
+                                        <div className="flex gap-2 items-center">
+                                          <Input 
+                                            type="number" 
+                                            placeholder="UGX" 
+                                            className="w-24 h-8 text-xs" 
+                                            value={withdrawAmount[u.id] || ""}
+                                            onChange={(e) => setWithdrawAmount({...withdrawAmount, [u.id]: e.target.value})}
+                                          />
+                                          <Button size="sm" variant="outline" onClick={() => handleWithdraw(u.id)} className="h-8">
+                                            <Banknote className="w-4 h-4 mr-1" /> Withdraw
+                                          </Button>
+                                        </div>
+                                      )}
+                                    </TableCell>
                                     <TableCell className="text-muted-foreground text-sm">
                                         {u.createdAt ? new Date(u.createdAt).toLocaleDateString() : '-'}
                                     </TableCell>

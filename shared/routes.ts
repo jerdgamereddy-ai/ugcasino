@@ -168,7 +168,23 @@ export const api = {
           totalWins: z.number(),
           netRevenue: z.number(),
           transactions: z.array(z.custom<typeof transactions.$inferSelect>()),
+          dailyStats: z.array(z.object({
+            date: z.string(),
+            bets: z.number(),
+            wins: z.number(),
+            deposits: z.number(),
+          })),
         }),
+        403: errorSchemas.forbidden,
+      },
+    },
+    withdraw: {
+      method: 'POST' as const,
+      path: '/api/admin/withdraw',
+      input: z.object({ userId: z.number(), amount: z.number().min(100) }),
+      responses: {
+        200: z.object({ balance: z.number(), message: z.string() }),
+        400: errorSchemas.validation,
         403: errorSchemas.forbidden,
       },
     },
