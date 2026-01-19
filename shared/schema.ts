@@ -11,6 +11,7 @@ export const users = pgTable("users", {
   password: text("password").notNull(),
   role: text("role", { enum: ["admin", "manager", "user"] }).default("user").notNull(),
   balance: integer("balance").default(0).notNull(), // In UGX
+  isApproved: boolean("is_approved").default(false).notNull(),
   createdAt: timestamp("created_at").defaultNow(),
 });
 

@@ -27,6 +27,7 @@ export default function Reports() {
     { title: "Total Bets", value: reports.totalBets, icon: Dice5, color: "text-blue-500" },
     { title: "Total Wins", value: reports.totalWins, icon: Trophy, color: "text-yellow-500" },
     { title: "Net Revenue", value: reports.netRevenue, icon: TrendingUp, color: reports.netRevenue >= 0 ? "text-green-500" : "text-red-500" },
+    { title: "User Funds (Pending)", value: (reports as any).totalPendingBalance || 0, icon: Wallet, color: "text-orange-500" },
   ];
 
   return (

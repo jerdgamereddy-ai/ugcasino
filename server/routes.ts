@@ -46,8 +46,12 @@ export async function registerRoutes(
       dailyStats: {} as Record<string, { date: string; bets: number; wins: number; deposits: number }>,
     });
 
+    const users = await storage.getAllUsers();
+    const totalPendingBalance = users.reduce((sum, u) => sum + u.balance, 0);
+
     res.json({
       ...report,
+      totalPendingBalance,
       netRevenue: report.totalBets - report.totalWins,
       transactions: transactions.slice(0, 100),
       dailyStats: Object.values(report.dailyStats).sort((a, b) => b.date.localeCompare(a.date)),
@@ -326,8 +330,15 @@ export async function registerRoutes(
   // === ADMIN USERS ===
   app.get(api.admin.users.path, async (req, res) => {
     if (!req.isAuthenticated() || (req.user.role !== 'admin' && req.user.role !== 'manager')) return res.status(403).send("Forbidden");
-    const users = await storage.getAllUsers();
-    res.json(users);
+    const usersList = await storage.getAllUsers();
+    res.json(usersList);
+  });
+
+  app.post("/api/admin/users/:id/approve", async (req, res) => {
+    if (!req.isAuthenticated() || (req.user.role !== 'admin' && req.user.role !== 'manager')) return res.status(403).send("Forbidden");
+    const userId = parseInt(req.params.id);
+    const updatedUser = await storage.approveUser(userId);
+    res.json(updatedUser);
   });
 
   app.post(api.admin.withdraw.path, async (req, res) => {

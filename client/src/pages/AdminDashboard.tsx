@@ -9,7 +9,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
-import { Shield, Plus, Users, Ticket, Copy, Banknote } from "lucide-react";
+import { Shield, Plus, Users, Ticket, Copy, Banknote, CheckCircle } from "lucide-react";
 import { api } from "@shared/routes";
 import { queryClient } from "@/lib/queryClient";
 
@@ -64,6 +64,19 @@ export default function AdminDashboard() {
       
       toast({ title: "Success", description: data.message });
       setWithdrawAmount({ ...withdrawAmount, [userId]: "" });
+      queryClient.invalidateQueries({ queryKey: [api.admin.users.path] });
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    }
+  };
+
+  const handleApprove = async (userId: number) => {
+    try {
+      const res = await fetch(`/api/admin/users/${userId}/approve`, {
+        method: 'POST',
+      });
+      if (!res.ok) throw new Error("Approval failed");
+      toast({ title: "User Approved", className: "bg-green-600 text-white" });
       queryClient.invalidateQueries({ queryKey: [api.admin.users.path] });
     } catch (err: any) {
       toast({ title: "Error", description: err.message, variant: "destructive" });
@@ -179,13 +192,14 @@ export default function AdminDashboard() {
                         <TableHead>Username</TableHead>
                         <TableHead>Role</TableHead>
                         <TableHead>Balance</TableHead>
+                        <TableHead>Status</TableHead>
                         <TableHead>Action</TableHead>
                         <TableHead>Joined</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                         {usersLoading ? (
-                            <TableRow><TableCell colSpan={6} className="text-center">Loading...</TableCell></TableRow>
+                            <TableRow><TableCell colSpan={7} className="text-center">Loading...</TableCell></TableRow>
                         ) : (
                             users?.map((u) => (
                                 <TableRow key={u.id} className="border-white/10 hover:bg-white/5">
@@ -194,20 +208,32 @@ export default function AdminDashboard() {
                                     <TableCell className="capitalize">{u.role}</TableCell>
                                     <TableCell className="font-mono">UGX {u.balance.toLocaleString()}</TableCell>
                                     <TableCell>
-                                      {user?.role === 'admin' && u.role === 'user' && (
-                                        <div className="flex gap-2 items-center">
-                                          <Input 
-                                            type="number" 
-                                            placeholder="UGX" 
-                                            className="w-24 h-8 text-xs" 
-                                            value={withdrawAmount[u.id] || ""}
-                                            onChange={(e) => setWithdrawAmount({...withdrawAmount, [u.id]: e.target.value})}
-                                          />
-                                          <Button size="sm" variant="outline" onClick={() => handleWithdraw(u.id)} className="h-8">
-                                            <Banknote className="w-4 h-4 mr-1" /> Withdraw
+                                      <span className={`px-2 py-1 rounded text-xs ${u.isApproved ? "bg-green-500/20 text-green-500" : "bg-red-500/20 text-red-500"}`}>
+                                        {u.isApproved ? "Approved" : "Pending"}
+                                      </span>
+                                    </TableCell>
+                                    <TableCell>
+                                      <div className="flex gap-2 items-center">
+                                        {!u.isApproved && (u.role === 'user' || user?.role === 'admin') && (
+                                          <Button size="sm" variant="luxury" onClick={() => handleApprove(u.id)} className="h-8">
+                                            <CheckCircle className="w-4 h-4 mr-1" /> Approve
                                           </Button>
-                                        </div>
-                                      )}
+                                        )}
+                                        {user?.role === 'admin' && u.role === 'user' && (
+                                          <>
+                                            <Input 
+                                              type="number" 
+                                              placeholder="UGX" 
+                                              className="w-24 h-8 text-xs" 
+                                              value={withdrawAmount[u.id] || ""}
+                                              onChange={(e) => setWithdrawAmount({...withdrawAmount, [u.id]: e.target.value})}
+                                            />
+                                            <Button size="sm" variant="outline" onClick={() => handleWithdraw(u.id)} className="h-8">
+                                              <Banknote className="w-4 h-4 mr-1" /> Withdraw
+                                            </Button>
+                                          </>
+                                        )}
+                                      </div>
                                     </TableCell>
                                     <TableCell className="text-muted-foreground text-sm">
                                         {u.createdAt ? new Date(u.createdAt).toLocaleDateString() : '-'}

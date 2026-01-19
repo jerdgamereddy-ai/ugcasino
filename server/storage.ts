@@ -8,6 +8,7 @@ export interface IStorage {
   getUserByUsername(username: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
   updateUserBalance(userId: number, amount: number): Promise<User>;
+  approveUser(userId: number): Promise<User>;
   getAllUsers(): Promise<User[]>;
 
   // Vouchers
@@ -48,6 +49,11 @@ export class DatabaseStorage implements IStorage {
     if (!user) throw new Error("User not found");
     const newBalance = user.balance + amount;
     const [updatedUser] = await db.update(users).set({ balance: newBalance }).where(eq(users.id, userId)).returning();
+    return updatedUser;
+  }
+
+  async approveUser(userId: number): Promise<User> {
+    const [updatedUser] = await db.update(users).set({ isApproved: true }).where(eq(users.id, userId)).returning();
     return updatedUser;
   }
 
