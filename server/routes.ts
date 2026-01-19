@@ -341,6 +341,70 @@ export async function registerRoutes(
     res.json(updatedUser);
   });
 
+  // === WITHDRAWAL REQUESTS ===
+  app.post("/api/withdraw/request", async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    
+    try {
+      const { amount } = z.object({ amount: z.number().min(500) }).parse(req.body);
+      if (req.user.balance < amount) return res.status(400).json({ message: "Insufficient balance" });
+
+      // Deduct immediately and create request
+      await storage.updateUserBalance(req.user.id, -amount);
+      const withdrawalRequest = await storage.createWithdrawalRequest({
+        userId: req.user.id,
+        amount,
+      });
+
+      await storage.createTransaction({
+        userId: req.user.id,
+        amount: -amount,
+        type: "withdrawal",
+        description: `Withdrawal request pending: ${withdrawalRequest.id}`,
+      });
+
+      res.status(201).json(withdrawalRequest);
+    } catch (err) {
+      res.status(400).json({ message: "Invalid amount or insufficient funds" });
+    }
+  });
+
+  app.get("/api/withdraw/requests", async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    
+    if (req.user.role === 'user') {
+      const requests = await storage.getUserWithdrawalRequests(req.user.id);
+      return res.json(requests);
+    } else {
+      const requests = await storage.getPendingWithdrawalRequests();
+      return res.json(requests);
+    }
+  });
+
+  app.post("/api/admin/withdraw/requests/:id/process", async (req, res) => {
+    if (!req.isAuthenticated() || req.user.role === 'user') return res.status(403).send("Forbidden");
+    
+    const { id } = req.params;
+    const { status } = z.object({ status: z.enum(["approved", "rejected"]) }).parse(req.body);
+    
+    const request = await storage.getWithdrawalRequest(parseInt(id));
+    if (!request || request.status !== 'pending') return res.status(404).json({ message: "Request not found or already processed" });
+
+    if (status === 'rejected') {
+      // Refund balance
+      await storage.updateUserBalance(request.userId, request.amount);
+      await storage.createTransaction({
+        userId: request.userId,
+        amount: request.amount,
+        type: "deposit",
+        description: `Withdrawal request rejected: ${request.id}`,
+      });
+    }
+
+    const updated = await storage.updateWithdrawalRequest(request.id, status, req.user.id);
+    res.json(updated);
+  });
+
   app.post(api.admin.withdraw.path, async (req, res) => {
     if (!req.isAuthenticated() || req.user.role !== 'admin') return res.status(403).send("Forbidden");
     

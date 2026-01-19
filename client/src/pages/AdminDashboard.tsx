@@ -12,11 +12,15 @@ import { useToast } from "@/hooks/use-toast";
 import { Shield, Plus, Users, Ticket, Copy, Banknote, CheckCircle } from "lucide-react";
 import { api } from "@shared/routes";
 import { queryClient } from "@/lib/queryClient";
+import { useQuery } from "@tanstack/react-query";
 
 export default function AdminDashboard() {
   const { data: user } = useUser();
   const { data: users, isLoading: usersLoading } = useUsersList();
   const { data: vouchers, isLoading: vouchersLoading } = useVouchers();
+  const { data: withdrawRequests, isLoading: requestsLoading } = useQuery<any[]>({
+    queryKey: ["/api/withdraw/requests"],
+  });
   const { mutate: createVoucher, isPending: creatingVoucher } = useCreateVoucher();
   const { toast } = useToast();
   
@@ -83,6 +87,22 @@ export default function AdminDashboard() {
     }
   };
 
+  const handleProcessWithdraw = async (id: number, status: "approved" | "rejected") => {
+    try {
+      const res = await fetch(`/api/admin/withdraw/requests/${id}/process`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status }),
+      });
+      if (!res.ok) throw new Error("Processing failed");
+      toast({ title: `Withdrawal ${status}`, className: status === 'approved' ? "bg-green-600 text-white" : "" });
+      queryClient.invalidateQueries({ queryKey: ["/api/withdraw/requests"] });
+      queryClient.invalidateQueries({ queryKey: [api.admin.users.path] });
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    }
+  };
+
   const copyToClipboard = (code: string) => {
     navigator.clipboard.writeText(code);
     toast({ title: "Copied!", description: code });
@@ -104,6 +124,7 @@ export default function AdminDashboard() {
         <Tabs defaultValue="vouchers" className="w-full">
           <TabsList className="bg-white/5 border border-white/10 w-full justify-start">
             <TabsTrigger value="vouchers">Voucher Management</TabsTrigger>
+            <TabsTrigger value="requests">Withdrawal Requests</TabsTrigger>
             <TabsTrigger value="users">User Management</TabsTrigger>
           </TabsList>
 
@@ -177,6 +198,48 @@ export default function AdminDashboard() {
                 </CardContent>
               </Card>
             </div>
+          </TabsContent>
+
+          <TabsContent value="requests" className="mt-6">
+            <Card className="glass-card">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2"><Banknote className="w-5 h-5"/> Pending Withdrawals</CardTitle>
+                <CardDescription>Review and approve player withdrawal requests.</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Table>
+                  <TableHeader>
+                    <TableRow className="border-white/10">
+                      <TableHead>User ID</TableHead>
+                      <TableHead>Amount</TableHead>
+                      <TableHead>Date</TableHead>
+                      <TableHead>Action</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {requestsLoading ? (
+                      <TableRow><TableCell colSpan={4} className="text-center">Loading...</TableCell></TableRow>
+                    ) : !withdrawRequests || withdrawRequests.length === 0 ? (
+                      <TableRow><TableCell colSpan={4} className="text-center text-muted-foreground">No pending requests</TableCell></TableRow>
+                    ) : (
+                      withdrawRequests.map((req) => (
+                        <TableRow key={req.id} className="border-white/10">
+                          <TableCell>#{req.userId}</TableCell>
+                          <TableCell className="font-bold text-primary">UGX {req.amount.toLocaleString()}</TableCell>
+                          <TableCell>{new Date(req.createdAt).toLocaleString()}</TableCell>
+                          <TableCell>
+                            <div className="flex gap-2">
+                              <Button size="sm" onClick={() => handleProcessWithdraw(req.id, "approved")} className="bg-green-600 hover:bg-green-700">Approve</Button>
+                              <Button size="sm" variant="destructive" onClick={() => handleProcessWithdraw(req.id, "rejected")}>Reject</Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    )}
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
           </TabsContent>
 
           <TabsContent value="users" className="mt-6">

@@ -112,17 +112,30 @@ export interface RouletteResult extends GameResult {
   color: 'red' | 'black' | 'green';
 }
 
-export interface ReportsResponse {
-  totalDeposits: number;
-  totalWithdrawals: number;
-  totalBets: number;
-  totalWins: number;
-  netRevenue: number;
-  transactions: Transaction[];
-  dailyStats: {
-    date: string;
-    bets: number;
-    wins: number;
-    deposits: number;
-  }[];
-}
+export const withdrawalRequests = pgTable("withdrawal_requests", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull(),
+  amount: integer("amount").notNull(),
+  status: text("status", { enum: ["pending", "approved", "rejected"] }).default("pending").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+  processedAt: timestamp("processed_at"),
+  processedBy: integer("processed_by"),
+});
+
+export const withdrawalRequestsRelations = relations(withdrawalRequests, ({ one }) => ({
+  user: one(users, {
+    fields: [withdrawalRequests.userId],
+    references: [users.id],
+  }),
+  processor: one(users, {
+    fields: [withdrawalRequests.processedBy],
+    references: [users.id],
+  }),
+}));
+
+export const insertWithdrawalRequestSchema = createInsertSchema(withdrawalRequests).pick({
+  amount: true,
+});
+
+export type WithdrawalRequest = typeof withdrawalRequests.$inferSelect;
+export type InsertWithdrawalRequest = z.infer<typeof insertWithdrawalRequestSchema>;

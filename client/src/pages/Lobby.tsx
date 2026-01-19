@@ -3,15 +3,17 @@ import { useUser } from "@/hooks/use-auth";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Link } from "wouter";
-import { Coins, Trophy, CreditCard, ChevronRight, Club, Dice5, Dices } from "lucide-react";
+import { Coins, Trophy, CreditCard, ChevronRight, Club, Dice5, Dices, Banknote } from "lucide-react";
 import { useRedeemVoucher } from "@/hooks/use-vouchers";
 import { useState } from "react";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
+import { queryClient } from "@/lib/queryClient";
 
 export default function Lobby() {
   const { data: user } = useUser();
   const [voucherCode, setVoucherCode] = useState("");
+  const [withdrawAmount, setWithdrawAmount] = useState("");
   const { mutate: redeem, isPending } = useRedeemVoucher();
   const { toast } = useToast();
 
@@ -27,6 +29,31 @@ export default function Lobby() {
         toast({ title: "Error", description: err.message, variant: "destructive" });
       }
     });
+  };
+
+  const handleWithdrawRequest = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const amount = parseInt(withdrawAmount);
+    if (!amount || amount < 500) {
+      toast({ title: "Error", description: "Minimum withdrawal is UGX 500", variant: "destructive" });
+      return;
+    }
+
+    try {
+      const res = await fetch("/api/withdraw/request", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ amount }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message);
+      
+      toast({ title: "Request Sent", description: "Your withdrawal request is pending approval.", className: "bg-green-600 text-white" });
+      setWithdrawAmount("");
+      queryClient.invalidateQueries({ queryKey: ["/api/user"] });
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    }
   };
 
   return (
@@ -52,27 +79,53 @@ export default function Lobby() {
           </div>
         </div>
 
-        {/* Voucher Redemption */}
-        <Card className="glass-card border-white/10">
-          <CardHeader>
-            <CardTitle className="text-lg flex items-center gap-2">
-              <CreditCard className="w-5 h-5 text-primary" /> Deposit Funds
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={handleRedeem} className="flex gap-4 max-w-md">
-              <Input 
-                placeholder="Enter Voucher Code" 
-                value={voucherCode} 
-                onChange={(e) => setVoucherCode(e.target.value)}
-                className="bg-black/30 border-white/10"
-              />
-              <Button type="submit" disabled={isPending} variant="secondary">
-                {isPending ? "Redeeming..." : "Redeem"}
-              </Button>
-            </form>
-          </CardContent>
-        </Card>
+        <div className="grid md:grid-cols-2 gap-6">
+          {/* Voucher Redemption */}
+          <Card className="glass-card border-white/10 h-full">
+            <CardHeader>
+              <CardTitle className="text-lg flex items-center gap-2">
+                <CreditCard className="w-5 h-5 text-primary" /> Deposit Funds
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <form onSubmit={handleRedeem} className="flex gap-4">
+                <Input 
+                  placeholder="Enter Voucher Code" 
+                  value={voucherCode} 
+                  onChange={(e) => setVoucherCode(e.target.value)}
+                  className="bg-black/30 border-white/10"
+                />
+                <Button type="submit" disabled={isPending} variant="secondary">
+                  {isPending ? "Redeeming..." : "Redeem"}
+                </Button>
+              </form>
+            </CardContent>
+          </Card>
+
+          {/* Withdrawal Request */}
+          <Card className="glass-card border-white/10 h-full">
+            <CardHeader>
+              <CardTitle className="text-lg flex items-center gap-2">
+                <Banknote className="w-5 h-5 text-primary" /> Withdraw Funds
+              </CardTitle>
+              <CardDescription>Minimum withdrawal: UGX 500</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <form onSubmit={handleWithdrawRequest} className="flex gap-4">
+                <Input 
+                  type="number"
+                  placeholder="Amount (UGX)" 
+                  value={withdrawAmount} 
+                  onChange={(e) => setWithdrawAmount(e.target.value)}
+                  className="bg-black/30 border-white/10"
+                />
+                <Button type="submit" variant="luxury">
+                  Request
+                </Button>
+              </form>
+            </CardContent>
+          </Card>
+        </div>
 
         {/* Games Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
