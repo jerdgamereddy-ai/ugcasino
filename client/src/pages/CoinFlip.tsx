@@ -55,24 +55,25 @@ export default function CoinFlip() {
     <ProtectedLayout>
       <div className="max-w-4xl mx-auto space-y-8">
         <div className="text-center space-y-4">
-          <h1 className="text-4xl md:text-6xl font-display font-bold text-white tracking-tighter">
+          <h1 className="text-5xl md:text-8xl font-display font-bold text-white tracking-tighter drop-shadow-[0_0_30px_rgba(212,175,55,0.5)]">
             Double or <span className="text-primary">Nothing</span>
           </h1>
-          <p className="text-muted-foreground text-lg">Pick a side, flip the coin, win big.</p>
+          <p className="text-white font-bold text-xl drop-shadow-md">Pick a side, flip the coin, win big.</p>
         </div>
 
         <div className="grid md:grid-cols-2 gap-8 items-center">
-          <Card className="glass-card border-white/10 p-8 flex flex-col items-center justify-center min-h-[400px]">
+          <Card className="glass-card border-white/10 p-8 flex flex-col items-center justify-center min-h-[400px] bg-gradient-to-b from-black/60 to-zinc-900/60">
             <AnimatePresence mode="wait">
               <motion.div
                 key={isFlipping ? "flipping" : result}
-                initial={{ rotateY: 0 }}
-                animate={isFlipping ? { rotateY: 1800 } : { rotateY: 0 }}
-                transition={isFlipping ? { duration: 2, ease: "easeInOut" } : { duration: 0.5 }}
-                className="relative w-48 h-48"
+                initial={{ rotateY: 0, scale: 0.8 }}
+                animate={isFlipping ? { rotateY: 1800, scale: 1.1 } : { rotateY: 0, scale: 1 }}
+                transition={isFlipping ? { duration: 2, ease: "easeInOut" } : { type: "spring", damping: 15 }}
+                className="relative w-56 h-56"
               >
-                <div className={`w-full h-full rounded-full border-8 border-primary bg-gradient-to-tr from-primary to-yellow-200 flex items-center justify-center shadow-[0_0_50px_rgba(212,175,55,0.4)]`}>
-                  <div className="text-6xl font-display font-black text-black select-none">
+                <div className={`w-full h-full rounded-full border-[10px] border-primary bg-gradient-to-tr from-primary via-yellow-200 to-primary flex items-center justify-center shadow-[0_0_80px_rgba(212,175,55,0.6)] relative overflow-hidden`}>
+                  <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_30%,_rgba(255,255,255,0.4)_0%,_transparent_50%)]" />
+                  <div className="text-8xl font-display font-black text-black select-none drop-shadow-md relative z-10">
                     {isFlipping ? "?" : (result ? (result === "heads" ? "H" : "T") : "$")}
                   </div>
                 </div>

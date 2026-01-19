@@ -74,34 +74,46 @@ export function RouletteBoard() {
   return (
     <div className="flex flex-col gap-8 items-center w-full max-w-4xl mx-auto p-4">
       {/* Wheel Representation (Simplified Visual) */}
-      <div className="relative w-64 h-64 rounded-full border-8 border-yellow-700 shadow-[0_0_30px_rgba(0,0,0,0.5)] bg-neutral-900 flex items-center justify-center overflow-hidden">
+      <div className="relative w-72 h-72 rounded-full border-[12px] border-primary shadow-[0_0_60px_rgba(212,175,55,0.4)] bg-neutral-900 flex items-center justify-center overflow-hidden">
+          <div className="absolute inset-0 bg-[conic-gradient(from_0deg,#1a1a1a_0%,#333_50%,#1a1a1a_100%)] opacity-50" />
           {isPending && (
              <motion.div 
-                className="absolute inset-0 border-t-4 border-white/50 rounded-full"
+                className="absolute inset-0 border-t-8 border-primary rounded-full shadow-[0_0_30px_rgba(212,175,55,0.8)]"
                 animate={{ rotate: 360 }}
-                transition={{ duration: 0.5, ease: "linear", repeat: Infinity }}
+                transition={{ duration: 0.4, ease: "linear", repeat: Infinity }}
              />
           )}
-          <div className="text-center z-10">
+          <div className="text-center z-10 bg-black/60 w-40 h-40 rounded-full flex flex-col items-center justify-center border-4 border-white/10 backdrop-blur-md">
               {lastResult ? (
                   <motion.div 
-                    initial={{ scale: 0.5, opacity: 0 }} 
-                    animate={{ scale: 1, opacity: 1 }}
+                    initial={{ scale: 0.2, opacity: 0, rotate: -180 }} 
+                    animate={{ scale: 1, opacity: 1, rotate: 0 }}
                     className="flex flex-col items-center"
                   >
-                      <span className={cn("text-6xl font-bold font-display", lastResult.color === "red" ? "text-red-500" : lastResult.color === "black" ? "text-white" : "text-green-500")}>
+                      <span className={cn(
+                        "text-7xl font-black font-display drop-shadow-[0_0_20px_rgba(255,255,255,0.3)]", 
+                        lastResult.color === "red" ? "text-red-500" : lastResult.color === "black" ? "text-white" : "text-green-400"
+                      )}>
                           {lastResult.number}
                       </span>
-                      <span className="text-xs uppercase text-muted-foreground tracking-widest mt-2">{lastResult.color}</span>
+                      <span className={cn(
+                        "text-xs font-black uppercase tracking-[0.3em] mt-2 px-3 py-1 rounded-full",
+                        lastResult.color === "red" ? "bg-red-500 text-white" : lastResult.color === "black" ? "bg-zinc-800 text-white" : "bg-green-500 text-black"
+                      )}>
+                        {lastResult.color}
+                      </span>
                   </motion.div>
               ) : (
-                  <span className="text-muted-foreground text-xs uppercase tracking-widest">Place Bet</span>
+                  <div className="flex flex-col items-center gap-2">
+                    <div className="w-12 h-12 rounded-full border-4 border-primary border-t-transparent animate-spin opacity-20" />
+                    <span className="text-primary font-black text-xs uppercase tracking-[0.2em] animate-pulse">Waiting...</span>
+                  </div>
               )}
           </div>
       </div>
 
       {/* Betting Board */}
-      <div className="bg-green-900/40 p-6 rounded-xl border border-green-800/30 backdrop-blur-sm overflow-x-auto w-full">
+      <div className="bg-green-600/20 p-8 rounded-3xl border-4 border-green-500/30 backdrop-blur-xl overflow-x-auto w-full shadow-[0_0_40px_rgba(34,197,94,0.15)]">
          <div className="flex flex-col gap-2 min-w-[600px]">
             {/* Zero Row */}
             <div className="flex">

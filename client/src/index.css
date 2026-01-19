@@ -20,19 +20,19 @@
   --popover: 240 10% 6%;
   --popover-foreground: 46 30% 96%;
 
-  --primary: 46 75% 55%;        /* Luxury Gold */
+  --primary: 46 95% 65%;        /* Brighter Luxury Gold */
   --primary-foreground: 240 10% 3.9%;
 
-  --secondary: 240 6% 15%;      /* Dark Gray */
+  --secondary: 260 80% 60%;      /* Vibrant Purple */
   --secondary-foreground: 46 30% 96%;
 
   --muted: 240 6% 15%;
   --muted-foreground: 240 5% 65%;
 
-  --accent: 46 75% 55%;
+  --accent: 280 90% 65%;        /* Electric Purple/Pink */
   --accent-foreground: 240 10% 3.9%;
 
-  --destructive: 0 62% 30%;     /* Deep Red */
+  --destructive: 0 90% 55%;     /* Brighter Red */
   --destructive-foreground: 0 86% 97%;
 
   --border: 240 6% 20%;

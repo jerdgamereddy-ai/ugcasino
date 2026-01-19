@@ -78,22 +78,24 @@ export function DiceGame() {
       <CardContent className="p-8">
         <div className="flex flex-col items-center gap-8">
           {/* Dice Display */}
-          <div className="relative w-32 h-32 flex items-center justify-center bg-white/5 rounded-3xl border border-white/10 shadow-[0_0_50px_rgba(212,175,55,0.1)]">
+          <div className="relative w-40 h-40 flex items-center justify-center bg-gradient-to-br from-white/10 to-transparent rounded-[2.5rem] border-2 border-primary shadow-[0_0_60px_rgba(212,175,55,0.3)]">
+            <div className="absolute inset-0 bg-primary/5 blur-xl rounded-full animate-pulse" />
             <AnimatePresence mode="wait">
               <motion.div
                 key={rolling ? "rolling" : (result || "idle")}
-                initial={{ rotateY: 0, scale: 0.8, opacity: 0 }}
+                initial={{ rotate: -180, scale: 0.5, opacity: 0 }}
                 animate={{ 
-                  rotateY: rolling ? [0, 90, 180, 270, 360] : 0,
+                  rotate: rolling ? [0, 90, 180, 270, 360] : 0,
                   scale: 1,
                   opacity: 1 
                 }}
                 transition={{ 
-                  rotateY: rolling ? { repeat: Infinity, duration: 0.2, ease: "linear" } : { duration: 0.3 },
+                  rotate: rolling ? { repeat: Infinity, duration: 0.15, ease: "linear" } : { type: "spring", damping: 12 },
                   duration: 0.3 
                 }}
+                className="relative z-10"
               >
-                <ActiveDice className={`w-20 h-20 ${rolling ? 'text-primary/50' : 'text-primary'}`} />
+                <ActiveDice className={`w-24 h-24 ${rolling ? 'text-primary animate-bounce' : 'text-primary drop-shadow-[0_0_15px_rgba(212,175,55,0.8)]'}`} />
               </motion.div>
             </AnimatePresence>
           </div>

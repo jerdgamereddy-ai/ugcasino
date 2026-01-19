@@ -92,20 +92,20 @@ export default function Lobby() {
             <Sparkles className="w-64 h-64 text-primary animate-pulse" />
           </div>
           
-          <div className="relative z-10 flex flex-col md:flex-row justify-between items-start md:items-center gap-8">
+            <div className="relative z-10 flex flex-col md:flex-row justify-between items-start md:items-center gap-8">
             <div className="space-y-4">
               <motion.div 
                 initial={{ scale: 0.8, opacity: 0 }}
                 animate={{ scale: 1, opacity: 1 }}
                 transition={{ duration: 0.5 }}
-                className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/20 border border-primary/30 text-primary text-xs font-bold uppercase tracking-widest"
+                className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/30 border border-primary/50 text-white text-xs font-bold uppercase tracking-widest shadow-[0_0_15px_rgba(212,175,55,0.3)]"
               >
-                <Zap className="w-3 h-3" /> Premium Casino Experience
+                <Zap className="w-3 h-3 text-yellow-300" /> Premium Casino Experience
               </motion.div>
-              <h1 className="text-4xl md:text-6xl font-display font-bold text-white leading-tight">
-                Welcome, <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary via-yellow-200 to-primary animate-gradient">{user?.username}</span>
+              <h1 className="text-4xl md:text-6xl font-display font-bold text-white leading-tight drop-shadow-[0_2px_15px_rgba(212,175,55,0.4)]">
+                Welcome, <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary via-yellow-200 to-primary animate-gradient drop-shadow-none">{user?.username}</span>
               </h1>
-              <p className="text-lg text-muted-foreground max-w-xl">
+              <p className="text-lg text-white font-bold max-w-xl drop-shadow-[0_2px_10px_rgba(0,0,0,1)] uppercase tracking-wide">
                 Experience the thrill of Uganda's most exclusive online casino. Your royal winning streak starts right here.
               </p>
             </div>

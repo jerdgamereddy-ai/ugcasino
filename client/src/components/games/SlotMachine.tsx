@@ -64,25 +64,26 @@ export function SlotMachine() {
     <div className="flex flex-col items-center gap-8 w-full max-w-2xl mx-auto p-4 md:p-8">
       
       {/* Machine Frame */}
-      <div className="relative bg-gradient-to-b from-neutral-800 to-neutral-900 p-8 rounded-3xl border-4 border-yellow-600 shadow-[0_0_50px_rgba(212,175,55,0.2)] w-full">
+      <div className="relative bg-gradient-to-b from-neutral-800 to-neutral-900 p-8 rounded-3xl border-4 border-primary shadow-[0_0_60px_rgba(212,175,55,0.4)] w-full">
         {/* Decorative Top */}
-        <div className="absolute -top-6 left-1/2 -translate-x-1/2 bg-yellow-600 px-6 py-2 rounded-t-xl border-t border-l border-r border-yellow-400">
-             <span className="font-display font-bold text-black tracking-widest">LUCKY SLOTS</span>
+        <div className="absolute -top-6 left-1/2 -translate-x-1/2 bg-primary px-8 py-3 rounded-t-2xl border-t-2 border-l-2 border-r-2 border-yellow-200 shadow-[0_-5px_20px_rgba(212,175,55,0.5)]">
+             <span className="font-display font-black text-black tracking-[0.2em] text-lg">LUCKY SLOTS</span>
         </div>
 
         {/* Reels Container */}
-        <div className="flex gap-2 md:gap-4 justify-center bg-black p-4 rounded-xl border-4 border-yellow-700/50 shadow-inner">
+        <div className="flex gap-2 md:gap-4 justify-center bg-black p-6 rounded-2xl border-4 border-yellow-900/50 shadow-[inset_0_0_40px_rgba(0,0,0,1)]">
           {reels.map((symbol, i) => (
             <div
               key={i}
-              className="w-20 h-28 md:w-32 md:h-40 bg-white rounded-lg flex items-center justify-center text-5xl md:text-7xl shadow-[inset_0_0_20px_rgba(0,0,0,0.5)] border border-gray-300 relative overflow-hidden"
+              className="w-20 h-28 md:w-32 md:h-40 bg-gradient-to-b from-white via-gray-100 to-white rounded-xl flex items-center justify-center text-5xl md:text-7xl shadow-[inset_0_0_20px_rgba(0,0,0,0.3),0_0_15px_rgba(255,255,255,0.2)] border-2 border-gray-300 relative overflow-hidden"
             >
-              <div className="absolute inset-0 bg-gradient-to-b from-black/20 to-transparent pointer-events-none" />
+              <div className="absolute inset-0 bg-gradient-to-b from-black/10 via-transparent to-black/10 pointer-events-none" />
               <motion.div
                 key={isSpinning ? `spinning-${i}-${Date.now()}` : `stopped-${i}`}
-                initial={{ y: isSpinning ? -50 : 0, opacity: isSpinning ? 0.5 : 1 }}
+                initial={{ y: isSpinning ? -100 : 0, opacity: isSpinning ? 0.3 : 1 }}
                 animate={{ y: 0, opacity: 1 }}
-                className="filter drop-shadow-md"
+                transition={{ type: "spring", stiffness: 300, damping: 20 }}
+                className="filter drop-shadow-[0_2px_5px_rgba(0,0,0,0.5)]"
               >
                 {symbol}
               </motion.div>

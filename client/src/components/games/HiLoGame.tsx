@@ -88,18 +88,23 @@ export function HiLoGame() {
       <CardContent className="p-8">
         <div className="flex flex-col items-center gap-8">
           {/* Card Display */}
-          <div className="relative w-32 h-48 flex items-center justify-center bg-white/5 rounded-2xl border-2 border-primary/20 shadow-[0_0_50px_rgba(212,175,55,0.1)]">
+          <div className="relative w-40 h-56 flex items-center justify-center bg-gradient-to-br from-zinc-800 to-black rounded-3xl border-4 border-primary shadow-[0_0_60px_rgba(212,175,55,0.4)] overflow-hidden">
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_rgba(212,175,55,0.1)_0%,_transparent_70%)]" />
             <AnimatePresence mode="wait">
               <motion.div
                 key={currentCard || "back"}
-                initial={{ rotateY: 90, opacity: 0 }}
-                animate={{ rotateY: 0, opacity: 1 }}
-                exit={{ rotateY: -90, opacity: 0 }}
-                className="flex flex-col items-center"
+                initial={{ rotateY: 180, scale: 0.5, opacity: 0 }}
+                animate={{ rotateY: 0, scale: 1, opacity: 1 }}
+                exit={{ rotateY: -180, scale: 0.5, opacity: 0 }}
+                transition={{ type: "spring", stiffness: 200, damping: 20 }}
+                className="flex flex-col items-center w-full h-full relative"
               >
-                <Club className="w-8 h-8 text-primary/50 absolute top-4 left-4" />
-                <span className="text-6xl font-bold text-primary">{cardDisplay(currentCard)}</span>
-                <Club className="w-8 h-8 text-primary/50 absolute bottom-4 right-4 rotate-180" />
+                <div className="absolute inset-2 border-2 border-primary/20 rounded-2xl pointer-events-none" />
+                <Club className="w-10 h-10 text-primary drop-shadow-[0_0_10px_rgba(212,175,55,0.5)] absolute top-6 left-6" />
+                <span className="text-8xl font-black font-display text-primary drop-shadow-[0_0_20px_rgba(212,175,55,0.8)] mt-4">
+                  {cardDisplay(currentCard)}
+                </span>
+                <Club className="w-10 h-10 text-primary drop-shadow-[0_0_10px_rgba(212,175,55,0.5)] absolute bottom-6 right-6 rotate-180" />
               </motion.div>
             </AnimatePresence>
           </div>
