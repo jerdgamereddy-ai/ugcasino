@@ -222,7 +222,7 @@ export default function AdminDashboard() {
                     ) : !withdrawRequests || withdrawRequests.length === 0 ? (
                       <TableRow><TableCell colSpan={4} className="text-center text-muted-foreground">No pending requests</TableCell></TableRow>
                     ) : (
-                      withdrawRequests.map((req) => (
+                      withdrawRequests.map((req: any) => (
                         <TableRow key={req.id} className="border-white/10">
                           <TableCell>#{req.userId}</TableCell>
                           <TableCell className="font-bold text-primary">UGX {req.amount.toLocaleString()}</TableCell>
