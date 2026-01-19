@@ -3,7 +3,7 @@ import { useUser } from "@/hooks/use-auth";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Link } from "wouter";
-import { Coins, Trophy, CreditCard, ChevronRight, Club, Dice5 } from "lucide-react";
+import { Coins, Trophy, CreditCard, ChevronRight, Club, Dice5, Dices } from "lucide-react";
 import { useRedeemVoucher } from "@/hooks/use-vouchers";
 import { useState } from "react";
 import { Input } from "@/components/ui/input";
@@ -130,7 +130,7 @@ export default function Lobby() {
                <div className="absolute inset-0 p-8 flex flex-col justify-end">
                 <div className="transform translate-y-4 group-hover:translate-y-0 transition-transform duration-300">
                   <div className="flex items-center gap-2 mb-2">
-                     <Dice5 className="text-primary w-6 h-6" />
+                     <Dices className="text-primary w-6 h-6" />
                      <span className="text-xs font-bold bg-purple-500 text-white px-2 py-0.5 rounded uppercase">New</span>
                   </div>
                   <h3 className="text-3xl font-display font-bold text-white mb-2">Royal Dice</h3>
