@@ -78,9 +78,21 @@ export async function registerRoutes(
     res.json(settings);
   });
 
-  // ... rest of game settings ...
-
-  // === HILO GAME ===
+  app.post(api.games.settings.update.path, async (req, res) => {
+    if (!req.isAuthenticated() || req.user.role !== 'admin') return res.status(403).send("Forbidden");
+    
+    try {
+      const { gameType, winChance } = z.object({
+        gameType: z.enum(["slots", "roulette", "dice", "hilo", "coinflip"]),
+        winChance: z.number().min(0).max(100)
+      }).parse(req.body);
+      
+      const settings = await storage.updateGameSettings(gameType, winChance / 100, req.user.id);
+      res.json(settings);
+    } catch (err) {
+      res.status(400).json({ message: "Invalid input" });
+    }
+  });
   app.post("/api/games/hilo/play", async (req, res) => {
     if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
 
