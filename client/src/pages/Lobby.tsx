@@ -250,6 +250,16 @@ export default function Lobby() {
               title: "High-Low Cards",
               desc: "Master the deck in this classic card duel.",
               id: "hilo"
+            },
+            {
+              href: "/coinflip",
+              img: "https://images.unsplash.com/photo-1596464716127-f2a82984de30?q=80&w=2070",
+              icon: Coins,
+              tag: "50/50",
+              tagColor: "bg-emerald-600",
+              title: "Double or Nothing",
+              desc: "Flip the royal coin and double your fortune.",
+              id: "coinflip"
             }
           ].map((game, idx) => (
             <motion.div 

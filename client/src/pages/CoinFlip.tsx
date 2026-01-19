@@ -1,0 +1,146 @@
+import { useState } from "react";
+import { ProtectedLayout } from "@/components/layout/ProtectedLayout";
+import { useUser } from "@/hooks/use-auth";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { useToast } from "@/hooks/use-toast";
+import { queryClient } from "@/lib/queryClient";
+import { motion, AnimatePresence } from "framer-motion";
+import { Coins, RotateCw } from "lucide-react";
+
+export default function CoinFlip() {
+  const { data: user } = useUser();
+  const { toast } = useToast();
+  const [bet, setBet] = useState(100);
+  const [isFlipping, setIsFlipping] = useState(false);
+  const [result, setResult] = useState<string | null>(null);
+  const [lastWon, setLastWon] = useState<boolean | null>(null);
+
+  const play = async (choice: "heads" | "tails") => {
+    if (bet < 100) return toast({ title: "Minimum bet is UGX 100", variant: "destructive" });
+    if (user && user.balance < bet) return toast({ title: "Insufficient balance", variant: "destructive" });
+
+    setIsFlipping(true);
+    setResult(null);
+
+    try {
+      const res = await fetch("/api/games/coinflip/play", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ bet, choice }),
+      });
+      
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message);
+
+      // Animation delay
+      setTimeout(() => {
+        setIsFlipping(false);
+        setResult(data.result);
+        setLastWon(data.won);
+        queryClient.invalidateQueries({ queryKey: ["/api/user"] });
+        
+        if (data.won) {
+          toast({ title: `You Won!`, description: `Payout: UGX ${data.payout}`, className: "bg-green-600 text-white" });
+        }
+      }, 2000);
+    } catch (err: any) {
+      setIsFlipping(false);
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    }
+  };
+
+  return (
+    <ProtectedLayout>
+      <div className="max-w-4xl mx-auto space-y-8">
+        <div className="text-center space-y-4">
+          <h1 className="text-4xl md:text-6xl font-display font-bold text-white tracking-tighter">
+            Double or <span className="text-primary">Nothing</span>
+          </h1>
+          <p className="text-muted-foreground text-lg">Pick a side, flip the coin, win big.</p>
+        </div>
+
+        <div className="grid md:grid-cols-2 gap-8 items-center">
+          <Card className="glass-card border-white/10 p-8 flex flex-col items-center justify-center min-h-[400px]">
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={isFlipping ? "flipping" : result}
+                initial={{ rotateY: 0 }}
+                animate={isFlipping ? { rotateY: 1800 } : { rotateY: 0 }}
+                transition={isFlipping ? { duration: 2, ease: "easeInOut" } : { duration: 0.5 }}
+                className="relative w-48 h-48"
+              >
+                <div className={`w-full h-full rounded-full border-8 border-primary bg-gradient-to-tr from-primary to-yellow-200 flex items-center justify-center shadow-[0_0_50px_rgba(212,175,55,0.4)]`}>
+                  <div className="text-6xl font-display font-black text-black select-none">
+                    {isFlipping ? "?" : (result ? (result === "heads" ? "H" : "T") : "$")}
+                  </div>
+                </div>
+              </motion.div>
+            </AnimatePresence>
+            
+            <div className="mt-12 h-8">
+              {result && !isFlipping && (
+                <motion.p 
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className={`text-2xl font-bold uppercase tracking-widest ${lastWon ? "text-green-500" : "text-red-500"}`}
+                >
+                  {result === "heads" ? "Heads" : "Tails"} - {lastWon ? "You Win!" : "You Lost"}
+                </motion.p>
+              )}
+            </div>
+          </Card>
+
+          <Card className="glass-card border-white/10 p-8 space-y-6">
+            <div className="space-y-4">
+              <label className="text-sm font-bold uppercase tracking-widest text-muted-foreground">Bet Amount (UGX)</label>
+              <div className="relative">
+                <Coins className="absolute left-4 top-1/2 -translate-y-1/2 text-primary w-5 h-5" />
+                <Input
+                  type="number"
+                  value={bet}
+                  onChange={(e) => setBet(Number(e.target.value))}
+                  className="bg-black/40 border-white/10 h-14 pl-12 text-xl font-mono text-white"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                {[500, 1000, 5000, 10000].map(amt => (
+                  <Button 
+                    key={amt} 
+                    variant="outline" 
+                    onClick={() => setBet(amt)}
+                    className="border-white/5 hover:border-primary/50 transition-colors"
+                  >
+                    {amt.toLocaleString()}
+                  </Button>
+                ))}
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <Button
+                disabled={isFlipping}
+                onClick={() => play("heads")}
+                className="h-20 text-xl font-bold uppercase tracking-widest bg-zinc-800 hover:bg-zinc-700 border border-white/10"
+              >
+                Heads
+              </Button>
+              <Button
+                disabled={isFlipping}
+                onClick={() => play("tails")}
+                className="h-20 text-xl font-bold uppercase tracking-widest bg-zinc-800 hover:bg-zinc-700 border border-white/10"
+              >
+                Tails
+              </Button>
+            </div>
+
+            <div className="pt-4 text-center">
+              <p className="text-xs text-muted-foreground uppercase tracking-widest">Payout: 1.95x</p>
+            </div>
+          </Card>
+        </div>
+      </div>
+    </ProtectedLayout>
+  );
+}

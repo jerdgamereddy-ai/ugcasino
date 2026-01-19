@@ -14,6 +14,7 @@ import GameSlots from "@/pages/GameSlots";
 import GameRoulette from "@/pages/GameRoulette";
 import GameDice from "@/pages/GameDice";
 import GameHiLo from "@/pages/GameHiLo";
+import CoinFlip from "@/pages/CoinFlip";
 import Reports from "@/pages/Reports";
 import GameControl from "@/pages/GameControl";
 import NotFound from "@/pages/not-found";
@@ -28,6 +29,7 @@ function Router() {
       <Route path="/roulette" component={GameRoulette} />
       <Route path="/dice" component={GameDice} />
       <Route path="/hilo" component={GameHiLo} />
+      <Route path="/coinflip" component={CoinFlip} />
       <Route path="/reports" component={Reports} />
       <Route path="/game-control" component={GameControl} />
       <Route component={NotFound} />

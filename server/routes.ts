@@ -63,13 +63,14 @@ export async function registerRoutes(
     if (!req.isAuthenticated() || req.user.role === 'user') return res.status(403).send("Forbidden");
     
     let settings = await storage.getAllGameSettings();
-    const gameTypes = ["slots", "roulette", "dice", "hilo"] as const;
+    const gameTypes = ["slots", "roulette", "dice", "hilo", "coinflip"] as const;
     const existingTypes = settings.map(s => s.gameType);
     
     // Seed missing settings on the fly
     for (const type of gameTypes) {
       if (!existingTypes.includes(type)) {
-        const newSetting = await storage.updateGameSettings(type as any, type === "dice" || type === "hilo" ? 0.48 : 0.3, req.user.id);
+        const defaultChance = (type === "dice" || type === "hilo" || type === "coinflip") ? 0.48 : 0.3;
+        const newSetting = await storage.updateGameSettings(type as any, defaultChance, req.user.id);
         settings.push(newSetting);
       }
     }
@@ -150,6 +151,38 @@ export async function registerRoutes(
       if (won) await storage.createTransaction({ userId: req.user.id, amount: payout, type: "win", description: "Dice win" });
 
       res.json({ won, payout, balance: user?.balance ?? 0, roll });
+    } catch (err) {
+      res.status(500).json({ message: "Internal Server Error" });
+    }
+  });
+
+  // === COIN FLIP GAME ===
+  app.post("/api/games/coinflip/play", async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+
+    try {
+      const { bet, choice } = z.object({ 
+        bet: z.number().min(100),
+        choice: z.enum(["heads", "tails"])
+      }).parse(req.body);
+
+      if (req.user.balance < bet) return res.status(400).json({ message: "Insufficient balance" });
+
+      const settings = await storage.getGameSettings("coinflip");
+      const winChance = settings?.winChance ?? 0.48;
+
+      await storage.updateUserBalance(req.user.id, -bet);
+      await storage.createTransaction({ userId: req.user.id, amount: -bet, type: "bet", description: "Coin Flip play" });
+
+      const won = Math.random() < winChance;
+      const result = won ? choice : (choice === "heads" ? "tails" : "heads");
+      
+      const payout = won ? bet * 1.95 : 0; // 1.95 payout for coin flip
+      const user = won ? await storage.updateUserBalance(req.user.id, Math.floor(payout)) : await storage.getUser(req.user.id);
+      
+      if (won) await storage.createTransaction({ userId: req.user.id, amount: Math.floor(payout), type: "win", description: "Coin Flip win" });
+
+      res.json({ won, payout: Math.floor(payout), balance: user?.balance ?? 0, result });
     } catch (err) {
       res.status(500).json({ message: "Internal Server Error" });
     }
