@@ -3,12 +3,13 @@ import { useUser } from "@/hooks/use-auth";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Link } from "wouter";
-import { Coins, Trophy, CreditCard, ChevronRight, Club, Dice5, Dices, Banknote } from "lucide-react";
+import { Coins, Trophy, CreditCard, ChevronRight, Club, Dice5, Dices, Banknote, Sparkles, Zap, Star } from "lucide-react";
 import { useRedeemVoucher } from "@/hooks/use-vouchers";
 import { useState } from "react";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
+import { motion, AnimatePresence } from "framer-motion";
 
 export default function Lobby() {
   const { data: user } = useUser();
@@ -56,169 +57,246 @@ export default function Lobby() {
     }
   };
 
+  const containerVariants = {
+    hidden: { opacity: 0 },
+    visible: {
+      opacity: 1,
+      transition: {
+        staggerChildren: 0.1
+      }
+    }
+  };
+
+  const itemVariants = {
+    hidden: { y: 20, opacity: 0 },
+    visible: {
+      y: 0,
+      opacity: 1
+    }
+  };
+
   return (
     <ProtectedLayout>
-      <div className="space-y-8">
-        {/* Welcome Header */}
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 animate-in slide-in-from-top duration-500">
-          <div>
-            <h1 className="text-4xl font-display font-bold text-white mb-2">
-              Welcome, <span className="text-primary">{user?.username}</span>
-            </h1>
-            <p className="text-muted-foreground">Select a game to start winning.</p>
+      <motion.div 
+        className="space-y-8"
+        initial="hidden"
+        animate="visible"
+        variants={containerVariants}
+      >
+        {/* Animated Hero Header */}
+        <motion.div 
+          className="relative overflow-hidden rounded-3xl p-8 md:p-12 bg-gradient-to-br from-black via-zinc-900 to-black border border-white/10 shadow-2xl"
+          variants={itemVariants}
+        >
+          <div className="absolute top-0 right-0 p-4 opacity-20 pointer-events-none">
+            <Sparkles className="w-64 h-64 text-primary animate-pulse" />
           </div>
           
-          <div className="bg-white/5 border border-white/10 rounded-xl p-4 flex items-center gap-4">
-             <div className="bg-yellow-500/20 p-2 rounded-full">
-                <CreditCard className="w-6 h-6 text-primary" />
-             </div>
-             <div>
-                <p className="text-xs text-muted-foreground uppercase tracking-wider">Current Balance</p>
-                <p className="text-2xl font-mono font-bold text-white">UGX {user?.balance.toLocaleString()}</p>
-             </div>
+          <div className="relative z-10 flex flex-col md:flex-row justify-between items-start md:items-center gap-8">
+            <div className="space-y-4">
+              <motion.div 
+                initial={{ scale: 0.8, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                transition={{ duration: 0.5 }}
+                className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/20 border border-primary/30 text-primary text-xs font-bold uppercase tracking-widest"
+              >
+                <Zap className="w-3 h-3" /> Premium Casino Experience
+              </motion.div>
+              <h1 className="text-4xl md:text-6xl font-display font-bold text-white leading-tight">
+                Welcome, <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary via-yellow-200 to-primary animate-gradient">{user?.username}</span>
+              </h1>
+              <p className="text-lg text-muted-foreground max-w-xl">
+                Experience the thrill of Uganda's most exclusive online casino. Your royal winning streak starts right here.
+              </p>
+            </div>
+            
+            <motion.div 
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl p-6 flex items-center gap-6 shadow-xl"
+            >
+               <div className="bg-gradient-to-tr from-primary to-yellow-200 p-4 rounded-xl shadow-[0_0_20px_rgba(212,175,55,0.3)]">
+                  <CreditCard className="w-8 h-8 text-black" />
+               </div>
+               <div>
+                  <p className="text-xs text-muted-foreground uppercase tracking-wider font-bold">Available Balance</p>
+                  <motion.p 
+                    key={user?.balance}
+                    initial={{ scale: 1.2, color: "#d4af37" }}
+                    animate={{ scale: 1, color: "#ffffff" }}
+                    className="text-3xl font-mono font-bold text-white"
+                  >
+                    UGX {user?.balance.toLocaleString()}
+                  </motion.p>
+               </div>
+            </motion.div>
           </div>
-        </div>
+        </motion.div>
 
         <div className="grid md:grid-cols-2 gap-6">
-          {/* Voucher Redemption */}
-          <Card className="glass-card border-white/10 h-full">
-            <CardHeader>
-              <CardTitle className="text-lg flex items-center gap-2">
-                <CreditCard className="w-5 h-5 text-primary" /> Deposit Funds
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <form onSubmit={handleRedeem} className="flex gap-4">
-                <Input 
-                  placeholder="Enter Voucher Code" 
-                  value={voucherCode} 
-                  onChange={(e) => setVoucherCode(e.target.value)}
-                  className="bg-black/30 border-white/10"
-                />
-                <Button type="submit" disabled={isPending} variant="secondary">
-                  {isPending ? "Redeeming..." : "Redeem"}
-                </Button>
-              </form>
-            </CardContent>
-          </Card>
+          {/* Animated Voucher Redemption */}
+          <motion.div variants={itemVariants}>
+            <Card className="glass-card border-white/10 h-full overflow-hidden relative group">
+              <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+              <CardHeader>
+                <CardTitle className="text-xl flex items-center gap-3">
+                  <div className="p-2 bg-primary/10 rounded-lg">
+                    <CreditCard className="w-5 h-5 text-primary" />
+                  </div>
+                  Deposit Funds
+                </CardTitle>
+                <CardDescription>Redeem your luxury voucher codes instantly.</CardDescription>
+              </CardHeader>
+              <CardContent className="relative z-10">
+                <form onSubmit={handleRedeem} className="flex gap-4">
+                  <Input 
+                    placeholder="Enter Voucher Code" 
+                    value={voucherCode} 
+                    onChange={(e) => setVoucherCode(e.target.value)}
+                    className="bg-black/40 border-white/10 focus:border-primary/50 transition-colors h-12"
+                  />
+                  <Button type="submit" disabled={isPending} variant="secondary" className="h-12 px-8 font-bold hover-elevate">
+                    {isPending ? "Redeeming..." : "Redeem"}
+                  </Button>
+                </form>
+              </CardContent>
+            </Card>
+          </motion.div>
 
-          {/* Withdrawal Request */}
-          <Card className="glass-card border-white/10 h-full">
-            <CardHeader>
-              <CardTitle className="text-lg flex items-center gap-2">
-                <Banknote className="w-5 h-5 text-primary" /> Withdraw Funds
-              </CardTitle>
-              <CardDescription>Minimum withdrawal: UGX 500</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <form onSubmit={handleWithdrawRequest} className="flex gap-4">
-                <Input 
-                  type="number"
-                  placeholder="Amount (UGX)" 
-                  value={withdrawAmount} 
-                  onChange={(e) => setWithdrawAmount(e.target.value)}
-                  className="bg-black/30 border-white/10"
-                />
-                <Button type="submit" variant="luxury">
-                  Request
-                </Button>
-              </form>
-            </CardContent>
-          </Card>
+          {/* Animated Withdrawal Request */}
+          <motion.div variants={itemVariants}>
+            <Card className="glass-card border-white/10 h-full overflow-hidden relative group">
+              <div className="absolute inset-0 bg-gradient-to-br from-blue-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+              <CardHeader>
+                <CardTitle className="text-xl flex items-center gap-3">
+                  <div className="p-2 bg-primary/10 rounded-lg">
+                    <Banknote className="w-5 h-5 text-primary" />
+                  </div>
+                  Withdraw Funds
+                </CardTitle>
+                <CardDescription>Minimum withdrawal: UGX 500</CardDescription>
+              </CardHeader>
+              <CardContent className="relative z-10">
+                <form onSubmit={handleWithdrawRequest} className="flex gap-4">
+                  <Input 
+                    type="number"
+                    placeholder="Amount (UGX)" 
+                    value={withdrawAmount} 
+                    onChange={(e) => setWithdrawAmount(e.target.value)}
+                    className="bg-black/40 border-white/10 focus:border-primary/50 transition-colors h-12"
+                  />
+                  <Button type="submit" variant="luxury" className="h-12 px-8 font-bold">
+                    Request
+                  </Button>
+                </form>
+              </CardContent>
+            </Card>
+          </motion.div>
         </div>
 
-        {/* Games Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {/* Slots Card */}
-          <Link href="/slots">
-            <div className="group relative h-64 rounded-2xl overflow-hidden cursor-pointer border border-white/10 hover:border-primary/50 transition-all duration-300 shadow-xl hover:shadow-[0_0_30px_rgba(212,175,55,0.15)]">
-              {/* Image Background */}
-              <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1596838132731-3301c3fd4317?q=80&w=2070')] bg-cover bg-center transition-transform duration-500 group-hover:scale-110" />
-              <div className="absolute inset-0 bg-black/60 group-hover:bg-black/40 transition-colors" />
-              
-              <div className="absolute inset-0 p-8 flex flex-col justify-end">
-                <div className="transform translate-y-4 group-hover:translate-y-0 transition-transform duration-300">
-                  <div className="flex items-center gap-2 mb-2">
-                     <Coins className="text-primary w-6 h-6" />
-                     <span className="text-xs font-bold bg-primary text-black px-2 py-0.5 rounded uppercase">Featured</span>
-                  </div>
-                  <h3 className="text-3xl font-display font-bold text-white mb-2">Royal Slots</h3>
-                  <p className="text-gray-300 mb-4 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                    Try your luck with our premium slot machines. Big jackpots await!
-                  </p>
-                  <Button variant="luxury" className="w-full sm:w-auto">Play Now <ChevronRight className="w-4 h-4 ml-2" /></Button>
-                </div>
-              </div>
-            </div>
-          </Link>
+        {/* Games Section Label */}
+        <motion.div 
+          variants={itemVariants}
+          className="flex items-center gap-4 py-4"
+        >
+          <div className="h-px flex-1 bg-gradient-to-r from-transparent via-white/10 to-transparent" />
+          <h2 className="text-2xl font-display font-bold text-white/80 flex items-center gap-2">
+            <Star className="w-5 h-5 text-primary fill-primary" />
+            Featured Games
+            <Star className="w-5 h-5 text-primary fill-primary" />
+          </h2>
+          <div className="h-px flex-1 bg-gradient-to-r from-transparent via-white/10 to-transparent" />
+        </motion.div>
 
-          {/* Roulette Card */}
-          <Link href="/roulette">
-            <div className="group relative h-64 rounded-2xl overflow-hidden cursor-pointer border border-white/10 hover:border-primary/50 transition-all duration-300 shadow-xl hover:shadow-[0_0_30px_rgba(212,175,55,0.15)]">
-               <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1605870445919-838d190e8e1b?q=80&w=2072')] bg-cover bg-center transition-transform duration-500 group-hover:scale-110" />
-               <div className="absolute inset-0 bg-black/60 group-hover:bg-black/40 transition-colors" />
-               
-               <div className="absolute inset-0 p-8 flex flex-col justify-end">
-                <div className="transform translate-y-4 group-hover:translate-y-0 transition-transform duration-300">
-                  <div className="flex items-center gap-2 mb-2">
-                     <Trophy className="text-primary w-6 h-6" />
-                     <span className="text-xs font-bold bg-secondary text-white px-2 py-0.5 rounded uppercase">Classic</span>
+        {/* Enhanced Games Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+          {[
+            {
+              href: "/slots",
+              img: "https://images.unsplash.com/photo-1596838132731-3301c3fd4317?q=80&w=2070",
+              icon: Coins,
+              tag: "Featured",
+              tagColor: "bg-primary",
+              title: "Royal Slots",
+              desc: "Spin the reels for ultimate golden treasures.",
+              id: "slots"
+            },
+            {
+              href: "/roulette",
+              img: "https://images.unsplash.com/photo-1605870445919-838d190e8e1b?q=80&w=2072",
+              icon: Trophy,
+              tag: "Classic",
+              tagColor: "bg-secondary",
+              title: "European Roulette",
+              desc: "Predict the wheel and claim your fortune.",
+              id: "roulette"
+            },
+            {
+              href: "/dice",
+              img: "https://images.unsplash.com/photo-1595131838585-34435997c65b?q=80&w=2070",
+              icon: Dices,
+              tag: "Trending",
+              tagColor: "bg-purple-600",
+              title: "Royal Dice",
+              desc: "Test your intuition with every single roll.",
+              id: "dice"
+            },
+            {
+              href: "/hilo",
+              img: "https://images.unsplash.com/photo-1511193311914-0346f16efe90?q=80&w=2073",
+              icon: Club,
+              tag: "High Stakes",
+              tagColor: "bg-blue-600",
+              title: "High-Low Cards",
+              desc: "Master the deck in this classic card duel.",
+              id: "hilo"
+            }
+          ].map((game, idx) => (
+            <motion.div 
+              key={game.id}
+              variants={itemVariants}
+              whileHover={{ y: -10 }}
+              transition={{ type: "spring", stiffness: 300 }}
+            >
+              <Link href={game.href}>
+                <div className="group relative h-72 rounded-3xl overflow-hidden cursor-pointer border border-white/10 hover:border-primary/50 transition-all duration-500 shadow-2xl hover:shadow-[0_0_50px_rgba(212,175,55,0.2)]">
+                  {/* Image Background with Parallax effect */}
+                  <motion.div 
+                    className="absolute inset-0 bg-cover bg-center transition-transform duration-700 group-hover:scale-110" 
+                    style={{ backgroundImage: `url(${game.img})` }}
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-transparent group-hover:from-black/90 transition-all" />
+                  
+                  <div className="absolute inset-0 p-8 flex flex-col justify-end">
+                    <div className="space-y-3 transform translate-y-6 group-hover:translate-y-0 transition-transform duration-500">
+                      <div className="flex items-center gap-3">
+                         <game.icon className="text-primary w-8 h-8 drop-shadow-[0_0_10px_rgba(212,175,55,0.8)]" />
+                         <span className={`text-[10px] font-black ${game.tagColor} text-white px-2.5 py-1 rounded-full uppercase tracking-tighter shadow-lg`}>
+                           {game.tag}
+                         </span>
+                      </div>
+                      <h3 className="text-4xl font-display font-bold text-white tracking-tight drop-shadow-lg">{game.title}</h3>
+                      <p className="text-gray-300 text-sm max-w-xs opacity-0 group-hover:opacity-100 transition-all duration-500 delay-100">
+                        {game.desc}
+                      </p>
+                      <motion.div
+                        className="pt-2 opacity-0 group-hover:opacity-100 transition-all duration-500 delay-200"
+                      >
+                        <Button variant="luxury" className="w-full sm:w-auto h-12 px-8 shadow-[0_5px_15px_rgba(0,0,0,0.3)]">
+                          Play Now <ChevronRight className="w-4 h-4 ml-2" />
+                        </Button>
+                      </motion.div>
+                    </div>
                   </div>
-                  <h3 className="text-3xl font-display font-bold text-white mb-2">European Roulette</h3>
-                  <p className="text-gray-300 mb-4 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                    Place your bets on Red, Black, or your lucky number.
-                  </p>
-                  <Button variant="luxury" className="w-full sm:w-auto">Play Now <ChevronRight className="w-4 h-4 ml-2" /></Button>
+                  
+                  {/* Decorative overlay for extra "luxury" feel */}
+                  <div className="absolute inset-0 border-[0.5px] border-white/5 rounded-3xl pointer-events-none" />
                 </div>
-              </div>
-            </div>
-          </Link>
-
-          {/* Dice Card */}
-          <Link href="/dice">
-            <div className="group relative h-64 rounded-2xl overflow-hidden cursor-pointer border border-white/10 hover:border-primary/50 transition-all duration-300 shadow-xl hover:shadow-[0_0_30px_rgba(212,175,55,0.15)]">
-               <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1595131838585-34435997c65b?q=80&w=2070')] bg-cover bg-center transition-transform duration-500 group-hover:scale-110" />
-               <div className="absolute inset-0 bg-black/60 group-hover:bg-black/40 transition-colors" />
-               
-               <div className="absolute inset-0 p-8 flex flex-col justify-end">
-                <div className="transform translate-y-4 group-hover:translate-y-0 transition-transform duration-300">
-                  <div className="flex items-center gap-2 mb-2">
-                     <Dices className="text-primary w-6 h-6" />
-                     <span className="text-xs font-bold bg-purple-500 text-white px-2 py-0.5 rounded uppercase">New</span>
-                  </div>
-                  <h3 className="text-3xl font-display font-bold text-white mb-2">Royal Dice</h3>
-                  <p className="text-gray-300 mb-4 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                    Test your luck with a roll of the dice. High or Low?
-                  </p>
-                  <Button variant="luxury" className="w-full sm:w-auto">Play Now <ChevronRight className="w-4 h-4 ml-2" /></Button>
-                </div>
-              </div>
-            </div>
-          </Link>
-
-          {/* HiLo Card */}
-          <Link href="/hilo">
-            <div className="group relative h-64 rounded-2xl overflow-hidden cursor-pointer border border-white/10 hover:border-primary/50 transition-all duration-300 shadow-xl hover:shadow-[0_0_30px_rgba(212,175,55,0.15)]">
-               <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1511193311914-0346f16efe90?q=80&w=2073')] bg-cover bg-center transition-transform duration-500 group-hover:scale-110" />
-               <div className="absolute inset-0 bg-black/60 group-hover:bg-black/40 transition-colors" />
-               
-               <div className="absolute inset-0 p-8 flex flex-col justify-end">
-                <div className="transform translate-y-4 group-hover:translate-y-0 transition-transform duration-300">
-                  <div className="flex items-center gap-2 mb-2">
-                     <Club className="text-primary w-6 h-6" />
-                     <span className="text-xs font-bold bg-blue-500 text-white px-2 py-0.5 rounded uppercase">Featured</span>
-                  </div>
-                  <h3 className="text-3xl font-display font-bold text-white mb-2">High-Low Cards</h3>
-                  <p className="text-gray-300 mb-4 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                    Predict the next card in this high-stakes game.
-                  </p>
-                  <Button variant="luxury" className="w-full sm:w-auto">Play Now <ChevronRight className="w-4 h-4 ml-2" /></Button>
-                </div>
-              </div>
-            </div>
-          </Link>
+              </Link>
+            </motion.div>
+          ))}
         </div>
-      </div>
+      </motion.div>
     </ProtectedLayout>
   );
 }
