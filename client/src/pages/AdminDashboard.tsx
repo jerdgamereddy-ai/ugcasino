@@ -26,6 +26,7 @@ export default function AdminDashboard() {
   
   const [amount, setAmount] = useState("");
   const [withdrawAmount, setWithdrawAmount] = useState<Record<number, string>>({});
+  const [userPasswords, setUserPasswords] = useState<Record<number, string>>({});
 
   if (user?.role !== "admin" && user?.role !== "manager") {
     return (
@@ -82,6 +83,27 @@ export default function AdminDashboard() {
       if (!res.ok) throw new Error("Approval failed");
       toast({ title: "User Approved", className: "bg-green-600 text-white" });
       queryClient.invalidateQueries({ queryKey: [api.admin.users.path] });
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    }
+  };
+
+  const handleChangePassword = async (userId: number) => {
+    const password = userPasswords[userId];
+    if (!password || password.length < 6) {
+      toast({ title: "Error", description: "Password must be at least 6 characters", variant: "destructive" });
+      return;
+    }
+
+    try {
+      const res = await fetch(`/api/admin/users/${userId}/password`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password }),
+      });
+      if (!res.ok) throw new Error("Password update failed");
+      toast({ title: "Success", description: "Password updated successfully", className: "bg-green-600 text-white" });
+      setUserPasswords({ ...userPasswords, [userId]: "" });
     } catch (err: any) {
       toast({ title: "Error", description: err.message, variant: "destructive" });
     }
@@ -294,6 +316,18 @@ export default function AdminDashboard() {
                                             <Button size="sm" variant="outline" onClick={() => handleWithdraw(u.id)} className="h-8">
                                               <Banknote className="w-4 h-4 mr-1" /> Withdraw
                                             </Button>
+                                            <div className="flex gap-1 ml-2">
+                                              <Input 
+                                                type="text" 
+                                                placeholder="New Pwd" 
+                                                className="w-24 h-8 text-xs" 
+                                                value={userPasswords[u.id] || ""}
+                                                onChange={(e) => setUserPasswords({...userPasswords, [u.id]: e.target.value})}
+                                              />
+                                              <Button size="sm" variant="outline" onClick={() => handleChangePassword(u.id)} className="h-8">
+                                                Update
+                                              </Button>
+                                            </div>
                                           </>
                                         )}
                                       </div>

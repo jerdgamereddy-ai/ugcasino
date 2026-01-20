@@ -16,6 +16,7 @@ export interface IStorage {
   createUser(user: InsertUser): Promise<User>;
   updateUserBalance(userId: number, amount: number): Promise<User>;
   approveUser(userId: number): Promise<User>;
+  updateUserPassword(userId: number, password: string): Promise<User>;
   getAllUsers(): Promise<User[]>;
 
   // Vouchers
@@ -77,6 +78,11 @@ export class DatabaseStorage implements IStorage {
 
   async approveUser(userId: number): Promise<User> {
     const [updatedUser] = await db.update(users).set({ isApproved: true }).where(eq(users.id, userId)).returning();
+    return updatedUser;
+  }
+
+  async updateUserPassword(userId: number, password: string): Promise<User> {
+    const [updatedUser] = await db.update(users).set({ password }).where(eq(users.id, userId)).returning();
     return updatedUser;
   }
 

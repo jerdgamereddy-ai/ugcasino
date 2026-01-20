@@ -5,6 +5,7 @@ import { storage } from "./storage";
 import { api } from "@shared/routes";
 import { z } from "zod";
 import { randomBytes } from "crypto";
+import { hashPassword } from "./auth";
 
 export async function registerRoutes(
   httpServer: Server,
@@ -384,6 +385,34 @@ export async function registerRoutes(
     const userId = parseInt(req.params.id);
     const updatedUser = await storage.approveUser(userId);
     res.json(updatedUser);
+  });
+
+  app.post("/api/admin/users/:id/password", async (req, res) => {
+    if (!req.isAuthenticated() || (req.user.role !== 'admin' && req.user.role !== 'manager')) return res.status(403).send("Forbidden");
+    
+    try {
+      const userId = parseInt(req.params.id);
+      const { password } = z.object({ password: z.string().min(6) }).parse(req.body);
+      
+      const hashedPassword = await hashPassword(password);
+      await storage.updateUserPassword(userId, hashedPassword);
+      res.json({ message: "Password updated successfully" });
+    } catch (err) {
+      res.status(400).json({ message: "Invalid password" });
+    }
+  });
+
+  app.post("/api/user/password", async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    
+    try {
+      const { password } = z.object({ password: z.string().min(6) }).parse(req.body);
+      const hashedPassword = await hashPassword(password);
+      await storage.updateUserPassword(req.user.id, hashedPassword);
+      res.json({ message: "Password updated successfully" });
+    } catch (err) {
+      res.status(400).json({ message: "Invalid password" });
+    }
   });
 
   // === WITHDRAWAL REQUESTS ===
