@@ -52,7 +52,6 @@ export function ProtectedLayout({ children }: { children: React.ReactNode }) {
 
   const navItems = [
     { label: "Lobby", href: "/", icon: Gamepad2 },
-    { label: "Transactions", href: "/transactions", icon: History },
   ];
 
   if (user?.role === "admin" || user?.role === "manager") {
