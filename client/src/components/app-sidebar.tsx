@@ -32,7 +32,9 @@ export function AppSidebar() {
     { title: "Dashboard", url: "/admin", icon: Users },
     { title: "Game Control", url: "/game-control", icon: Settings },
     { title: "Reports", url: "/reports", icon: FileText },
-  ].filter(item => {
+  ];
+
+  const filteredAdminItems = adminItems.filter(item => {
     if (user?.role === 'manager') {
       return item.title !== "Game Control";
     }
@@ -65,7 +67,7 @@ export function AppSidebar() {
             <SidebarGroupLabel>Management</SidebarGroupLabel>
             <SidebarGroupContent>
               <SidebarMenu>
-                {adminItems.map((item) => (
+                {filteredAdminItems.map((item) => (
                   <SidebarMenuItem key={item.title}>
                     <SidebarMenuButton asChild isActive={location === item.url}>
                       <Link href={item.url}>
