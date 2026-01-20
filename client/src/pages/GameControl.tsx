@@ -80,6 +80,8 @@ export default function GameControl() {
   });
 
   const diceSetting = settings?.find(s => s.gameType === 'dice');
+  const plinkoSetting = settings?.find(s => s.gameType === 'plinko');
+  const minesSetting = settings?.find(s => s.gameType === 'mines');
 
   if (isLoading) {
     return (

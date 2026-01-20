@@ -7,7 +7,6 @@ import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
-
 import { Input } from "@/components/ui/input";
 
 export default function GameMines() {
@@ -140,5 +139,3 @@ export default function GameMines() {
     </ProtectedLayout>
   );
 }
-
-import { Input } from "@/components/ui/input";
