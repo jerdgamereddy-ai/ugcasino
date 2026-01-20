@@ -112,6 +112,21 @@ export interface RouletteResult extends GameResult {
   color: 'red' | 'black' | 'green';
 }
 
+export interface ReportsResponse {
+  totalDeposits: number;
+  totalWithdrawals: number;
+  totalBets: number;
+  totalWins: number;
+  netRevenue: number;
+  dailyStats: {
+    date: string;
+    bets: number;
+    wins: number;
+    deposits: number;
+  }[];
+  transactions: Transaction[];
+}
+
 export const withdrawalRequests = pgTable("withdrawal_requests", {
   id: serial("id").primaryKey(),
   userId: integer("user_id").notNull(),
