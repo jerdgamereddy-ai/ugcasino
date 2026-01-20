@@ -36,7 +36,7 @@ export const transactions = pgTable("transactions", {
 
 export const gameSettings = pgTable("game_settings", {
   id: serial("id").primaryKey(),
-  gameType: text("game_type", { enum: ["slots", "roulette", "dice", "hilo", "coinflip"] }).notNull().unique(),
+  gameType: text("game_type", { enum: ["slots", "roulette", "dice", "hilo", "coinflip", "plinko", "mines"] }).notNull().unique(),
   winChance: doublePrecision("win_chance").default(0.3).notNull(), // 0.0 to 1.0 (30% default)
   updatedBy: integer("updated_by").notNull(),
   updatedAt: timestamp("updated_at").defaultNow(),
@@ -81,7 +81,7 @@ export const redeemVoucherSchema = z.object({
 });
 
 export const updateGameSettingsSchema = z.object({
-  gameType: z.enum(["slots", "roulette", "dice", "hilo", "coinflip"]),
+  gameType: z.enum(["slots", "roulette", "dice", "hilo", "coinflip", "plinko", "mines"]),
   winChance: z.number().min(0).max(100), // Percent
 });
 

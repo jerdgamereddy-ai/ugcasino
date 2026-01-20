@@ -64,13 +64,13 @@ export async function registerRoutes(
     if (!req.isAuthenticated() || req.user.role === 'user') return res.status(403).send("Forbidden");
     
     let settings = await storage.getAllGameSettings();
-    const gameTypes = ["slots", "roulette", "dice", "hilo", "coinflip"] as const;
+    const gameTypes = ["slots", "roulette", "dice", "hilo", "coinflip", "plinko", "mines"] as const;
     const existingTypes = settings.map(s => s.gameType);
     
     // Seed missing settings on the fly
     for (const type of gameTypes) {
       if (!existingTypes.includes(type)) {
-        const defaultChance = (type === "dice" || type === "hilo" || type === "coinflip") ? 0.48 : 0.3;
+        const defaultChance = (type === "dice" || type === "hilo" || type === "coinflip" || type === "plinko" || type === "mines") ? 0.48 : 0.3;
         const newSetting = await storage.updateGameSettings(type as any, defaultChance, req.user.id);
         settings.push(newSetting);
       }
@@ -84,7 +84,7 @@ export async function registerRoutes(
     
     try {
       const { gameType, winChance } = z.object({
-        gameType: z.enum(["slots", "roulette", "dice", "hilo", "coinflip"]),
+        gameType: z.enum(["slots", "roulette", "dice", "hilo", "coinflip", "plinko", "mines"]),
         winChance: z.number().min(0).max(100)
       }).parse(req.body);
       
@@ -196,6 +196,66 @@ export async function registerRoutes(
       if (won) await storage.createTransaction({ userId: req.user.id, amount: Math.floor(payout), type: "win", description: "Coin Flip win" });
 
       res.json({ won, payout: Math.floor(payout), balance: user?.balance ?? 0, result });
+    } catch (err) {
+      res.status(500).json({ message: "Internal Server Error" });
+    }
+  });
+
+  // === PLINKO GAME ===
+  app.post("/api/games/plinko/play", async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    try {
+      const { bet } = z.object({ bet: z.number().min(100) }).parse(req.body);
+      if (req.user.balance < bet) return res.status(400).json({ message: "Insufficient balance" });
+      const settings = await storage.getGameSettings("plinko");
+      const winChance = settings?.winChance ?? 0.48;
+      await storage.updateUserBalance(req.user.id, -bet);
+      await storage.createTransaction({ userId: req.user.id, amount: -bet, type: "bet", description: "Plinko play" });
+      
+      const multipliers = [0.2, 0.5, 1.2, 2, 5, 2, 1.2, 0.5, 0.2];
+      const won = Math.random() < winChance;
+      let multiplierIndex;
+      if (won) {
+        const winIndices = [2, 3, 4, 5, 6];
+        multiplierIndex = winIndices[Math.floor(Math.random() * winIndices.length)];
+      } else {
+        const loseIndices = [0, 1, 7, 8];
+        multiplierIndex = loseIndices[Math.floor(Math.random() * loseIndices.length)];
+      }
+      
+      const multiplier = multipliers[multiplierIndex];
+      const payout = Math.floor(bet * multiplier);
+      const user = await storage.updateUserBalance(req.user.id, payout);
+      if (payout > 0) await storage.createTransaction({ userId: req.user.id, amount: payout, type: "win", description: "Plinko win" });
+      res.json({ won: multiplier > 1, payout, balance: user.balance, multiplier, multiplierIndex });
+    } catch (err) {
+      res.status(500).json({ message: "Internal Server Error" });
+    }
+  });
+
+  // === MINES GAME ===
+  app.post("/api/games/mines/play", async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    try {
+      const { bet, minesCount, selectedCells } = z.object({ 
+        bet: z.number().min(100),
+        minesCount: z.number().min(1).max(24),
+        selectedCells: z.array(z.number())
+      }).parse(req.body);
+      
+      if (req.user.balance < bet) return res.status(400).json({ message: "Insufficient balance" });
+      const settings = await storage.getGameSettings("mines");
+      const winChance = settings?.winChance ?? 0.48;
+      
+      await storage.updateUserBalance(req.user.id, -bet);
+      await storage.createTransaction({ userId: req.user.id, amount: -bet, type: "bet", description: "Mines play" });
+      
+      const won = Math.random() < winChance;
+      const payout = won ? Math.floor(bet * (1 + (minesCount * selectedCells.length * 0.2))) : 0;
+      const user = won ? await storage.updateUserBalance(req.user.id, payout) : await storage.getUser(req.user.id);
+      if (won) await storage.createTransaction({ userId: req.user.id, amount: payout, type: "win", description: "Mines win" });
+      
+      res.json({ won, payout, balance: user?.balance ?? 0 });
     } catch (err) {
       res.status(500).json({ message: "Internal Server Error" });
     }

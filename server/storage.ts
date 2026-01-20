@@ -124,7 +124,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Game Settings
-  async getGameSettings(gameType: "slots" | "roulette" | "dice" | "hilo" | "coinflip"): Promise<GameSetting | undefined> {
+  async getGameSettings(gameType: "slots" | "roulette" | "dice" | "hilo" | "coinflip" | "plinko" | "mines"): Promise<GameSetting | undefined> {
     const [settings] = await db.select().from(gameSettings).where(eq(gameSettings.gameType, gameType));
     return settings;
   }
@@ -133,7 +133,7 @@ export class DatabaseStorage implements IStorage {
     return await db.select().from(gameSettings);
   }
 
-  async updateGameSettings(gameType: "slots" | "roulette" | "dice" | "hilo" | "coinflip", winChance: number, updatedBy: number): Promise<GameSetting> {
+  async updateGameSettings(gameType: "slots" | "roulette" | "dice" | "hilo" | "coinflip" | "plinko" | "mines", winChance: number, updatedBy: number): Promise<GameSetting> {
     const [updated] = await db.insert(gameSettings)
       .values({ gameType, winChance, updatedBy })
       .onConflictDoUpdate({

@@ -3,7 +3,7 @@ import { useUser } from "@/hooks/use-auth";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Link } from "wouter";
-import { Coins, Trophy, CreditCard, ChevronRight, Club, Dice5, Dices, Banknote, Sparkles, Zap, Star } from "lucide-react";
+import { Coins, Trophy, CreditCard, ChevronRight, Club, Dice5, Dices, Banknote, Sparkles, Zap, Star, Gem } from "lucide-react";
 import { useRedeemVoucher } from "@/hooks/use-vouchers";
 import { useState } from "react";
 import { Input } from "@/components/ui/input";
@@ -260,6 +260,26 @@ export default function Lobby() {
               title: "Double or Nothing",
               desc: "Flip the royal coin and double your fortune.",
               id: "coinflip"
+            },
+            {
+              href: "/plinko",
+              img: "https://images.unsplash.com/photo-1605870445919-838d190e8e1b?q=80&w=2072",
+              icon: Zap,
+              tag: "Exciting",
+              tagColor: "bg-green-600",
+              title: "Plinko",
+              desc: "Watch the ball drop for massive multipliers.",
+              id: "plinko"
+            },
+            {
+              href: "/mines",
+              img: "https://images.unsplash.com/photo-1596838132731-3301c3fd4317?q=80&w=2070",
+              icon: Gem,
+              tag: "Strategy",
+              tagColor: "bg-red-600",
+              title: "Diamond Mines",
+              desc: "Avoid the mines and find the hidden gems.",
+              id: "mines"
             }
           ].map((game, idx) => (
             <motion.div 
