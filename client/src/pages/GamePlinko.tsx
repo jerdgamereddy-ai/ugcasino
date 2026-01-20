@@ -110,7 +110,7 @@ export default function GamePlinko() {
                   <motion.div 
                     initial={{ top: "0%", left: "50%" }}
                     animate={{ top: "90%", left: `${45 + (Math.random() * 10)}%` }}
-                    transition={{ duration: 2, ease: "bounceOut" }}
+                    transition={{ duration: 2, ease: "easeOut" }}
                     className="absolute w-4 h-4 bg-primary rounded-full shadow-[0_0_15px_rgba(212,175,55,1)] z-20"
                   />
                 )}
