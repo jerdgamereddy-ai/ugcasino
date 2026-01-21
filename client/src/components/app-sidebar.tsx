@@ -1,5 +1,5 @@
 import { Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarGroupLabel, SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarFooter } from "@/components/ui/sidebar"
-import { Home, Dice5, Target, Dices, Settings, FileText, Users, LogOut, Club, Shield, LayoutDashboard } from "lucide-react"
+import { Home, Dice5, Target, Dices, Settings, FileText, Users, LogOut, Club, Shield, LayoutDashboard, Coins, Zap, RotateCcw, Gem } from "lucide-react"
 import { Link, useLocation } from "wouter"
 import { useQuery, useMutation } from "@tanstack/react-query"
 import { User } from "@shared/schema"
@@ -28,6 +28,11 @@ export function AppSidebar() {
     { title: "Roulette", url: "/roulette", icon: Target },
     { title: "Dice", url: "/dice", icon: Dices },
     { title: "Hi-Lo", url: "/hilo", icon: Club },
+    { title: "Coin Flip", url: "/coinflip", icon: Coins },
+    { title: "Plinko", url: "/plinko", icon: Zap },
+    { title: "Mines", url: "/mines", icon: Gem },
+    { title: "Wheel", url: "/wheel", icon: RotateCcw },
+    { title: "Poker", url: "/poker", icon: Club },
   ];
 
   const adminItems = [

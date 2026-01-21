@@ -76,7 +76,8 @@ export default function GameMines() {
                   type="number" 
                   value={bet} 
                   onChange={(e) => setBet(Number(e.target.value))}
-                  className="bg-black/40 border-white/10 text-white"
+                  className="bg-black/40 border-white/10 text-white placeholder:text-white/50 focus:text-white"
+                  style={{ color: 'white', opacity: 1 }}
                   disabled={gameState === "playing"}
                 />
               </div>
