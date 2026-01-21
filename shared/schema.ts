@@ -117,6 +117,7 @@ export interface ReportsResponse {
   totalWithdrawals: number;
   totalBets: number;
   totalWins: number;
+  totalPendingBalance: number;
   netRevenue: number;
   dailyStats: {
     date: string;

@@ -142,6 +142,7 @@ export default function AdminDashboard() {
     { title: "Total Withdrawals", value: reports.totalWithdrawals, icon: TrendingDown, color: "text-red-500" },
     { title: "Total Bets", value: reports.totalBets, icon: Dice5, color: "text-blue-500" },
     { title: "Total Wins", value: reports.totalWins, icon: Trophy, color: "text-yellow-500" },
+    { title: "Player Balances", value: reports.totalPendingBalance, icon: Users, color: "text-purple-500" },
     { title: "Net Revenue", value: reports.netRevenue, icon: TrendingUp, color: reports.netRevenue >= 0 ? "text-green-500" : "text-red-500" },
   ] : [];
 
