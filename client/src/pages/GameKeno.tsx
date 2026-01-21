@@ -8,6 +8,8 @@ import { motion } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
 
+import { playSound } from "@/lib/sounds";
+
 export default function GameKeno() {
   const [bet, setBet] = useState(100);
   const [selectedNumbers, setSelectedNumbers] = useState<number[]>([]);
@@ -17,6 +19,7 @@ export default function GameKeno() {
 
   const toggleNumber = (num: number) => {
     if (isSpinning) return;
+    playSound('click');
     if (selectedNumbers.includes(num)) {
       setSelectedNumbers(selectedNumbers.filter(n => n !== num));
     } else if (selectedNumbers.length < 10) {
@@ -31,6 +34,7 @@ export default function GameKeno() {
       toast({ title: "Select Numbers", description: "Please select at least one number." });
       return;
     }
+    playSound('spin');
     setIsSpinning(true);
     setResults([]);
 
@@ -46,12 +50,14 @@ export default function GameKeno() {
       setResults(data.drawnNumbers);
       
       if (data.won) {
+        playSound('win');
         toast({ 
           title: "YOU WON!", 
           description: `Payout: UGX ${data.payout.toLocaleString()}`, 
-          className: "bg-green-600 text-white" 
+          className: "bg-emerald-600 text-white font-bold" 
         });
       } else {
+        playSound('lose');
         toast({ title: "Better luck next time!", variant: "destructive" });
       }
       queryClient.invalidateQueries({ queryKey: ["/api/user"] });

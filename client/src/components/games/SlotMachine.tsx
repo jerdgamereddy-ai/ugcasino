@@ -8,6 +8,8 @@ import { Coins, Loader2, Sparkles } from "lucide-react";
 // Symbols for the slots
 const SYMBOLS = ["🍒", "💎", "7️⃣", "🍋", "🎰", "⭐"];
 
+import { playSound } from "@/lib/sounds";
+
 export function SlotMachine() {
   const [reels, setReels] = useState(["🎰", "🎰", "🎰"]);
   const [bet, setBet] = useState(100);
@@ -16,6 +18,7 @@ export function SlotMachine() {
   const { toast } = useToast();
 
   const handleSpin = () => {
+    playSound('spin');
     setIsSpinning(true);
     
     // Optimistic animation start
@@ -33,12 +36,14 @@ export function SlotMachine() {
             setReels(data.reels);
             
             if (data.won) {
+              playSound('win');
               toast({
                 title: "WINNER! 🎉",
                 description: `You won UGX ${data.payout.toLocaleString()}`,
-                className: "bg-primary border-primary text-black font-bold",
+                className: "bg-emerald-600 border-emerald-400 text-white font-black",
               });
             } else {
+                playSound('lose');
                 toast({
                     title: "Try Again",
                     description: "Better luck next time!",

@@ -11,6 +11,8 @@ import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
 import { motion, AnimatePresence } from "framer-motion";
 
+import { playSound } from "@/lib/sounds";
+
 export default function Lobby() {
   const { data: user } = useUser();
   const [voucherCode, setVoucherCode] = useState("");
@@ -23,7 +25,8 @@ export default function Lobby() {
     if (!voucherCode) return;
     redeem({ code: voucherCode }, {
       onSuccess: (data) => {
-        toast({ title: "Success!", description: data.message, className: "bg-green-600 text-white" });
+        playSound('win');
+        toast({ title: "Success!", description: data.message, className: "bg-emerald-600 text-white font-bold" });
         setVoucherCode("");
       },
       onError: (err) => {
@@ -85,11 +88,11 @@ export default function Lobby() {
       >
         {/* Animated Hero Header */}
         <motion.div 
-          className="relative overflow-hidden rounded-3xl p-8 md:p-12 bg-gradient-to-br from-black via-zinc-900 to-black border border-white/10 shadow-2xl"
+          className="relative overflow-hidden rounded-3xl p-8 md:p-12 bg-gradient-to-br from-black via-emerald-900/30 to-black border border-emerald-500/20 shadow-[0_0_50px_rgba(16,185,129,0.15)]"
           variants={itemVariants}
         >
           <div className="absolute top-0 right-0 p-4 opacity-20 pointer-events-none">
-            <Sparkles className="w-64 h-64 text-primary animate-pulse" />
+            <Sparkles className="w-64 h-64 text-emerald-500 animate-pulse" />
           </div>
           
             <div className="relative z-10 flex flex-col md:flex-row justify-between items-start md:items-center gap-8">
@@ -98,15 +101,15 @@ export default function Lobby() {
                 initial={{ scale: 0.8, opacity: 0 }}
                 animate={{ scale: 1, opacity: 1 }}
                 transition={{ duration: 0.5 }}
-                className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/30 border border-primary/50 text-white text-xs font-bold uppercase tracking-widest shadow-[0_0_15px_rgba(212,175,55,0.3)]"
+                className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/20 border border-emerald-500/50 text-emerald-400 text-xs font-bold uppercase tracking-widest shadow-[0_0_15px_rgba(16,185,129,0.3)]"
               >
-                <Zap className="w-3 h-3 text-yellow-300" /> Premium Casino Experience
+                <Sparkles className="w-3 h-3 text-emerald-400 animate-pulse" /> Uganda's #1 Luxury Lounge
               </motion.div>
-              <h1 className="text-4xl md:text-6xl font-display font-bold text-white leading-tight drop-shadow-[0_2px_15px_rgba(212,175,55,0.4)]">
-                Welcome, <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary via-yellow-200 to-primary animate-gradient drop-shadow-none">{user?.username}</span>
+              <h1 className="text-4xl md:text-6xl font-display font-bold text-white leading-tight drop-shadow-[0_2px_15px_rgba(16,185,129,0.4)]">
+                Welcome, <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary via-emerald-400 to-primary animate-gradient drop-shadow-none">{user?.username}</span>
               </h1>
-              <p className="text-lg text-white font-bold max-w-xl drop-shadow-[0_2px_10px_rgba(0,0,0,1)] uppercase tracking-wide">
-                Experience the thrill of Uganda's most exclusive online casino. Your royal winning streak starts right here.
+              <p className="text-lg text-white font-bold max-w-xl drop-shadow-[0_2px_10px_rgba(0,0,0,1)] uppercase tracking-wide leading-relaxed">
+                Experience the thrill of <span className="text-emerald-400">Emerald Lounge</span>. Your <span className="text-rose-500">Royal streak</span> starts right here.
               </p>
             </div>
             

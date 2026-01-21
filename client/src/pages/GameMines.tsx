@@ -9,6 +9,8 @@ import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
 import { Input } from "@/components/ui/input";
 
+import { playSound } from "@/lib/sounds";
+
 export default function GameMines() {
   const [bet, setBet] = useState(100);
   const [minesCount, setMinesCount] = useState(3);
@@ -19,6 +21,7 @@ export default function GameMines() {
 
   const handleStart = () => {
     if (gameState === "playing") return;
+    playSound('spin');
     setGameState("playing");
     setSelectedCells([]);
     setRevealedCells({});
@@ -26,6 +29,7 @@ export default function GameMines() {
 
   const handleCellClick = async (index: number) => {
     if (gameState !== "playing" || revealedCells[index]) return;
+    playSound('click');
     
     const newSelected = [...selectedCells, index];
     setSelectedCells(newSelected);
@@ -41,9 +45,11 @@ export default function GameMines() {
       
       if (data.won) {
         setRevealedCells({ ...revealedCells, [index]: "gem" });
-        toast({ title: "GEM FOUND!", description: `Current Payout: UGX ${data.payout.toLocaleString()}`, className: "bg-green-600 text-white" });
+        playSound('win');
+        toast({ title: "GEM FOUND!", description: `Current Payout: UGX ${data.payout.toLocaleString()}`, className: "bg-emerald-600 text-white font-bold" });
       } else {
         setRevealedCells({ ...revealedCells, [index]: "bomb" });
+        playSound('lose');
         setGameState("ended");
         toast({ title: "BOOM!", description: "You hit a mine!", variant: "destructive" });
       }
@@ -75,10 +81,13 @@ export default function GameMines() {
                 <Input 
                   type="number" 
                   value={bet} 
-                  onChange={(e) => setBet(Number(e.target.value))}
-                  className="bg-black/40 border-white/10 text-white placeholder:text-white/50 focus:text-white"
+                  onChange={(e) => setBet(Math.max(100, parseInt(e.target.value) || 0))}
+                  onBlur={(e) => setBet(Math.max(100, parseInt(e.target.value) || 100))}
+                  className="bg-white/10 border-white/20 text-white placeholder:text-white/50 focus:bg-white/20 transition-all h-12 text-lg font-mono"
                   style={{ color: 'white', opacity: 1 }}
                   disabled={gameState === "playing"}
+                  step={100}
+                  min={100}
                 />
               </div>
               <div className="space-y-2">
