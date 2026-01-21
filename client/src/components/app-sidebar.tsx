@@ -1,10 +1,12 @@
-import { Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarGroupLabel, SidebarMenu, SidebarMenuButton, SidebarMenuItem } from "@/components/ui/sidebar"
-import { Home, Dice5, Target, Dices, Settings, FileText, Users, LogOut, Club } from "lucide-react"
+import { Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarGroupLabel, SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarFooter } from "@/components/ui/sidebar"
+import { Home, Dice5, Target, Dices, Settings, FileText, Users, LogOut, Club, Shield, LayoutDashboard } from "lucide-react"
 import { Link, useLocation } from "wouter"
 import { useQuery, useMutation } from "@tanstack/react-query"
 import { User } from "@shared/schema"
 import { api } from "@shared/routes"
 import { queryClient } from "@/lib/queryClient"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { Button } from "@/components/ui/button"
 
 export function AppSidebar() {
   const [location] = useLocation();
@@ -29,9 +31,8 @@ export function AppSidebar() {
   ];
 
   const adminItems = [
-    { title: "Dashboard", url: "/admin", icon: Users },
+    { title: "Admin Panel", url: "/admin", icon: Shield },
     { title: "Game Control", url: "/game-control", icon: Settings },
-    { title: "Reports", url: "/reports", icon: FileText },
   ];
 
   const filteredAdminItems = adminItems.filter(item => {
@@ -42,59 +43,92 @@ export function AppSidebar() {
   });
 
   return (
-    <Sidebar>
-      <SidebarContent>
+    <Sidebar className="border-r border-white/5 bg-black/95">
+      <SidebarContent className="p-4">
+        <div className="flex items-center gap-3 mb-8 px-2">
+            <div className="bg-primary p-2 rounded-lg">
+                <Shield className="w-6 h-6 text-black" />
+            </div>
+            <div>
+                <h1 className="font-display font-bold text-lg text-primary tracking-tight">UG CASINO</h1>
+                <p className="text-[10px] text-muted-foreground uppercase tracking-widest">Luxury Play</p>
+            </div>
+        </div>
+
         <SidebarGroup>
-          <SidebarGroupLabel>Games</SidebarGroupLabel>
-          <SidebarGroupContent>
+          <SidebarMenu>
+            {playerItems.map((item) => (
+              <SidebarMenuItem key={item.title}>
+                <SidebarMenuButton asChild isActive={location === item.url} className="hover:bg-primary/10 transition-colors">
+                  <Link href={item.url}>
+                    <item.icon className={location === item.url ? "text-primary" : "text-muted-foreground"} />
+                    <span className={location === item.url ? "text-primary font-medium" : "text-muted-foreground"}>{item.title}</span>
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            ))}
+          </SidebarMenu>
+        </SidebarGroup>
+
+        {(user?.role === 'admin' || user?.role === 'manager') && (
+          <SidebarGroup className="mt-4 pt-4 border-t border-white/5">
             <SidebarMenu>
-              {playerItems.map((item) => (
+              {filteredAdminItems.map((item) => (
                 <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton asChild isActive={location === item.url}>
+                  <SidebarMenuButton asChild isActive={location === item.url} className="hover:bg-primary/10 transition-colors">
                     <Link href={item.url}>
-                      <item.icon />
-                      <span>{item.title}</span>
+                      <item.icon className={location === item.url ? "text-primary" : "text-muted-foreground"} />
+                      <span className={location === item.url ? "text-primary font-medium" : "text-muted-foreground"}>{item.title}</span>
                     </Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               ))}
             </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
-
-        {(user?.role === 'admin' || user?.role === 'manager') && (
-          <SidebarGroup>
-            <SidebarGroupLabel>Management</SidebarGroupLabel>
-            <SidebarGroupContent>
-              <SidebarMenu>
-                {filteredAdminItems.map((item) => (
-                  <SidebarMenuItem key={item.title}>
-                    <SidebarMenuButton asChild isActive={location === item.url}>
-                      <Link href={item.url}>
-                        <item.icon />
-                        <span>{item.title}</span>
-                      </Link>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                ))}
-              </SidebarMenu>
-            </SidebarGroupContent>
           </SidebarGroup>
         )}
-
-        <SidebarGroup className="mt-auto">
-          <SidebarGroupContent>
-            <SidebarMenu>
-              <SidebarMenuItem>
-                <SidebarMenuButton onClick={() => logoutMutation.mutate()}>
-                  <LogOut />
-                  <span>Logout</span>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
       </SidebarContent>
+
+      <SidebarFooter className="p-4 border-t border-white/5">
+         {user && (
+            <div className="bg-white/5 rounded-xl p-3 border border-white/5">
+                <div className="flex items-center gap-3 mb-3">
+                    <Avatar className="h-8 w-8 border border-primary/20">
+                        <AvatarImage src="" />
+                        <AvatarFallback className="bg-primary/10 text-primary text-xs">{user.username[0].toUpperCase()}</AvatarFallback>
+                    </Avatar>
+                    <div className="flex flex-col">
+                        <span className="text-sm font-medium">{user.username}</span>
+                        <span className="text-[10px] text-primary uppercase font-bold tracking-tighter">{user.role}</span>
+                    </div>
+                </div>
+                <div className="flex items-center justify-between mb-3 bg-black/40 p-2 rounded-lg">
+                    <div className="flex items-center gap-1.5">
+                        <div className="bg-primary/20 rounded-full p-1">
+                            <Wallet className="w-3 h-3 text-primary" />
+                        </div>
+                        <span className="text-xs font-bold text-primary">{user.balance.toLocaleString()} UGX</span>
+                    </div>
+                </div>
+                <div className="flex gap-2">
+                    <Button variant="outline" size="sm" className="flex-1 h-8 text-[10px] bg-transparent border-white/10" asChild>
+                        <Link href="/profile">
+                            <Settings className="w-3 h-3 mr-1" /> Pwd
+                        </Link>
+                    </Button>
+                    <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        className="flex-1 h-8 text-[10px] hover:bg-destructive/10 hover:text-destructive"
+                        onClick={() => logoutMutation.mutate()}
+                    >
+                        <LogOut className="w-3 h-3 mr-1" /> Exit
+                    </Button>
+                </div>
+            </div>
+         )}
+      </SidebarFooter>
     </Sidebar>
   )
 }
+
+import { Wallet } from "lucide-react"

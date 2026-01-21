@@ -9,10 +9,12 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
-import { Shield, Plus, Users, Ticket, Copy, Banknote, CheckCircle } from "lucide-react";
+import { Shield, Plus, Users, Ticket, Copy, Banknote, CheckCircle, Wallet, TrendingDown, Dice5, Trophy, TrendingUp, BarChart3, Loader2 } from "lucide-react";
 import { api } from "@shared/routes";
 import { queryClient } from "@/lib/queryClient";
 import { useQuery } from "@tanstack/react-query";
+import { ReportsResponse } from "@shared/schema";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, Legend } from 'recharts';
 
 export default function AdminDashboard() {
   const { data: user } = useUser();
@@ -21,6 +23,11 @@ export default function AdminDashboard() {
   const { data: withdrawRequests, isLoading: requestsLoading } = useQuery<any[]>({
     queryKey: ["/api/withdraw/requests"],
   });
+  const { data: reports, isLoading: reportsLoading } = useQuery<ReportsResponse>({
+    queryKey: [api.admin.reports.path],
+    enabled: user?.role === 'admin' || user?.role === 'manager'
+  });
+
   const { mutate: createVoucher, isPending: creatingVoucher } = useCreateVoucher();
   const { toast } = useToast();
   
@@ -130,6 +137,14 @@ export default function AdminDashboard() {
     toast({ title: "Copied!", description: code });
   };
 
+  const reportStats = reports ? [
+    { title: "Total Deposits", value: reports.totalDeposits, icon: Wallet, color: "text-green-500" },
+    { title: "Total Withdrawals", value: reports.totalWithdrawals, icon: TrendingDown, color: "text-red-500" },
+    { title: "Total Bets", value: reports.totalBets, icon: Dice5, color: "text-blue-500" },
+    { title: "Total Wins", value: reports.totalWins, icon: Trophy, color: "text-yellow-500" },
+    { title: "Net Revenue", value: reports.netRevenue, icon: TrendingUp, color: reports.netRevenue >= 0 ? "text-green-500" : "text-red-500" },
+  ] : [];
+
   return (
     <ProtectedLayout>
       <div className="space-y-6">
@@ -138,17 +153,101 @@ export default function AdminDashboard() {
              <Shield className="w-8 h-8 text-primary" />
           </div>
           <div>
-            <h1 className="text-3xl font-display font-bold">Admin Dashboard</h1>
-            <p className="text-muted-foreground">Manage users, vouchers, and system settings.</p>
+            <h1 className="text-3xl font-display font-bold text-primary">Admin Dashboard</h1>
+            <p className="text-muted-foreground">Manage users, vouchers, and view performance reports.</p>
           </div>
         </div>
 
-        <Tabs defaultValue="vouchers" className="w-full">
+        <Tabs defaultValue="reports" className="w-full">
           <TabsList className="bg-white/5 border border-white/10 w-full justify-start">
+            <TabsTrigger value="reports">Performance Reports</TabsTrigger>
             <TabsTrigger value="vouchers">Voucher Management</TabsTrigger>
             <TabsTrigger value="requests">Withdrawal Requests</TabsTrigger>
             <TabsTrigger value="users">User Management</TabsTrigger>
           </TabsList>
+
+          <TabsContent value="reports" className="mt-6 space-y-6">
+            {reportsLoading ? (
+              <div className="flex justify-center p-12"><Loader2 className="w-8 h-8 animate-spin" /></div>
+            ) : reports ? (
+              <>
+                <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
+                  {reportStats.map((stat) => (
+                    <Card key={stat.title} className="glass-card">
+                      <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
+                        <CardTitle className="text-sm font-medium">{stat.title}</CardTitle>
+                        <stat.icon className={`h-4 w-4 ${stat.color}`} />
+                      </CardHeader>
+                      <CardContent>
+                        <div className="text-2xl font-bold text-primary">UGX {stat.value.toLocaleString()}</div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+
+                <Card className="glass-card">
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <BarChart3 className="h-5 w-5" /> Daily Activity
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="h-[300px]">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={reports.dailyStats}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#333" />
+                        <XAxis dataKey="date" stroke="#888" />
+                        <YAxis stroke="#888" />
+                        <RechartsTooltip 
+                          contentStyle={{ backgroundColor: '#1a1a1a', border: '1px solid #333' }}
+                          itemStyle={{ color: '#fff' }}
+                        />
+                        <Legend />
+                        <Bar dataKey="bets" name="Total Bets" fill="#3b82f6" />
+                        <Bar dataKey="wins" name="Total Wins" fill="#eab308" />
+                        <Bar dataKey="deposits" name="Total Deposits" fill="#22c55e" />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </CardContent>
+                </Card>
+
+                <Card className="glass-card">
+                  <CardHeader>
+                    <CardTitle>Recent Transactions</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <Table>
+                      <TableHeader>
+                        <TableRow className="border-white/10">
+                          <TableHead>Date</TableHead>
+                          <TableHead>User ID</TableHead>
+                          <TableHead>Type</TableHead>
+                          <TableHead>Description</TableHead>
+                          <TableHead className="text-right">Amount</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {reports.transactions.map((tx: any) => (
+                          <TableRow key={tx.id} className="border-white/10 hover:bg-white/5">
+                            <TableCell className="text-sm">{new Date(tx.createdAt!).toLocaleString()}</TableCell>
+                            <TableCell className="font-mono">#{tx.userId}</TableCell>
+                            <TableCell className="capitalize text-xs">
+                              <span className="px-2 py-0.5 rounded-full bg-white/5">{tx.type.replace('_', ' ')}</span>
+                            </TableCell>
+                            <TableCell className="text-sm text-muted-foreground">{tx.description}</TableCell>
+                            <TableCell className={`text-right font-bold ${tx.amount >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                              UGX {Math.abs(tx.amount).toLocaleString()}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </CardContent>
+                </Card>
+              </>
+            ) : (
+              <div className="text-center p-12 text-muted-foreground">No reporting data available.</div>
+            )}
+          </TabsContent>
 
           <TabsContent value="vouchers" className="mt-6 space-y-6">
             <div className="grid md:grid-cols-3 gap-6">
@@ -309,7 +408,7 @@ export default function AdminDashboard() {
                                             <Input 
                                               type="number" 
                                               placeholder="UGX" 
-                                              className="w-24 h-8 text-xs" 
+                                              className="w-24 h-8 text-xs bg-black/30 border-white/10" 
                                               value={withdrawAmount[u.id] || ""}
                                               onChange={(e) => setWithdrawAmount({...withdrawAmount, [u.id]: e.target.value})}
                                             />
@@ -320,7 +419,7 @@ export default function AdminDashboard() {
                                               <Input 
                                                 type="text" 
                                                 placeholder="New Pwd" 
-                                                className="w-24 h-8 text-xs" 
+                                                className="w-24 h-8 text-xs bg-black/30 border-white/10" 
                                                 value={userPasswords[u.id] || ""}
                                                 onChange={(e) => setUserPasswords({...userPasswords, [u.id]: e.target.value})}
                                               />
