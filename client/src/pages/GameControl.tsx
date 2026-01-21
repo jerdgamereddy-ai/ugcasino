@@ -79,10 +79,6 @@ export default function GameControl() {
     queryKey: [api.games.settings.get.path],
   });
 
-  const diceSetting = settings?.find(s => s.gameType === 'dice');
-  const plinkoSetting = settings?.find(s => s.gameType === 'plinko');
-  const minesSetting = settings?.find(s => s.gameType === 'mines');
-
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-full">

@@ -17,6 +17,8 @@ import GameHiLo from "@/pages/GameHiLo";
 import CoinFlip from "@/pages/CoinFlip";
 import GamePlinko from "@/pages/GamePlinko";
 import GameMines from "@/pages/GameMines";
+import GameWheel from "@/pages/GameWheel";
+import GamePoker from "@/pages/GamePoker";
 import Reports from "@/pages/Reports";
 import GameControl from "@/pages/GameControl";
 import NotFound from "@/pages/not-found";
@@ -34,6 +36,8 @@ function Router() {
       <Route path="/coinflip" component={CoinFlip} />
       <Route path="/plinko" component={GamePlinko} />
       <Route path="/mines" component={GameMines} />
+      <Route path="/wheel" component={GameWheel} />
+      <Route path="/poker" component={GamePoker} />
       <Route path="/reports" component={Reports} />
       <Route path="/game-control" component={GameControl} />
       <Route component={NotFound} />

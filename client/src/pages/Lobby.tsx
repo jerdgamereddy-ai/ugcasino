@@ -3,7 +3,7 @@ import { useUser } from "@/hooks/use-auth";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Link } from "wouter";
-import { Coins, Trophy, CreditCard, ChevronRight, Club, Dice5, Dices, Banknote, Sparkles, Zap, Star, Gem } from "lucide-react";
+import { Coins, Trophy, CreditCard, ChevronRight, Club, Dice5, Dices, Banknote, Sparkles, Zap, Star, Gem, RotateCcw, LucideIcon, Club as Cards } from "lucide-react";
 import { useRedeemVoucher } from "@/hooks/use-vouchers";
 import { useState } from "react";
 import { Input } from "@/components/ui/input";
@@ -280,6 +280,26 @@ export default function Lobby() {
               title: "Diamond Mines",
               desc: "Avoid the mines and find the hidden gems.",
               id: "mines"
+            },
+            {
+              href: "/wheel",
+              img: "https://images.unsplash.com/photo-1605870445919-838d190e8e1b?q=80&w=2072",
+              icon: RotateCcw as LucideIcon,
+              tag: "New",
+              tagColor: "bg-primary",
+              title: "Wheel of Fortune",
+              desc: "Spin the luxury wheel for instant wins.",
+              id: "wheel"
+            },
+            {
+              href: "/poker",
+              img: "https://images.unsplash.com/photo-1511193311914-0346f16efe90?q=80&w=2073",
+              icon: Cards as LucideIcon,
+              tag: "Hot",
+              tagColor: "bg-red-500",
+              title: "Video Poker",
+              desc: "Jacks or better for big payouts.",
+              id: "poker"
             }
           ].map((game, idx) => (
             <motion.div 

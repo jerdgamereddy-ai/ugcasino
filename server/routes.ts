@@ -64,13 +64,13 @@ export async function registerRoutes(
     if (!req.isAuthenticated() || req.user.role === 'user') return res.status(403).send("Forbidden");
     
     let settings = await storage.getAllGameSettings();
-    const gameTypes = ["slots", "roulette", "dice", "hilo", "coinflip", "plinko", "mines"] as const;
+    const gameTypes = ["slots", "roulette", "dice", "hilo", "coinflip", "plinko", "mines", "wheel", "poker"] as const;
     const existingTypes = settings.map(s => s.gameType);
     
     // Seed missing settings on the fly
     for (const type of gameTypes) {
       if (!existingTypes.includes(type)) {
-        const defaultChance = (type === "dice" || type === "hilo" || type === "coinflip" || type === "plinko" || type === "mines") ? 0.48 : 0.3;
+        const defaultChance = (type === "dice" || type === "hilo" || type === "coinflip" || type === "plinko" || type === "mines" || type === "wheel" || type === "poker") ? 0.48 : 0.3;
         const newSetting = await storage.updateGameSettings(type as any, defaultChance, req.user.id);
         settings.push(newSetting);
       }
@@ -84,11 +84,11 @@ export async function registerRoutes(
     
     try {
       const { gameType, winChance } = z.object({
-        gameType: z.enum(["slots", "roulette", "dice", "hilo", "coinflip", "plinko", "mines"]),
+        gameType: z.enum(["slots", "roulette", "dice", "hilo", "coinflip", "plinko", "mines", "wheel", "poker"]),
         winChance: z.number().min(0).max(100)
       }).parse(req.body);
       
-      const settings = await storage.updateGameSettings(gameType, winChance / 100, req.user.id);
+      const settings = await storage.updateGameSettings(gameType as any, winChance / 100, req.user.id);
       res.json(settings);
     } catch (err) {
       res.status(400).json({ message: "Invalid input" });
@@ -261,12 +261,95 @@ export async function registerRoutes(
     }
   });
 
+  // === WHEEL GAME ===
+  app.post("/api/games/wheel/play", async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    try {
+      const { bet } = z.object({ bet: z.number().min(100) }).parse(req.body);
+      if (req.user.balance < bet) return res.status(400).json({ message: "Insufficient balance" });
+      
+      const settings = await storage.getGameSettings("wheel");
+      const winChance = settings?.winChance ?? 0.48;
+      
+      await storage.updateUserBalance(req.user.id, -bet);
+      await storage.createTransaction({ userId: req.user.id, amount: -bet, type: "bet", description: "Wheel spin" });
+      
+      const won = Math.random() < winChance;
+      const segmentIndex = won ? (Math.floor(Math.random() * 4) * 2) : (Math.floor(Math.random() * 4) * 2 + 1);
+      const multiplier = won ? 2 : 0;
+      const payout = Math.floor(bet * multiplier);
+      
+      const user = won ? await storage.updateUserBalance(req.user.id, payout) : await storage.getUser(req.user.id);
+      if (won) await storage.createTransaction({ userId: req.user.id, amount: payout, type: "win", description: "Wheel win" });
+      
+      res.json({ won, payout, balance: user?.balance ?? 0, segmentIndex, multiplier });
+    } catch (err) {
+      res.status(500).json({ message: "Internal Server Error" });
+    }
+  });
+
+  // === POKER GAME ===
+  app.post("/api/games/poker/deal", async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    try {
+      const { bet } = z.object({ bet: z.number().min(100) }).parse(req.body);
+      if (req.user.balance < bet) return res.status(400).json({ message: "Insufficient balance" });
+      await storage.updateUserBalance(req.user.id, -bet);
+      await storage.createTransaction({ userId: req.user.id, amount: -bet, type: "bet", description: "Poker deal" });
+      const suits = ["♠", "♣", "♥", "♦"];
+      const values = ["A", "2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K"];
+      const hand = Array.from({ length: 5 }).map(() => ({
+        value: values[Math.floor(Math.random() * values.length)],
+        suit: suits[Math.floor(Math.random() * suits.length)]
+      }));
+      res.json({ hand });
+    } catch (err) { res.status(500).send("Error"); }
+  });
+
+  app.post("/api/games/poker/draw", async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    try {
+      const { bet, holds, hand } = z.object({ 
+        bet: z.number(), 
+        holds: z.array(z.boolean()),
+        hand: z.array(z.object({ value: z.string(), suit: z.string() }))
+      }).parse(req.body);
+      
+      const settings = await storage.getGameSettings("poker");
+      const winChance = settings?.winChance ?? 0.3;
+      
+      const suits = ["♠", "♣", "♥", "♦"];
+      const values = ["A", "2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K"];
+      
+      const newHand = hand.map((card, i) => holds[i] ? card : {
+        value: values[Math.floor(Math.random() * values.length)],
+        suit: suits[Math.floor(Math.random() * suits.length)]
+      });
+
+      const won = Math.random() < winChance;
+      const payout = won ? bet * 2 : 0;
+      const result = won ? "JACKS OR BETTER" : "NO PAIR";
+      
+      if (won) {
+        await storage.updateUserBalance(req.user.id, payout);
+        await storage.createTransaction({ userId: req.user.id, amount: payout, type: "win", description: "Poker win" });
+      }
+      
+      const user = await storage.getUser(req.user.id);
+      res.json({ won, payout, balance: user?.balance, hand: newHand, result });
+    } catch (err) { res.status(500).send("Error"); }
+  });
+
   app.post(api.games.settings.update.path, async (req, res) => {
     if (!req.isAuthenticated() || req.user.role !== 'admin') return res.status(403).send("Forbidden");
     
     try {
-      const { gameType, winChance } = api.games.settings.update.input.parse(req.body);
-      const settings = await storage.updateGameSettings(gameType, winChance / 100, req.user.id);
+      const { gameType, winChance } = z.object({
+        gameType: z.enum(["slots", "roulette", "dice", "hilo", "coinflip", "plinko", "mines", "wheel", "poker"]),
+        winChance: z.number().min(0).max(100)
+      }).parse(req.body);
+      
+      const settings = await storage.updateGameSettings(gameType as any, winChance / 100, req.user.id);
       res.json(settings);
     } catch (err) {
       res.status(400).json({ message: "Invalid input" });

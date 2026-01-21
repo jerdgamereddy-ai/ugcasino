@@ -124,8 +124,8 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Game Settings
-  async getGameSettings(gameType: "slots" | "roulette" | "dice" | "hilo" | "coinflip" | "plinko" | "mines"): Promise<GameSetting | undefined> {
-    const [settings] = await db.select().from(gameSettings).where(eq(gameSettings.gameType, gameType));
+  async getGameSettings(gameType: string): Promise<GameSetting | undefined> {
+    const [settings] = await db.select().from(gameSettings).where(eq(gameSettings.gameType, gameType as any));
     return settings;
   }
 
@@ -133,9 +133,9 @@ export class DatabaseStorage implements IStorage {
     return await db.select().from(gameSettings);
   }
 
-  async updateGameSettings(gameType: "slots" | "roulette" | "dice" | "hilo" | "coinflip" | "plinko" | "mines", winChance: number, updatedBy: number): Promise<GameSetting> {
+  async updateGameSettings(gameType: string, winChance: number, updatedBy: number): Promise<GameSetting> {
     const [updated] = await db.insert(gameSettings)
-      .values({ gameType, winChance, updatedBy })
+      .values({ gameType: gameType as any, winChance, updatedBy })
       .onConflictDoUpdate({
         target: gameSettings.gameType,
         set: { winChance, updatedBy, updatedAt: new Date() }

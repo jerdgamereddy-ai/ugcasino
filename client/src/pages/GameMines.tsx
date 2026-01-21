@@ -18,6 +18,7 @@ export default function GameMines() {
   const { toast } = useToast();
 
   const handleStart = () => {
+    if (gameState === "playing") return;
     setGameState("playing");
     setSelectedCells([]);
     setRevealedCells({});
@@ -75,7 +76,7 @@ export default function GameMines() {
                   type="number" 
                   value={bet} 
                   onChange={(e) => setBet(Number(e.target.value))}
-                  className="bg-black/40 border-white/10"
+                  className="bg-black/40 border-white/10 text-white"
                   disabled={gameState === "playing"}
                 />
               </div>
