@@ -64,13 +64,13 @@ export async function registerRoutes(
     if (!req.isAuthenticated() || req.user.role === 'user') return res.status(403).send("Forbidden");
     
     let settings = await storage.getAllGameSettings();
-    const gameTypes = ["slots", "roulette", "dice", "hilo", "coinflip", "plinko", "mines", "wheel", "poker"] as const;
+    const gameTypes = ["slots", "roulette", "dice", "hilo", "coinflip", "plinko", "mines", "wheel", "poker", "keno"] as const;
     const existingTypes = settings.map(s => s.gameType);
     
     // Seed missing settings on the fly
     for (const type of gameTypes) {
       if (!existingTypes.includes(type)) {
-        const defaultChance = (type === "dice" || type === "hilo" || type === "coinflip" || type === "plinko" || type === "mines" || type === "wheel" || type === "poker") ? 0.48 : 0.3;
+        const defaultChance = (type === "dice" || type === "hilo" || type === "coinflip" || type === "plinko" || type === "mines" || type === "wheel" || type === "poker" || type === "keno") ? 0.48 : 0.3;
         const newSetting = await storage.updateGameSettings(type as any, defaultChance, req.user.id);
         settings.push(newSetting);
       }
@@ -84,7 +84,7 @@ export async function registerRoutes(
     
     try {
       const { gameType, winChance } = z.object({
-        gameType: z.enum(["slots", "roulette", "dice", "hilo", "coinflip", "plinko", "mines", "wheel", "poker"]),
+        gameType: z.enum(["slots", "roulette", "dice", "hilo", "coinflip", "plinko", "mines", "wheel", "poker", "keno"]),
         winChance: z.number().min(0).max(100)
       }).parse(req.body);
       
@@ -345,7 +345,7 @@ export async function registerRoutes(
     
     try {
       const { gameType, winChance } = z.object({
-        gameType: z.enum(["slots", "roulette", "dice", "hilo", "coinflip", "plinko", "mines", "wheel", "poker"]),
+        gameType: z.enum(["slots", "roulette", "dice", "hilo", "coinflip", "plinko", "mines", "wheel", "poker", "keno"]),
         winChance: z.number().min(0).max(100)
       }).parse(req.body);
       
@@ -406,6 +406,76 @@ export async function registerRoutes(
   });
 
   // === GAMES ===
+  app.post("/api/games/keno/play", async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    
+    const { bet, selectedNumbers } = z.object({
+      bet: z.number().min(100),
+      selectedNumbers: z.array(z.number()).min(1).max(10)
+    }).parse(req.body);
+
+    if (req.user.balance < bet) {
+      return res.status(400).json({ message: "Insufficient balance" });
+    }
+
+    const settings = await storage.getGameSettings("keno");
+    const winChance = settings?.winChance ?? 0.48;
+
+    // Draw 20 numbers from 1 to 80
+    const allNumbers = Array.from({ length: 80 }, (_, i) => i + 1);
+    const drawnNumbers: number[] = [];
+    
+    // Simulate drawing
+    for (let i = 0; i < 20; i++) {
+      const randomIndex = Math.floor(Math.random() * allNumbers.length);
+      drawnNumbers.push(allNumbers.splice(randomIndex, 1)[0]);
+    }
+
+    const hits = selectedNumbers.filter(num => drawnNumbers.includes(num)).length;
+    
+    // Payout logic based on hits and number of selections
+    // This is a simplified version adjusted by winChance
+    const hitRatios: Record<number, Record<number, number>> = {
+      1: { 1: 3 },
+      2: { 1: 1, 2: 9 },
+      3: { 2: 2, 3: 16 },
+      4: { 2: 1, 3: 5, 4: 40 },
+      5: { 3: 3, 4: 15, 5: 100 },
+      10: { 5: 2, 6: 15, 7: 100, 8: 500, 9: 1000, 10: 5000 }
+    };
+
+    const count = selectedNumbers.length;
+    let multiplier = 0;
+    
+    // Find closest selection count in ratios
+    const selectionKey = Object.keys(hitRatios)
+      .map(Number)
+      .sort((a, b) => b - a)
+      .find(k => k <= count) || 1;
+
+    multiplier = hitRatios[selectionKey][hits] || 0;
+
+    // Adjust multiplier based on admin winChance (house edge)
+    // If random < winChance, we ensure a win if they have hits
+    const isRiggedWin = Math.random() < winChance;
+    if (!isRiggedWin && multiplier > 1) {
+      multiplier = 0; // Forced loss if house edge hits
+    }
+
+    const won = multiplier > 0;
+    const payout = won ? Math.floor(bet * multiplier) : 0;
+
+    await storage.updateUserBalance(req.user.id, payout - bet);
+    await storage.createTransaction({
+      userId: req.user.id,
+      amount: payout - bet,
+      type: "game",
+      description: `Keno: ${hits} hits on ${count} numbers`
+    });
+
+    res.json({ won, payout, drawnNumbers, hits, balance: req.user.balance + payout - bet });
+  });
+
   app.post(api.games.slots.spin.path, async (req, res) => {
     if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
 

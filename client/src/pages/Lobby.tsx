@@ -300,6 +300,16 @@ export default function Lobby() {
               title: "Video Poker",
               desc: "Jacks or better for big payouts.",
               id: "poker"
+            },
+            {
+              href: "/keno",
+              img: "https://images.unsplash.com/photo-1596838132731-3301c3fd4317?q=80&w=2070",
+              icon: Target as LucideIcon,
+              tag: "Classic",
+              tagColor: "bg-blue-600",
+              title: "Luxury Keno",
+              desc: "Select your numbers and win the luxury jackpot.",
+              id: "keno"
             }
           ].map((game, idx) => (
             <motion.div 

@@ -33,6 +33,7 @@ export function AppSidebar() {
     { title: "Mines", url: "/mines", icon: Gem },
     { title: "Wheel", url: "/wheel", icon: RotateCcw },
     { title: "Poker", url: "/poker", icon: Club },
+    { title: "Keno", url: "/keno", icon: Target },
   ];
 
   const adminItems = [
