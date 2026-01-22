@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -16,7 +17,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { useLocation } from "wouter";
-import { Coins, Loader2 } from "lucide-react";
+import { Coins, Loader2, Ticket } from "lucide-react";
 import { insertUserSchema } from "@shared/schema";
 
 export default function Login() {
@@ -24,6 +25,30 @@ export default function Login() {
   const { mutate: login, isPending: isLoginPending } = useLogin();
   const { mutate: register, isPending: isRegisterPending } = useRegister();
   const { toast } = useToast();
+  const [voucherCode, setVoucherCode] = useState("");
+  const [isVoucherLoading, setIsVoucherLoading] = useState(false);
+
+  const onVoucherLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!voucherCode) return;
+    setIsVoucherLoading(true);
+    try {
+      const res = await fetch("/api/login/voucher", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ code: voucherCode }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message);
+      
+      toast({ title: "Welcome!", description: data.message, className: "bg-primary text-black" });
+      window.location.href = "/";
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    } finally {
+      setIsVoucherLoading(false);
+    }
+  };
 
   const loginForm = useForm({
     defaultValues: { username: "", password: "" },
@@ -76,9 +101,10 @@ export default function Login() {
         </CardHeader>
         <CardContent>
           <Tabs defaultValue="login" className="w-full">
-            <TabsList className="grid w-full grid-cols-2 mb-6 bg-white/5">
+            <TabsList className="grid w-full grid-cols-3 mb-6 bg-white/5">
               <TabsTrigger value="login">Login</TabsTrigger>
               <TabsTrigger value="register">Register</TabsTrigger>
+              <TabsTrigger value="voucher">Voucher</TabsTrigger>
             </TabsList>
             
             <TabsContent value="login">
@@ -151,6 +177,25 @@ export default function Login() {
                   </Button>
                 </form>
               </Form>
+            </TabsContent>
+            <TabsContent value="voucher">
+              <form onSubmit={onVoucherLogin} className="space-y-4">
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Voucher Code</label>
+                  <Input 
+                    placeholder="Enter your luxury voucher code" 
+                    value={voucherCode}
+                    onChange={(e) => setVoucherCode(e.target.value.toUpperCase())}
+                    className="bg-white/5 border-white/10 focus:border-primary/50 text-center font-mono text-lg tracking-widest"
+                  />
+                </div>
+                <Button type="submit" className="w-full" variant="luxury" disabled={isVoucherLoading}>
+                  {isVoucherLoading ? <Loader2 className="animate-spin" /> : <><Ticket className="w-4 h-4 mr-2" /> Play Now</>}
+                </Button>
+                <p className="text-[10px] text-center text-muted-foreground uppercase tracking-tighter">
+                  Instant access. No account required.
+                </p>
+              </form>
             </TabsContent>
           </Tabs>
         </CardContent>
