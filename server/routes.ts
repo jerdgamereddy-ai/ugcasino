@@ -426,9 +426,10 @@ export async function registerRoutes(
     const drawnNumbers: number[] = [];
     
     // Simulate drawing
+    const availableNumbers = [...allNumbers];
     for (let i = 0; i < 20; i++) {
-      const randomIndex = Math.floor(Math.random() * allNumbers.length);
-      drawnNumbers.push(allNumbers.splice(randomIndex, 1)[0]);
+      const randomIndex = Math.floor(Math.random() * availableNumbers.length);
+      drawnNumbers.push(availableNumbers.splice(randomIndex, 1)[0]);
     }
 
     const hits = selectedNumbers.filter(num => drawnNumbers.includes(num)).length;

@@ -9,10 +9,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
-import { Shield, Plus, Users, Ticket, Copy, Banknote, CheckCircle, Wallet, TrendingDown, Dice5, Trophy, TrendingUp, BarChart3, Loader2 } from "lucide-react";
-import { api } from "@shared/routes";
-import { queryClient } from "@/lib/queryClient";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { ReportsResponse } from "@shared/schema";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, Legend } from 'recharts';
 
@@ -28,8 +25,34 @@ export default function AdminDashboard() {
     enabled: user?.role === 'admin' || user?.role === 'manager'
   });
 
-  const { mutate: createVoucher, isPending: creatingVoucher } = useCreateVoucher();
-  const { toast } = useToast();
+  const { data: gameSettings, isLoading: settingsLoading } = useQuery<any[]>({
+    queryKey: [api.games.settings.get.path],
+  });
+
+  const updateSettingMutation = useMutation({
+    mutationFn: async ({ gameType, winChance }: { gameType: string, winChance: number }) => {
+      const res = await fetch(api.games.settings.update.path, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ gameType, winChance }),
+      });
+      if (!res.ok) throw new Error("Failed to update setting");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [api.games.settings.get.path] });
+      toast({ title: "Setting Updated", className: "bg-green-600 text-white" });
+    },
+    onError: (err: any) => {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    }
+  });
+
+  const handleUpdateWinChance = (gameType: string, chance: string) => {
+    const value = parseInt(chance);
+    if (isNaN(value) || value < 0 || value > 100) return;
+    updateSettingMutation.mutate({ gameType, winChance: value });
+  };
   
   const [amount, setAmount] = useState("");
   const [withdrawAmount, setWithdrawAmount] = useState<Record<number, string>>({});
@@ -165,6 +188,7 @@ export default function AdminDashboard() {
             <TabsTrigger value="vouchers">Voucher Management</TabsTrigger>
             <TabsTrigger value="requests">Withdrawal Requests</TabsTrigger>
             <TabsTrigger value="users">User Management</TabsTrigger>
+            <TabsTrigger value="games">Game Controls</TabsTrigger>
           </TabsList>
 
           <TabsContent value="reports" className="mt-6 space-y-6">
@@ -358,6 +382,50 @@ export default function AdminDashboard() {
                         </TableRow>
                       ))
                     )}
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="games" className="mt-6">
+            <Card className="glass-card">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2"><Dice5 className="w-5 h-5"/> Win Probability Control</CardTitle>
+                <CardDescription>Adjust winning percentages for each game (0-100%). Higher values mean more player wins.</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Table>
+                  <TableHeader>
+                    <TableRow className="border-white/10">
+                      <TableHead>Game Name</TableHead>
+                      <TableHead>Current Win Chance (%)</TableHead>
+                      <TableHead>Adjust Level</TableHead>
+                      <TableHead>Action</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {settingsLoading ? (
+                      <TableRow><TableCell colSpan={4} className="text-center">Loading...</TableCell></TableRow>
+                    ) : gameSettings?.map((setting) => (
+                      <TableRow key={setting.id} className="border-white/10">
+                        <TableCell className="capitalize font-bold text-primary">{setting.gameType}</TableCell>
+                        <TableCell className="font-mono">{Math.round(setting.winChance * 100)}%</TableCell>
+                        <TableCell>
+                          <Input 
+                            type="number" 
+                            min="0" 
+                            max="100"
+                            defaultValue={Math.round(setting.winChance * 100)}
+                            className="w-24 bg-black/30 border-white/10"
+                            onBlur={(e) => handleUpdateWinChance(setting.gameType, e.target.value)}
+                          />
+                        </TableCell>
+                        <TableCell>
+                           <span className="text-xs text-muted-foreground italic">Auto-saves on blur</span>
+                        </TableCell>
+                      </TableRow>
+                    ))}
                   </TableBody>
                 </Table>
               </CardContent>
