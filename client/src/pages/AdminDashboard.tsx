@@ -19,7 +19,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 
 export default function AdminDashboard() {
   const { data: user } = useUser();
-  const [timeFilter, setTimeFilter] = useState<"day" | "week" | "month" | "year">("day");
+  const [timeFilter, setTimeFilter] = useState<"day" | "week" | "month" | "year" | "custom">("day");
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
   const { data: users, isLoading: usersLoading } = useUsersList();
   const { data: vouchers, isLoading: vouchersLoading } = useVouchers();
   const { mutate: createVoucher, isPending: creatingVoucher } = useCreateVoucher();
@@ -170,6 +172,16 @@ export default function AdminDashboard() {
     const filteredStats = reports ? reports.dailyStats.filter(stat => {
       const statDate = new Date(stat.date);
       const now = new Date();
+      
+      if (timeFilter === "custom") {
+        if (!startDate && !endDate) return true;
+        const start = startDate ? new Date(startDate) : new Date(0);
+        const end = endDate ? new Date(endDate) : new Date();
+        // Set end to end of day
+        end.setHours(23, 59, 59, 999);
+        return statDate >= start && statDate <= end;
+      }
+
       if (timeFilter === "day") {
         return statDate.toDateString() === now.toDateString();
       } else if (timeFilter === "week") {
@@ -225,18 +237,44 @@ export default function AdminDashboard() {
           </TabsList>
 
           <TabsContent value="reports" className="mt-6 space-y-6">
-            <div className="flex justify-end">
-              <Select value={timeFilter} onValueChange={(v: any) => setTimeFilter(v)}>
-                <SelectTrigger className="w-[180px] bg-black/30 border-white/10">
-                  <SelectValue placeholder="Filter by time" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="day">Today</SelectItem>
-                  <SelectItem value="week">Last 7 Days</SelectItem>
-                  <SelectItem value="month">Last 30 Days</SelectItem>
-                  <SelectItem value="year">Last Year</SelectItem>
-                </SelectContent>
-              </Select>
+            <div className="flex flex-wrap gap-4 justify-end items-end">
+              {timeFilter === "custom" && (
+                <div className="flex gap-2 items-end">
+                  <div className="space-y-1">
+                    <label className="text-[10px] uppercase text-muted-foreground font-bold">Start Date</label>
+                    <Input 
+                      type="date" 
+                      value={startDate} 
+                      onChange={(e) => setStartDate(e.target.value)}
+                      className="w-[150px] bg-black/30 border-white/10 h-9 text-xs"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] uppercase text-muted-foreground font-bold">End Date</label>
+                    <Input 
+                      type="date" 
+                      value={endDate} 
+                      onChange={(e) => setEndDate(e.target.value)}
+                      className="w-[150px] bg-black/30 border-white/10 h-9 text-xs"
+                    />
+                  </div>
+                </div>
+              )}
+              <div className="space-y-1">
+                <label className="text-[10px] uppercase text-muted-foreground font-bold">Period</label>
+                <Select value={timeFilter} onValueChange={(v: any) => setTimeFilter(v)}>
+                  <SelectTrigger className="w-[150px] bg-black/30 border-white/10 h-9 text-xs">
+                    <SelectValue placeholder="Filter by time" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="day">Today</SelectItem>
+                    <SelectItem value="week">Last 7 Days</SelectItem>
+                    <SelectItem value="month">Last 30 Days</SelectItem>
+                    <SelectItem value="year">Last Year</SelectItem>
+                    <SelectItem value="custom">Custom Range</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
             {reportsLoading ? (
               <div className="flex justify-center p-12"><Loader2 className="w-8 h-8 animate-spin" /></div>
