@@ -10,6 +10,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { useMutation, useQuery } from "@tanstack/react-query";
+import { Shield, Plus, Users, Ticket, Copy, Banknote, CheckCircle, Wallet, TrendingDown, Dice5, Trophy, TrendingUp, BarChart3, Loader2 } from "lucide-react";
+import { api } from "@shared/routes";
+import { queryClient } from "@/lib/queryClient";
 import { ReportsResponse } from "@shared/schema";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, Legend } from 'recharts';
 
@@ -17,6 +20,8 @@ export default function AdminDashboard() {
   const { data: user } = useUser();
   const { data: users, isLoading: usersLoading } = useUsersList();
   const { data: vouchers, isLoading: vouchersLoading } = useVouchers();
+  const { mutate: createVoucher, isPending: creatingVoucher } = useCreateVoucher();
+  const { toast } = useToast();
   const { data: withdrawRequests, isLoading: requestsLoading } = useQuery<any[]>({
     queryKey: ["/api/withdraw/requests"],
   });
