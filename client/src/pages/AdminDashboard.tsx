@@ -14,10 +14,12 @@ import { Shield, Plus, Users, Ticket, Copy, Banknote, CheckCircle, Wallet, Trend
 import { api } from "@shared/routes";
 import { queryClient } from "@/lib/queryClient";
 import { ReportsResponse } from "@shared/schema";
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, Legend } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, Legend, LineChart, Line } from 'recharts';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 export default function AdminDashboard() {
   const { data: user } = useUser();
+  const [timeFilter, setTimeFilter] = useState<"day" | "week" | "month" | "year">("day");
   const { data: users, isLoading: usersLoading } = useUsersList();
   const { data: vouchers, isLoading: vouchersLoading } = useVouchers();
   const { mutate: createVoucher, isPending: creatingVoucher } = useCreateVoucher();
@@ -165,14 +167,40 @@ export default function AdminDashboard() {
     toast({ title: "Copied!", description: code });
   };
 
-  const reportStats = reports ? [
-    { title: "Total Deposits", value: reports.totalDeposits, icon: Wallet, color: "text-green-500" },
-    { title: "Total Withdrawals", value: reports.totalWithdrawals, icon: TrendingDown, color: "text-red-500" },
-    { title: "Total Bets", value: reports.totalBets, icon: Dice5, color: "text-blue-500" },
-    { title: "Total Wins", value: reports.totalWins, icon: Trophy, color: "text-yellow-500" },
-    { title: "Player Balances", value: reports.totalPendingBalance, icon: Users, color: "text-purple-500" },
-    { title: "Net Revenue", value: reports.netRevenue, icon: TrendingUp, color: reports.netRevenue >= 0 ? "text-green-500" : "text-red-500" },
-  ] : [];
+    const filteredStats = reports ? reports.dailyStats.filter(stat => {
+      const statDate = new Date(stat.date);
+      const now = new Date();
+      if (timeFilter === "day") {
+        return statDate.toDateString() === now.toDateString();
+      } else if (timeFilter === "week") {
+        const lastWeek = new Date();
+        lastWeek.setDate(now.getDate() - 7);
+        return statDate >= lastWeek;
+      } else if (timeFilter === "month") {
+        const lastMonth = new Date();
+        lastMonth.setMonth(now.getMonth() - 1);
+        return statDate >= lastMonth;
+      } else if (timeFilter === "year") {
+        const lastYear = new Date();
+        lastYear.setFullYear(now.getFullYear() - 1);
+        return statDate >= lastYear;
+      }
+      return true;
+    }) : [];
+
+    const totals = filteredStats.reduce((acc, stat) => ({
+      deposits: acc.deposits + stat.deposits,
+      bets: acc.bets + stat.bets,
+      wins: acc.wins + stat.wins
+    }), { deposits: 0, bets: 0, wins: 0 });
+
+    const reportStats = reports ? [
+      { title: "Filtered Deposits", value: totals.deposits, icon: Wallet, color: "text-green-500" },
+      { title: "Filtered Bets", value: totals.bets, icon: Dice5, color: "text-blue-500" },
+      { title: "Filtered Wins", value: totals.wins, icon: Trophy, color: "text-yellow-500" },
+      { title: "Net Revenue", value: totals.bets - totals.wins, icon: TrendingUp, color: (totals.bets - totals.wins) >= 0 ? "text-green-500" : "text-red-500" },
+      { title: "Player Balances", value: reports.totalPendingBalance, icon: Users, color: "text-purple-500" },
+    ] : [];
 
   return (
     <ProtectedLayout>
@@ -197,6 +225,19 @@ export default function AdminDashboard() {
           </TabsList>
 
           <TabsContent value="reports" className="mt-6 space-y-6">
+            <div className="flex justify-end">
+              <Select value={timeFilter} onValueChange={(v: any) => setTimeFilter(v)}>
+                <SelectTrigger className="w-[180px] bg-black/30 border-white/10">
+                  <SelectValue placeholder="Filter by time" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="day">Today</SelectItem>
+                  <SelectItem value="week">Last 7 Days</SelectItem>
+                  <SelectItem value="month">Last 30 Days</SelectItem>
+                  <SelectItem value="year">Last Year</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
             {reportsLoading ? (
               <div className="flex justify-center p-12"><Loader2 className="w-8 h-8 animate-spin" /></div>
             ) : reports ? (
@@ -218,12 +259,12 @@ export default function AdminDashboard() {
                 <Card className="glass-card">
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2">
-                      <BarChart3 className="h-5 w-5" /> Daily Activity
+                      <BarChart3 className="h-5 w-5" /> Activity Trend
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="h-[300px]">
                     <ResponsiveContainer width="100%" height="100%">
-                      <BarChart data={reports.dailyStats}>
+                      <BarChart data={filteredStats}>
                         <CartesianGrid strokeDasharray="3 3" stroke="#333" />
                         <XAxis dataKey="date" stroke="#888" />
                         <YAxis stroke="#888" />
@@ -232,9 +273,9 @@ export default function AdminDashboard() {
                           itemStyle={{ color: '#fff' }}
                         />
                         <Legend />
-                        <Bar dataKey="bets" name="Total Bets" fill="#3b82f6" />
-                        <Bar dataKey="wins" name="Total Wins" fill="#eab308" />
-                        <Bar dataKey="deposits" name="Total Deposits" fill="#22c55e" />
+                        <Bar dataKey="bets" name="Bets" fill="#3b82f6" />
+                        <Bar dataKey="wins" name="Wins" fill="#eab308" />
+                        <Bar dataKey="deposits" name="Deposits" fill="#22c55e" />
                       </BarChart>
                     </ResponsiveContainer>
                   </CardContent>
