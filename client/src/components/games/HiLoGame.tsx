@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { motion, AnimatePresence } from "framer-motion";
 import { Coins, ChevronUp, ChevronDown, Club } from "lucide-react";
+import { playSound } from "@/lib/sounds";
 
 export function HiLoGame() {
   const { data: user } = useUser();
@@ -40,12 +41,14 @@ export function HiLoGame() {
       setCurrentCard(data.card);
       setLoading(false);
       if (data.won) {
+        playSound('win');
         toast({
           title: "YOU WIN!",
           description: `Correct! You won UGX ${data.payout.toLocaleString()}`,
           className: "bg-green-600 text-white border-none",
         });
       } else {
+        playSound('lose');
         toast({
           title: "LOST",
           description: "Incorrect prediction.",
@@ -65,11 +68,13 @@ export function HiLoGame() {
 
   const handleStart = () => {
     if (bet < 500) return;
+    playSound('deal');
     setPlaying(true);
     setCurrentCard(Math.floor(Math.random() * 13) + 1);
   };
 
   const handlePredict = (prediction: "higher" | "lower") => {
+    playSound('flip');
     setLoading(true);
     cardMutation.mutate(prediction);
   };

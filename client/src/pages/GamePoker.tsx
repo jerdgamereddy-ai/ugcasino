@@ -8,6 +8,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
 import { Input } from "@/components/ui/input";
+import { playSound } from "@/lib/sounds";
 
 const SUITS = ["♠", "♣", "♥", "♦"];
 const VALUES = ["A", "2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K"];
@@ -31,6 +32,7 @@ export default function GamePoker() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.message);
       
+      playSound('deal');
       setHand(data.hand.map((card: any) => ({ ...card, held: false })));
       setGameState("playing");
       setResult("");
@@ -42,6 +44,7 @@ export default function GamePoker() {
 
   const toggleHold = (index: number) => {
     if (gameState !== "playing") return;
+    playSound('click');
     const newHand = [...hand];
     newHand[index].held = !newHand[index].held;
     setHand(newHand);
@@ -66,8 +69,10 @@ export default function GamePoker() {
       setResult(data.result);
       
       if (data.won) {
+        playSound('jackpot', 0.5);
         toast({ title: data.result, description: `You won UGX ${data.payout}!`, className: "bg-green-600 text-white" });
       } else {
+        playSound('lose');
         toast({ title: "No Pair", description: "Better luck next time!", variant: "destructive" });
       }
       queryClient.invalidateQueries({ queryKey: ["/api/user"] });

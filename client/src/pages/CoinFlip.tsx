@@ -8,6 +8,7 @@ import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
 import { motion, AnimatePresence } from "framer-motion";
 import { Coins, RotateCw } from "lucide-react";
+import { playSound } from "@/lib/sounds";
 
 export default function CoinFlip() {
   const { data: user } = useUser();
@@ -21,6 +22,7 @@ export default function CoinFlip() {
     if (bet < 500) return toast({ title: "Minimum bet is UGX 500", variant: "destructive" });
     if (user && user.balance < bet) return toast({ title: "Insufficient balance", variant: "destructive" });
 
+    playSound('flip');
     setIsFlipping(true);
     setResult(null);
 
@@ -42,7 +44,10 @@ export default function CoinFlip() {
         queryClient.invalidateQueries({ queryKey: ["/api/user"] });
         
         if (data.won) {
+          playSound('jackpot', 0.5);
           toast({ title: `You Won!`, description: `Payout: UGX ${data.payout}`, className: "bg-green-600 text-white" });
+        } else {
+          playSound('lose');
         }
       }, 2000);
     } catch (err: any) {

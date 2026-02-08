@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { motion, AnimatePresence } from "framer-motion";
 import { Dice1, Dice2, Dice3, Dice4, Dice5, Dice6, Coins } from "lucide-react";
+import { playSound } from "@/lib/sounds";
 
 const DiceIcons = [Dice1, Dice2, Dice3, Dice4, Dice5, Dice6];
 
@@ -43,11 +44,14 @@ export function DiceGame() {
         setRolling(false);
         setResult(data.roll);
         if (data.won) {
+          playSound('win');
           toast({
             title: "YOU WIN!",
             description: `Congratulations! You won UGX ${data.payout.toLocaleString()}`,
             className: "bg-green-600 text-white border-none",
           });
+        } else {
+          playSound('lose');
         }
       }, 1000);
     },
@@ -63,6 +67,7 @@ export function DiceGame() {
 
   const handleRoll = () => {
     if (bet < 500) return;
+    playSound('roll');
     setRolling(true);
     setResult(null);
     rollMutation.mutate();

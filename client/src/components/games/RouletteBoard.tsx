@@ -5,6 +5,7 @@ import { useToast } from "@/hooks/use-toast";
 import { motion } from "framer-motion";
 import { Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { playSound } from "@/lib/sounds";
 
 // Simplified roulette logic for UI
 const RED_NUMBERS = [1, 3, 5, 7, 9, 12, 14, 16, 18, 19, 21, 23, 25, 27, 30, 32, 34, 36];
@@ -17,11 +18,13 @@ export function RouletteBoard() {
   const [lastResult, setLastResult] = useState<{ number: number; color: string } | null>(null);
 
   const handleBet = (type: 'number' | 'color' | 'parity', value: number | string) => {
+    playSound('bet', 0.3);
     setSelectedBet({ type, value });
   };
 
   const handleSpin = () => {
     if (!selectedBet) return;
+    playSound('spin');
 
     spin(
       {
@@ -31,14 +34,17 @@ export function RouletteBoard() {
       },
       {
         onSuccess: (data) => {
+          playSound('reveal');
           setLastResult(data.result);
           if (data.won) {
+            playSound('jackpot', 0.5);
             toast({
-              title: "WINNER! 🎉",
+              title: "WINNER!",
               description: `Result: ${data.result.number} (${data.result.color}). You won UGX ${data.payout.toLocaleString()}`,
               className: "bg-primary border-primary text-black font-bold",
             });
           } else {
+            playSound('lose');
             toast({
               title: "Lost",
               description: `Result: ${data.result.number} (${data.result.color}). Try again!`,
@@ -60,9 +66,10 @@ export function RouletteBoard() {
     return (
       <button
         onClick={() => handleBet('number', num)}
+        data-testid={`button-roulette-${num}`}
         className={cn(
-            "w-10 h-10 sm:w-12 sm:h-12 flex items-center justify-center text-sm sm:text-base font-bold text-white transition-all border border-white/10",
-            isRed ? "bg-red-700 hover:bg-red-600" : "bg-neutral-800 hover:bg-neutral-700",
+            "w-10 h-10 sm:w-12 sm:h-12 flex items-center justify-center text-sm sm:text-base font-bold text-white transition-all border border-white/10 hover-elevate",
+            isRed ? "bg-red-700" : "bg-neutral-800",
             isSelected && "ring-4 ring-yellow-400 z-10 scale-110 shadow-lg"
         )}
       >
@@ -119,8 +126,9 @@ export function RouletteBoard() {
             <div className="flex">
                 <button 
                     onClick={() => handleBet('number', 0)}
+                    data-testid="button-roulette-0"
                     className={cn(
-                        "w-full h-12 flex items-center justify-center text-white font-bold bg-green-700 hover:bg-green-600 rounded-t-lg border border-white/10",
+                        "w-full h-12 flex items-center justify-center text-white font-bold bg-green-700 rounded-t-lg border border-white/10 hover-elevate",
                         selectedBet?.value === 0 && "ring-4 ring-yellow-400 z-10"
                     )}
                 >
@@ -139,25 +147,29 @@ export function RouletteBoard() {
             <div className="grid grid-cols-4 gap-2 mt-2">
                 <button 
                     onClick={() => handleBet('color', 'red')}
-                    className={cn("bg-red-700 h-12 rounded text-white font-bold hover:brightness-110", selectedBet?.value === 'red' && "ring-2 ring-yellow-400")}
+                    data-testid="button-bet-red"
+                    className={cn("bg-red-700 h-12 rounded text-white font-bold hover-elevate", selectedBet?.value === 'red' && "ring-2 ring-yellow-400")}
                 >
                     RED
                 </button>
                 <button 
                     onClick={() => handleBet('color', 'black')}
-                    className={cn("bg-black h-12 rounded text-white font-bold hover:bg-gray-900 border border-white/10", selectedBet?.value === 'black' && "ring-2 ring-yellow-400")}
+                    data-testid="button-bet-black"
+                    className={cn("bg-black h-12 rounded text-white font-bold border border-white/10 hover-elevate", selectedBet?.value === 'black' && "ring-2 ring-yellow-400")}
                 >
                     BLACK
                 </button>
                  <button 
                     onClick={() => handleBet('parity', 'even')}
-                    className={cn("bg-transparent border border-white/20 h-12 rounded text-white font-bold hover:bg-white/5", selectedBet?.value === 'even' && "ring-2 ring-yellow-400 bg-white/10")}
+                    data-testid="button-bet-even"
+                    className={cn("bg-transparent border border-white/20 h-12 rounded text-white font-bold hover-elevate", selectedBet?.value === 'even' && "ring-2 ring-yellow-400 bg-white/10")}
                 >
                     EVEN
                 </button>
                 <button 
                     onClick={() => handleBet('parity', 'odd')}
-                    className={cn("bg-transparent border border-white/20 h-12 rounded text-white font-bold hover:bg-white/5", selectedBet?.value === 'odd' && "ring-2 ring-yellow-400 bg-white/10")}
+                    data-testid="button-bet-odd"
+                    className={cn("bg-transparent border border-white/20 h-12 rounded text-white font-bold hover-elevate", selectedBet?.value === 'odd' && "ring-2 ring-yellow-400 bg-white/10")}
                 >
                     ODD
                 </button>
@@ -171,8 +183,9 @@ export function RouletteBoard() {
              {[500, 1000, 2000, 5000, 10000, 20000, 50000].map(amt => (
                  <button
                     key={amt}
-                    onClick={() => setBetAmount(amt)}
-                    className={cn("px-3 py-1.5 rounded font-mono text-sm border transition-colors", betAmount === amt ? "bg-primary text-black border-primary font-bold" : "border-white/10 text-muted-foreground hover:border-primary/50")}
+                    onClick={() => { setBetAmount(amt); playSound('bet', 0.2); }}
+                    data-testid={`button-roulette-bet-${amt}`}
+                    className={cn("px-3 py-1.5 rounded font-mono text-sm border transition-colors hover-elevate", betAmount === amt ? "bg-primary text-black border-primary font-bold" : "border-white/10 text-muted-foreground")}
                  >
                      {amt.toLocaleString()}
                  </button>
@@ -189,6 +202,7 @@ export function RouletteBoard() {
             className="min-w-[150px]"
             onClick={handleSpin} 
             disabled={!selectedBet || isPending}
+            data-testid="button-roulette-spin"
         >
              {isPending ? <Loader2 className="animate-spin" /> : "SPIN"}
          </Button>

@@ -3,9 +3,9 @@ import { useUser } from "@/hooks/use-auth";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Link } from "wouter";
-import { Coins, Trophy, CreditCard, ChevronRight, Club, Dice5, Dices, Banknote, Sparkles, Zap, Star, Gem, RotateCcw, LucideIcon, Club as Cards, Target } from "lucide-react";
+import { Coins, Trophy, CreditCard, ChevronRight, Club, Dice5, Dices, Banknote, Sparkles, Zap, Star, Gem, RotateCcw, LucideIcon, Club as Cards, Target, Crown, Diamond } from "lucide-react";
 import { useRedeemVoucher } from "@/hooks/use-vouchers";
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
@@ -13,6 +13,154 @@ import { motion, AnimatePresence } from "framer-motion";
 
 import { playSound } from "@/lib/sounds";
 import { BroadcastBanner } from "@/components/BroadcastBanner";
+
+function AnimatedCounter({ target, duration = 2000, prefix = "", suffix = "" }: { target: number; duration?: number; prefix?: string; suffix?: string }) {
+  const [count, setCount] = useState(0);
+  const frameRef = useRef<number>();
+
+  useEffect(() => {
+    let start = 0;
+    const startTime = performance.now();
+
+    const animate = (currentTime: number) => {
+      const elapsed = currentTime - startTime;
+      const progress = Math.min(elapsed / duration, 1);
+      const eased = 1 - Math.pow(1 - progress, 3);
+      const current = Math.floor(eased * target);
+      setCount(current);
+      if (progress < 1) {
+        frameRef.current = requestAnimationFrame(animate);
+      }
+    };
+
+    frameRef.current = requestAnimationFrame(animate);
+    return () => {
+      if (frameRef.current) cancelAnimationFrame(frameRef.current);
+    };
+  }, [target, duration]);
+
+  return (
+    <span className="tabular-nums">
+      {prefix}{count.toLocaleString()}{suffix}
+    </span>
+  );
+}
+
+function JackpotTicker() {
+  const [jackpot, setJackpot] = useState(247835920);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setJackpot(prev => prev + Math.floor(Math.random() * 5000) + 1000);
+    }, 100);
+    return () => clearInterval(interval);
+  }, []);
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, scale: 0.8 }}
+      animate={{ opacity: 1, scale: 1 }}
+      className="relative overflow-hidden rounded-2xl border-2 border-primary/50 bg-gradient-to-r from-black via-zinc-900 to-black p-4 md:p-6"
+    >
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        {[...Array(20)].map((_, i) => (
+          <motion.div
+            key={i}
+            className="absolute w-1 h-1 bg-primary rounded-full"
+            initial={{ x: `${Math.random() * 100}%`, y: `${Math.random() * 100}%`, opacity: 0 }}
+            animate={{
+              opacity: [0, 1, 0],
+              scale: [0, 1.5, 0],
+            }}
+            transition={{
+              duration: 2,
+              repeat: Infinity,
+              delay: Math.random() * 2,
+            }}
+          />
+        ))}
+      </div>
+      <div className="flex flex-col items-center gap-2 relative z-10">
+        <div className="flex items-center gap-2">
+          <motion.div
+            animate={{ rotate: [0, 15, -15, 0] }}
+            transition={{ duration: 1, repeat: Infinity, repeatDelay: 2 }}
+          >
+            <Crown className="w-5 h-5 text-primary" />
+          </motion.div>
+          <span className="text-[10px] md:text-xs font-black uppercase tracking-[0.3em] text-primary">Progressive Jackpot</span>
+          <motion.div
+            animate={{ rotate: [0, -15, 15, 0] }}
+            transition={{ duration: 1, repeat: Infinity, repeatDelay: 2 }}
+          >
+            <Crown className="w-5 h-5 text-primary" />
+          </motion.div>
+        </div>
+        <motion.div
+          className="text-2xl md:text-5xl font-black font-mono text-transparent bg-clip-text bg-gradient-to-r from-primary via-yellow-200 to-primary tracking-wider"
+          animate={{ textShadow: ["0 0 20px rgba(212,175,55,0.3)", "0 0 40px rgba(212,175,55,0.6)", "0 0 20px rgba(212,175,55,0.3)"] }}
+          transition={{ duration: 2, repeat: Infinity }}
+        >
+          UGX {jackpot.toLocaleString()}
+        </motion.div>
+      </div>
+
+      <div className="absolute top-0 left-0 w-3 h-3 border-t-2 border-l-2 border-primary rounded-tl-lg" />
+      <div className="absolute top-0 right-0 w-3 h-3 border-t-2 border-r-2 border-primary rounded-tr-lg" />
+      <div className="absolute bottom-0 left-0 w-3 h-3 border-b-2 border-l-2 border-primary rounded-bl-lg" />
+      <div className="absolute bottom-0 right-0 w-3 h-3 border-b-2 border-r-2 border-primary rounded-br-lg" />
+    </motion.div>
+  );
+}
+
+function LiveStatsBillboard() {
+  const [stats, setStats] = useState({
+    totalBets: 1247893,
+    totalWins: 892341,
+    playersOnline: 342,
+    biggestWin: 5000000,
+  });
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setStats(prev => ({
+        totalBets: prev.totalBets + Math.floor(Math.random() * 50),
+        totalWins: prev.totalWins + Math.floor(Math.random() * 30),
+        playersOnline: Math.max(200, prev.playersOnline + Math.floor(Math.random() * 10) - 5),
+        biggestWin: prev.biggestWin,
+      }));
+    }, 2000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const items = [
+    { label: "Total Bets", value: stats.totalBets, icon: Coins, color: "text-amber-400" },
+    { label: "Total Wins", value: stats.totalWins, icon: Trophy, color: "text-emerald-400" },
+    { label: "Players Online", value: stats.playersOnline, icon: Zap, color: "text-cyan-400" },
+    { label: "Biggest Win", value: stats.biggestWin, icon: Diamond, color: "text-purple-400", prefix: "UGX " },
+  ];
+
+  return (
+    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+      {items.map((item, idx) => (
+        <motion.div
+          key={item.label}
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: idx * 0.1 }}
+          className="relative bg-zinc-900/80 rounded-xl p-3 md:p-4 border border-white/5 text-center overflow-hidden group"
+        >
+          <div className="absolute inset-0 bg-gradient-to-t from-white/[0.02] to-transparent pointer-events-none" />
+          <item.icon className={`w-5 h-5 ${item.color} mx-auto mb-1 opacity-60`} />
+          <div className={`text-lg md:text-xl font-black font-mono ${item.color}`}>
+            <AnimatedCounter target={item.value} duration={2500} prefix={item.prefix || ""} />
+          </div>
+          <div className="text-[9px] md:text-[10px] text-muted-foreground uppercase tracking-widest mt-1 font-bold">{item.label}</div>
+        </motion.div>
+      ))}
+    </div>
+  );
+}
 
 export default function Lobby() {
   const { data: user } = useUser();
@@ -94,6 +242,11 @@ export default function Lobby() {
         animate="visible"
         variants={containerVariants}
       >
+        {/* Jackpot Billboard */}
+        <motion.div variants={itemVariants}>
+          <JackpotTicker />
+        </motion.div>
+
         {/* Animated Hero Header */}
         <motion.div 
           className="relative overflow-hidden rounded-3xl p-8 md:p-12 bg-gradient-to-br from-black via-emerald-900/30 to-black border border-emerald-500/20 shadow-[0_0_50px_rgba(16,185,129,0.15)]"
@@ -144,6 +297,11 @@ export default function Lobby() {
           </div>
         </motion.div>
 
+        {/* Live Stats Billboard */}
+        <motion.div variants={itemVariants}>
+          <LiveStatsBillboard />
+        </motion.div>
+
         <div className="grid md:grid-cols-2 gap-6">
           {/* Animated Voucher Redemption */}
           <motion.div variants={itemVariants}>
@@ -165,8 +323,9 @@ export default function Lobby() {
                     value={voucherCode} 
                     onChange={(e) => setVoucherCode(e.target.value)}
                     className="bg-black/40 border-white/10 focus:border-primary/50 transition-colors h-12"
+                    data-testid="input-voucher-code"
                   />
-                  <Button type="submit" disabled={isPending} variant="secondary" className="h-12 px-8 font-bold hover-elevate">
+                  <Button type="submit" disabled={isPending} variant="secondary" className="h-12 px-8 font-bold hover-elevate" data-testid="button-redeem-voucher">
                     {isPending ? "Redeeming..." : "Redeem"}
                   </Button>
                 </form>
@@ -345,7 +504,7 @@ export default function Lobby() {
               transition={{ type: "spring", stiffness: 300 }}
             >
               <Link href={game.href}>
-                <div className="group relative h-72 rounded-3xl overflow-hidden cursor-pointer border border-white/10 hover:border-primary/50 transition-all duration-500 shadow-2xl hover:shadow-[0_0_50px_rgba(212,175,55,0.2)]">
+                <div className="group relative h-72 rounded-3xl overflow-hidden cursor-pointer border border-white/10 hover:border-primary/50 transition-all duration-500 shadow-2xl hover:shadow-[0_0_50px_rgba(212,175,55,0.2)]" data-testid={`card-game-${game.id}`}>
                   {/* Image Background with Parallax effect */}
                   <motion.div 
                     className="absolute inset-0 bg-cover bg-center transition-transform duration-700 group-hover:scale-110" 

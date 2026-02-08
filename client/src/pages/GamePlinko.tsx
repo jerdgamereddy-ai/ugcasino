@@ -7,6 +7,7 @@ import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
+import { playSound } from "@/lib/sounds";
 
 export default function GamePlinko() {
   const [bet, setBet] = useState(500);
@@ -17,6 +18,7 @@ export default function GamePlinko() {
 
   const handlePlay = async () => {
     if (isDropping) return;
+    playSound('bounce');
     setIsDropping(true);
     setMultiplier(null);
     
@@ -43,7 +45,10 @@ export default function GamePlinko() {
         setMultiplier(data.multiplier);
         queryClient.invalidateQueries({ queryKey: ["/api/user"] });
         if (data.multiplier > 1) {
+          playSound('win');
           toast({ title: "WIN!", description: `You won UGX ${data.payout.toLocaleString()}`, className: "bg-green-600 text-white" });
+        } else {
+          playSound('lose');
         }
       }, 2000);
     } catch (err: any) {

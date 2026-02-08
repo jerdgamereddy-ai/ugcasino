@@ -8,6 +8,7 @@ import { motion } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
 import { Input } from "@/components/ui/input";
+import { playSound } from "@/lib/sounds";
 
 export default function GameWheel() {
   const [bet, setBet] = useState(500);
@@ -17,6 +18,7 @@ export default function GameWheel() {
 
   const handleSpin = async () => {
     if (isSpinning) return;
+    playSound('spin');
     setIsSpinning(true);
     
     try {
@@ -35,8 +37,10 @@ export default function GameWheel() {
       setTimeout(() => {
         setIsSpinning(false);
         if (data.won) {
+          playSound('jackpot', 0.5);
           toast({ title: "WINNER!", description: `Multiplier: x${data.multiplier}`, className: "bg-green-600 text-white" });
         } else {
+          playSound('lose');
           toast({ title: "Better luck next time!", description: "Try again!", variant: "destructive" });
         }
         queryClient.invalidateQueries({ queryKey: ["/api/user"] });
