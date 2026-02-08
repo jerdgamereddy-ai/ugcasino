@@ -3,7 +3,7 @@ import { useUser } from "@/hooks/use-auth";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Link } from "wouter";
-import { Coins, Trophy, CreditCard, ChevronRight, Club, Dice5, Dices, Banknote, Sparkles, Zap, Star, Gem, RotateCcw, LucideIcon, Club as Cards, Target, Crown, Diamond } from "lucide-react";
+import { Coins, Trophy, CreditCard, ChevronRight, Club, Dice5, Dices, Banknote, Sparkles, Zap, Star, Gem, RotateCcw, LucideIcon, Club as Cards, Target, Crown, Diamond, Fish } from "lucide-react";
 import { useRedeemVoucher } from "@/hooks/use-vouchers";
 import { useState, useEffect, useRef } from "react";
 import { Input } from "@/components/ui/input";
@@ -495,6 +495,16 @@ export default function Lobby() {
               title: "Luxury Keno",
               desc: "Select your numbers and win the luxury jackpot.",
               id: "keno"
+            },
+            {
+              href: "/fishhunt",
+              img: "https://images.unsplash.com/photo-1544551763-46a013bb70d5?q=80&w=2070",
+              icon: Fish as LucideIcon,
+              tag: "NEW",
+              tagColor: "bg-cyan-600",
+              title: "Fish Hunt",
+              desc: "Hunt legendary sea creatures for massive multipliers!",
+              id: "fishhunt"
             }
           ].map((game, idx) => (
             <motion.div 

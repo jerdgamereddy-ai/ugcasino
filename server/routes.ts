@@ -456,7 +456,7 @@ export async function registerRoutes(
     if (!req.isAuthenticated() || req.user.role === 'user') return res.status(403).send("Forbidden");
     
     let settings = await storage.getAllGameSettings();
-    const gameTypes = ["slots", "roulette", "dice", "hilo", "coinflip", "plinko", "mines", "wheel", "poker", "keno"] as const;
+    const gameTypes = ["slots", "roulette", "dice", "hilo", "coinflip", "plinko", "mines", "wheel", "poker", "keno", "fishhunt"] as const;
     const existingTypes = settings.map(s => s.gameType);
     
     for (const type of gameTypes) {
@@ -928,6 +928,72 @@ export async function registerRoutes(
       });
 
       res.json({ won, payout, drawnNumbers, hits, balance: user.balance });
+    } catch (err) {
+      res.status(500).json({ message: "Internal Server Error" });
+    }
+  });
+
+  // === FISH HUNT GAME ===
+  app.post("/api/games/fishhunt/shoot", async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+
+    try {
+      const { bet, fishType } = z.object({
+        bet: z.number().min(500),
+        fishType: z.string()
+      }).parse(req.body);
+
+      if (req.user.balance < bet) {
+        return res.status(400).json({ message: "Insufficient balance" });
+      }
+
+      const settings = await storage.getGameSettings("fishhunt");
+      const winChance = settings?.winChance ?? 0.45;
+
+      const FISH_MULTIPLIERS: Record<string, number> = {
+        small_fish: 2,
+        medium_fish: 3,
+        pufferfish: 5,
+        turtle: 4,
+        jellyfish: 6,
+        shark: 10,
+        octopus: 8,
+        whale: 15,
+        mermaid: 20,
+        scorpion_king: 50,
+      };
+
+      const multiplier = FISH_MULTIPLIERS[fishType] || 2;
+
+      const catchDifficulty: Record<string, number> = {
+        small_fish: 1.0,
+        medium_fish: 0.85,
+        pufferfish: 0.7,
+        turtle: 0.75,
+        jellyfish: 0.6,
+        shark: 0.4,
+        octopus: 0.5,
+        whale: 0.25,
+        mermaid: 0.2,
+        scorpion_king: 0.08,
+      };
+
+      const difficulty = catchDifficulty[fishType] || 1.0;
+      const adjustedChance = winChance * difficulty;
+      const caught = Math.random() < adjustedChance;
+
+      await storage.updateUserBalance(req.user.id, -bet);
+      await storage.createTransaction({ userId: req.user.id, amount: -bet, type: "bet", description: `Fish Hunt: Shot at ${fishType}` });
+
+      let payout = 0;
+      if (caught) {
+        payout = Math.floor(bet * multiplier);
+        await storage.updateUserBalance(req.user.id, payout);
+        await storage.createTransaction({ userId: req.user.id, amount: payout, type: "win", description: `Fish Hunt: Caught ${fishType} (x${multiplier})` });
+      }
+
+      const user = await storage.getUser(req.user.id);
+      res.json({ caught, payout, multiplier, fishType, balance: user?.balance ?? 0 });
     } catch (err) {
       res.status(500).json({ message: "Internal Server Error" });
     }

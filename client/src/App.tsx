@@ -22,6 +22,7 @@ import GameMines from "@/pages/GameMines";
 import GameWheel from "@/pages/GameWheel";
 import GamePoker from "@/pages/GamePoker";
 import GameKeno from "@/pages/GameKeno";
+import GameFishHunt from "@/pages/GameFishHunt";
 import Reports from "@/pages/Reports";
 import GameControl from "@/pages/GameControl";
 import ForgotPassword from "@/pages/ForgotPassword";
@@ -47,6 +48,7 @@ function Router() {
       <Route path="/wheel" component={GameWheel} />
       <Route path="/poker" component={GamePoker} />
       <Route path="/keno" component={GameKeno} />
+      <Route path="/fishhunt" component={GameFishHunt} />
       <Route path="/reports" component={Reports} />
       <Route path="/game-control" component={GameControl} />
       <Route component={NotFound} />

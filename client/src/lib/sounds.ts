@@ -13,6 +13,9 @@ const SOUND_URLS: Record<string, string> = {
   jackpot: 'https://assets.mixkit.co/active_storage/sfx/2020/2020-preview.mp3',
   deal: 'https://assets.mixkit.co/active_storage/sfx/2009/2009-preview.mp3',
   bounce: 'https://assets.mixkit.co/active_storage/sfx/2572/2572-preview.mp3',
+  shoot: 'https://assets.mixkit.co/active_storage/sfx/2785/2785-preview.mp3',
+  splash: 'https://assets.mixkit.co/active_storage/sfx/2401/2401-preview.mp3',
+  bubble: 'https://assets.mixkit.co/active_storage/sfx/2358/2358-preview.mp3',
 };
 
 export type SoundType = keyof typeof SOUND_URLS;
