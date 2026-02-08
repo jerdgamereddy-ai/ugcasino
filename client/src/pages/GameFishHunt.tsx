@@ -686,7 +686,7 @@ export default function GameFishHunt() {
                       onClick={() => handleShoot(fish)}
                       whileHover={{ scale: 1.15 }}
                       whileTap={{ scale: 0.9 }}
-                      data-testid={`fish-target-${fish.type}`}
+                      data-testid={`fish-target-${fish.id}`}
                     >
                       <FishSVG fish={fish} />
                     </motion.div>
@@ -748,7 +748,7 @@ export default function GameFishHunt() {
                   </div>
 
                   {isShooting && (
-                    <div className="absolute top-3 right-3 z-30">
+                    <div className="absolute top-3 right-3 z-30" data-testid="status-reloading">
                       <span className="text-yellow-400 text-xs font-bold animate-pulse">RELOADING...</span>
                     </div>
                   )}
