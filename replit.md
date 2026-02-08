@@ -36,7 +36,7 @@ Preferred communication style: Simple, everyday language.
 - **Migrations**: Drizzle Kit for database migrations (`drizzle-kit push` for development)
 
 ### Key Data Models
-- **Users**: id, username, password, role (admin/manager/user), balance (UGX integer), profitSharePercentage (double)
+- **Users**: id, username, password, role (admin/manager/user), balance (UGX integer), profitSharePercentage (double), phoneNumber (optional text)
 - **Vouchers**: code-based deposit system, tracks creator and redeemer
 - **Transactions**: audit log of all balance changes (deposits, withdrawals, bets, wins)
 - **Game Settings**: per-game win probability configuration (0.0-1.0)

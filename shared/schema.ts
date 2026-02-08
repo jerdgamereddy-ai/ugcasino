@@ -15,6 +15,7 @@ export const users = pgTable("users", {
   isSuspended: boolean("is_suspended").default(false).notNull(),
   createdBy: integer("created_by"),
   profitSharePercentage: doublePrecision("profit_share_percentage").default(0).notNull(),
+  phoneNumber: text("phone_number"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 

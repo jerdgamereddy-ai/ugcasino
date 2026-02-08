@@ -8,7 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { Shield, Plus, Users, UserCog, Loader2, Ban, CheckCircle, Megaphone, Calculator } from "lucide-react";
+import { Shield, Plus, Users, UserCog, Loader2, Ban, CheckCircle, Megaphone, Calculator, Phone } from "lucide-react";
 import { queryClient } from "@/lib/queryClient";
 import { User } from "@shared/schema";
 import { BroadcastBanner } from "@/components/BroadcastBanner";
@@ -20,6 +20,7 @@ export default function SuperManagerDashboard() {
   const { toast } = useToast();
   const [newManagerUsername, setNewManagerUsername] = useState("");
   const [newManagerPassword, setNewManagerPassword] = useState("");
+  const [newManagerPhone, setNewManagerPhone] = useState("");
 
   const { data: subordinates, isLoading: usersLoading } = useQuery<User[]>({
     queryKey: ["/api/admin/users"],
@@ -27,7 +28,7 @@ export default function SuperManagerDashboard() {
   });
 
   const createManagerMutation = useMutation({
-    mutationFn: async (data: { username: string; password: string }) => {
+    mutationFn: async (data: { username: string; password: string; phoneNumber?: string }) => {
       const res = await fetch("/api/super-manager/create-manager", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -43,6 +44,7 @@ export default function SuperManagerDashboard() {
       toast({ title: "Manager created successfully", className: "bg-green-600 text-white" });
       setNewManagerUsername("");
       setNewManagerPassword("");
+      setNewManagerPhone("");
       queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
     },
     onError: (err: any) => {
@@ -126,6 +128,7 @@ export default function SuperManagerDashboard() {
                       <TableRow className="border-white/10">
                         <TableHead>ID</TableHead>
                         <TableHead>Username</TableHead>
+                        <TableHead>Phone</TableHead>
                         <TableHead>Status</TableHead>
                         <TableHead>Balance</TableHead>
                         <TableHead>Change Password</TableHead>
@@ -136,6 +139,15 @@ export default function SuperManagerDashboard() {
                         <TableRow key={mgr.id} className="border-white/10" data-testid={`row-manager-${mgr.id}`}>
                           <TableCell>#{mgr.id}</TableCell>
                           <TableCell className="font-medium">{mgr.username}</TableCell>
+                          <TableCell>
+                            {mgr.phoneNumber ? (
+                              <a href={`tel:${mgr.phoneNumber}`} className="flex items-center gap-1 text-primary hover:underline text-xs" data-testid={`link-phone-${mgr.id}`}>
+                                <Phone className="w-3 h-3" /> {mgr.phoneNumber}
+                              </a>
+                            ) : (
+                              <span className="text-muted-foreground text-xs">N/A</span>
+                            )}
+                          </TableCell>
                           <TableCell>
                             {mgr.isSuspended ? (
                               <span className="flex items-center gap-1 text-red-500 text-xs"><Ban className="w-3 h-3" /> Suspended</span>
@@ -183,6 +195,7 @@ export default function SuperManagerDashboard() {
                       <TableRow className="border-white/10">
                         <TableHead>ID</TableHead>
                         <TableHead>Username</TableHead>
+                        <TableHead>Phone</TableHead>
                         <TableHead>Status</TableHead>
                         <TableHead>Balance</TableHead>
                       </TableRow>
@@ -192,6 +205,15 @@ export default function SuperManagerDashboard() {
                         <TableRow key={p.id} className="border-white/10" data-testid={`row-player-${p.id}`}>
                           <TableCell>#{p.id}</TableCell>
                           <TableCell>{p.username}</TableCell>
+                          <TableCell>
+                            {p.phoneNumber ? (
+                              <a href={`tel:${p.phoneNumber}`} className="flex items-center gap-1 text-primary hover:underline text-xs" data-testid={`link-phone-player-${p.id}`}>
+                                <Phone className="w-3 h-3" /> {p.phoneNumber}
+                              </a>
+                            ) : (
+                              <span className="text-muted-foreground text-xs">N/A</span>
+                            )}
+                          </TableCell>
                           <TableCell>
                             {p.isSuspended ? (
                               <span className="flex items-center gap-1 text-red-500 text-xs"><Ban className="w-3 h-3" /> Suspended</span>
@@ -218,7 +240,7 @@ export default function SuperManagerDashboard() {
               <CardContent>
                 <form onSubmit={(e) => {
                   e.preventDefault();
-                  createManagerMutation.mutate({ username: newManagerUsername, password: newManagerPassword });
+                  createManagerMutation.mutate({ username: newManagerUsername, password: newManagerPassword, phoneNumber: newManagerPhone || undefined });
                 }} className="space-y-4">
                   <div className="space-y-2">
                     <label className="text-xs uppercase text-muted-foreground font-bold">Username</label>
@@ -239,6 +261,17 @@ export default function SuperManagerDashboard() {
                       onChange={(e) => setNewManagerPassword(e.target.value)}
                       className="bg-white/5 border-white/10"
                       data-testid="input-new-manager-password"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-xs uppercase text-muted-foreground font-bold">Phone Number (optional)</label>
+                    <Input
+                      type="tel"
+                      placeholder="e.g. +256 700 000000"
+                      value={newManagerPhone}
+                      onChange={(e) => setNewManagerPhone(e.target.value)}
+                      className="bg-white/5 border-white/10"
+                      data-testid="input-new-manager-phone"
                     />
                   </div>
                   <Button type="submit" className="w-full" disabled={createManagerMutation.isPending} data-testid="button-create-manager">

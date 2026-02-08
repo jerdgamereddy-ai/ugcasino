@@ -8,7 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { Shield, Plus, Users, Loader2, Ban, CheckCircle, Megaphone } from "lucide-react";
+import { Shield, Plus, Users, Loader2, Ban, CheckCircle, Megaphone, Phone } from "lucide-react";
 import { queryClient } from "@/lib/queryClient";
 import { User } from "@shared/schema";
 import { BroadcastBanner } from "@/components/BroadcastBanner";
@@ -19,6 +19,7 @@ export default function ManagerDashboard() {
   const { toast } = useToast();
   const [newUserUsername, setNewUserUsername] = useState("");
   const [newUserPassword, setNewUserPassword] = useState("");
+  const [newUserPhone, setNewUserPhone] = useState("");
 
   const { data: myUsers, isLoading: usersLoading } = useQuery<User[]>({
     queryKey: ["/api/admin/users"],
@@ -26,7 +27,7 @@ export default function ManagerDashboard() {
   });
 
   const createUserMutation = useMutation({
-    mutationFn: async (data: { username: string; password: string }) => {
+    mutationFn: async (data: { username: string; password: string; phoneNumber?: string }) => {
       const res = await fetch("/api/manager/create-user", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -42,6 +43,7 @@ export default function ManagerDashboard() {
       toast({ title: "Player created successfully", className: "bg-green-600 text-white" });
       setNewUserUsername("");
       setNewUserPassword("");
+      setNewUserPhone("");
       queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
     },
     onError: (err: any) => {
@@ -119,6 +121,7 @@ export default function ManagerDashboard() {
                       <TableRow className="border-white/10">
                         <TableHead>ID</TableHead>
                         <TableHead>Username</TableHead>
+                        <TableHead>Phone</TableHead>
                         <TableHead>Status</TableHead>
                         <TableHead>Balance</TableHead>
                         <TableHead>Change Password</TableHead>
@@ -129,6 +132,15 @@ export default function ManagerDashboard() {
                         <TableRow key={u.id} className="border-white/10" data-testid={`row-user-${u.id}`}>
                           <TableCell>#{u.id}</TableCell>
                           <TableCell className="font-medium">{u.username}</TableCell>
+                          <TableCell>
+                            {u.phoneNumber ? (
+                              <a href={`tel:${u.phoneNumber}`} className="flex items-center gap-1 text-primary hover:underline text-xs" data-testid={`link-phone-${u.id}`}>
+                                <Phone className="w-3 h-3" /> {u.phoneNumber}
+                              </a>
+                            ) : (
+                              <span className="text-muted-foreground text-xs">N/A</span>
+                            )}
+                          </TableCell>
                           <TableCell>
                             {u.isSuspended ? (
                               <span className="flex items-center gap-1 text-red-500 text-xs"><Ban className="w-3 h-3" /> Suspended</span>
@@ -168,7 +180,7 @@ export default function ManagerDashboard() {
               <CardContent>
                 <form onSubmit={(e) => {
                   e.preventDefault();
-                  createUserMutation.mutate({ username: newUserUsername, password: newUserPassword });
+                  createUserMutation.mutate({ username: newUserUsername, password: newUserPassword, phoneNumber: newUserPhone || undefined });
                 }} className="space-y-4">
                   <div className="space-y-2">
                     <label className="text-xs uppercase text-muted-foreground font-bold">Username</label>
@@ -189,6 +201,17 @@ export default function ManagerDashboard() {
                       onChange={(e) => setNewUserPassword(e.target.value)}
                       className="bg-white/5 border-white/10"
                       data-testid="input-new-user-password"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-xs uppercase text-muted-foreground font-bold">Phone Number (optional)</label>
+                    <Input
+                      type="tel"
+                      placeholder="e.g. +256 700 000000"
+                      value={newUserPhone}
+                      onChange={(e) => setNewUserPhone(e.target.value)}
+                      className="bg-white/5 border-white/10"
+                      data-testid="input-new-user-phone"
                     />
                   </div>
                   <Button type="submit" className="w-full" disabled={createUserMutation.isPending} data-testid="button-create-user">

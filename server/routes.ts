@@ -6,7 +6,7 @@ import { api } from "@shared/routes";
 import { z } from "zod";
 import { randomBytes } from "crypto";
 import { hashPassword } from "./auth";
-import { adminPasswordSchema, securityAnswersSchema, securityVerifySchema, ADMIN_SECURITY_QUESTIONS } from "@shared/schema";
+import { adminPasswordSchema, securityAnswersSchema, securityVerifySchema, ADMIN_SECURITY_QUESTIONS, type User } from "@shared/schema";
 
 export async function registerRoutes(
   httpServer: Server,
@@ -235,9 +235,10 @@ export async function registerRoutes(
   app.post("/api/super-manager/create-manager", async (req, res) => {
     if (!req.isAuthenticated() || req.user.role !== 'super_manager') return res.status(403).send("Forbidden");
     try {
-      const { username, password } = z.object({
+      const { username, password, phoneNumber } = z.object({
         username: z.string().min(2),
         password: z.string().min(6),
+        phoneNumber: z.string().optional(),
       }).parse(req.body);
 
       const existing = await storage.getUserByUsername(username);
@@ -248,6 +249,7 @@ export async function registerRoutes(
         username,
         password: hashedPassword,
         role: "manager",
+        phoneNumber: phoneNumber || null,
         isApproved: true,
         isSuspended: false,
         createdBy: req.user.id,
@@ -263,9 +265,10 @@ export async function registerRoutes(
   app.post("/api/manager/create-user", async (req, res) => {
     if (!req.isAuthenticated() || req.user.role !== 'manager') return res.status(403).send("Forbidden");
     try {
-      const { username, password } = z.object({
+      const { username, password, phoneNumber } = z.object({
         username: z.string().min(2),
         password: z.string().min(6),
+        phoneNumber: z.string().optional(),
       }).parse(req.body);
 
       const existing = await storage.getUserByUsername(username);
@@ -276,6 +279,7 @@ export async function registerRoutes(
         username,
         password: hashedPassword,
         role: "user",
+        phoneNumber: phoneNumber || null,
         isApproved: true,
         isSuspended: false,
         createdBy: req.user.id,

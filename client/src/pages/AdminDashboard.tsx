@@ -9,7 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useState, useRef } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { Shield, Plus, Users, Ticket, Copy, Banknote, CheckCircle, Loader2, Ban, Trash2, ArrowUpCircle, KeyRound, UserCog, Lock, BarChart3, Settings2, ChevronUp, ChevronDown, Megaphone, Calculator } from "lucide-react";
+import { Shield, Plus, Users, Ticket, Copy, Banknote, CheckCircle, Loader2, Ban, Trash2, ArrowUpCircle, KeyRound, UserCog, Lock, BarChart3, Settings2, ChevronUp, ChevronDown, Megaphone, Calculator, Phone } from "lucide-react";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -341,6 +341,7 @@ export default function AdminDashboard() {
                       <TableRow className="border-white/10">
                         <TableHead>ID</TableHead>
                         <TableHead>Username</TableHead>
+                        <TableHead>Phone</TableHead>
                         <TableHead>Status</TableHead>
                         <TableHead>Balance</TableHead>
                         <TableHead>Reset Password</TableHead>
@@ -352,6 +353,15 @@ export default function AdminDashboard() {
                         <TableRow key={sm.id} className="border-white/10" data-testid={`row-sm-${sm.id}`}>
                           <TableCell>#{sm.id}</TableCell>
                           <TableCell className="font-medium">{sm.username}</TableCell>
+                          <TableCell>
+                            {sm.phoneNumber ? (
+                              <a href={`tel:${sm.phoneNumber}`} className="flex items-center gap-1 text-primary hover:underline text-xs" data-testid={`link-phone-sm-${sm.id}`}>
+                                <Phone className="w-3 h-3" /> {sm.phoneNumber}
+                              </a>
+                            ) : (
+                              <span className="text-muted-foreground text-xs">N/A</span>
+                            )}
+                          </TableCell>
                           <TableCell>
                             {sm.isSuspended ? (
                               <span className="flex items-center gap-1 text-red-500 text-xs"><Ban className="w-3 h-3" /> Suspended</span>
@@ -413,6 +423,7 @@ export default function AdminDashboard() {
                       <TableRow className="border-white/10">
                         <TableHead>ID</TableHead>
                         <TableHead>Username</TableHead>
+                        <TableHead>Phone</TableHead>
                         <TableHead>Role</TableHead>
                         <TableHead>Status</TableHead>
                         <TableHead>Balance</TableHead>
@@ -424,6 +435,15 @@ export default function AdminDashboard() {
                         <TableRow key={u.id} className="border-white/10" data-testid={`row-user-${u.id}`}>
                           <TableCell>#{u.id}</TableCell>
                           <TableCell className="font-medium">{u.username}</TableCell>
+                          <TableCell>
+                            {u.phoneNumber ? (
+                              <a href={`tel:${u.phoneNumber}`} className="flex items-center gap-1 text-primary hover:underline text-xs" data-testid={`link-phone-user-${u.id}`}>
+                                <Phone className="w-3 h-3" /> {u.phoneNumber}
+                              </a>
+                            ) : (
+                              <span className="text-muted-foreground text-xs">N/A</span>
+                            )}
+                          </TableCell>
                           <TableCell>{getRoleBadge(u.role)}</TableCell>
                           <TableCell>
                             {u.isSuspended ? (
