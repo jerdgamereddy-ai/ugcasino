@@ -49,7 +49,7 @@ export const transactions = pgTable("transactions", {
 
 export const gameSettings = pgTable("game_settings", {
   id: serial("id").primaryKey(),
-  gameType: text("game_type", { enum: ["slots", "roulette", "dice", "hilo", "coinflip", "plinko", "mines", "wheel", "poker", "fishhunt"] }).notNull().unique(),
+  gameType: text("game_type", { enum: ["slots", "roulette", "dice", "hilo", "coinflip", "plinko", "mines", "wheel", "poker", "keno", "fishhunt"] }).notNull().unique(),
   winChance: doublePrecision("win_chance").default(0.3).notNull(),
   updatedBy: integer("updated_by").notNull(),
   updatedAt: timestamp("updated_at").defaultNow(),

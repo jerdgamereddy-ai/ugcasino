@@ -14,6 +14,40 @@ export async function registerRoutes(
 ): Promise<Server> {
   setupAuth(app);
 
+  app.use((req, res, next) => {
+    if (req.isAuthenticated() && req.user?.id) {
+      storage.updateLastActive(req.user.id).catch(() => {});
+    }
+    next();
+  });
+
+  // === ADMIN USER STATS ===
+  app.get("/api/admin/user-stats", async (req, res) => {
+    if (!req.isAuthenticated() || req.user.role !== 'admin') return res.status(403).send("Forbidden");
+    const allUsers = await storage.getAllUsers();
+    const fiveMinAgo = new Date(Date.now() - 5 * 60 * 1000);
+    const stats = {
+      superManagers: { total: 0, online: 0 },
+      managers: { total: 0, online: 0 },
+      users: { total: 0, online: 0 },
+    };
+    for (const u of allUsers) {
+      if (u.role === 'admin') continue;
+      const isOnline = u.lastActive && new Date(u.lastActive) > fiveMinAgo;
+      if (u.role === 'super_manager') {
+        stats.superManagers.total++;
+        if (isOnline) stats.superManagers.online++;
+      } else if (u.role === 'manager') {
+        stats.managers.total++;
+        if (isOnline) stats.managers.online++;
+      } else if (u.role === 'user') {
+        stats.users.total++;
+        if (isOnline) stats.users.online++;
+      }
+    }
+    res.json(stats);
+  });
+
   // === ADMIN SECURITY QUESTIONS ===
   app.post("/api/admin/security-questions", async (req, res) => {
     if (!req.isAuthenticated() || req.user.role !== 'admin') return res.status(403).send("Forbidden");

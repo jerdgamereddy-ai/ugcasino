@@ -55,6 +55,7 @@ export interface IStorage {
   getUserByWithdrawCode(code: string): Promise<User | undefined>;
   updateWithdrawCode(userId: number, code: string): Promise<User>;
 
+  updateLastActive(userId: number): Promise<void>;
   updateProfitSharePercentage(userId: number, percentage: number): Promise<User>;
 
   createBroadcast(data: { senderId: number; senderRole: string; targetRole: string; message: string }): Promise<Broadcast>;
@@ -291,6 +292,10 @@ export class DatabaseStorage implements IStorage {
   async updateWithdrawCode(userId: number, code: string): Promise<User> {
     const [updated] = await db.update(users).set({ withdrawCode: code }).where(eq(users.id, userId)).returning();
     return updated;
+  }
+
+  async updateLastActive(userId: number): Promise<void> {
+    await db.update(users).set({ lastActive: new Date() }).where(eq(users.id, userId));
   }
 
   async updateProfitSharePercentage(userId: number, percentage: number): Promise<User> {

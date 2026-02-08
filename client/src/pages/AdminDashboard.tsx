@@ -9,7 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useState, useRef } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { Shield, Plus, Users, Ticket, Copy, Banknote, CheckCircle, Loader2, Ban, Trash2, ArrowUpCircle, KeyRound, UserCog, Lock, BarChart3, Settings2, ChevronUp, ChevronDown, Megaphone, Calculator, Phone } from "lucide-react";
+import { Shield, Plus, Users, Ticket, Copy, Banknote, CheckCircle, Loader2, Ban, Trash2, ArrowUpCircle, KeyRound, UserCog, Lock, BarChart3, Settings2, ChevronUp, ChevronDown, Megaphone, Calculator, Phone, CircleDot, Crown, Briefcase } from "lucide-react";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -93,6 +93,15 @@ export default function AdminDashboard() {
   const { data: gameSettings, isLoading: gameSettingsLoading } = useQuery<GameSetting[]>({
     queryKey: [api.games.settings.get.path],
     enabled: user?.role === 'admin',
+  });
+  const { data: userStats } = useQuery<{
+    superManagers: { total: number; online: number };
+    managers: { total: number; online: number };
+    users: { total: number; online: number };
+  }>({
+    queryKey: ["/api/admin/user-stats"],
+    enabled: user?.role === 'admin',
+    refetchInterval: 30000,
   });
 
   const [amount, setAmount] = useState("");
@@ -337,6 +346,68 @@ export default function AdminDashboard() {
         </div>
 
         <BroadcastBanner />
+
+        {userStats && (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <Card className="glass-card">
+              <CardContent className="pt-5 pb-4">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-3">
+                    <div className="bg-yellow-500/20 p-2.5 rounded-lg">
+                      <Crown className="w-5 h-5 text-yellow-500" />
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground uppercase tracking-wide">Super Managers</p>
+                      <p className="text-2xl font-bold" data-testid="text-total-super-managers">{userStats.superManagers.total}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-green-500/10">
+                    <CircleDot className="w-3 h-3 text-green-500" />
+                    <span className="text-xs font-semibold text-green-500" data-testid="text-online-super-managers">{userStats.superManagers.online} online</span>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+            <Card className="glass-card">
+              <CardContent className="pt-5 pb-4">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-3">
+                    <div className="bg-blue-500/20 p-2.5 rounded-lg">
+                      <Briefcase className="w-5 h-5 text-blue-500" />
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground uppercase tracking-wide">Managers</p>
+                      <p className="text-2xl font-bold" data-testid="text-total-managers">{userStats.managers.total}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-green-500/10">
+                    <CircleDot className="w-3 h-3 text-green-500" />
+                    <span className="text-xs font-semibold text-green-500" data-testid="text-online-managers">{userStats.managers.online} online</span>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+            <Card className="glass-card">
+              <CardContent className="pt-5 pb-4">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-3">
+                    <div className="bg-green-500/20 p-2.5 rounded-lg">
+                      <Users className="w-5 h-5 text-green-500" />
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground uppercase tracking-wide">Players</p>
+                      <p className="text-2xl font-bold" data-testid="text-total-players">{userStats.users.total}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-green-500/10">
+                    <CircleDot className="w-3 h-3 text-green-500" />
+                    <span className="text-xs font-semibold text-green-500" data-testid="text-online-players">{userStats.users.online} online</span>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        )}
 
         <Tabs defaultValue="users" className="w-full">
           <TabsList className="bg-white/5 border border-white/10 w-full justify-start flex-wrap gap-1">
