@@ -18,6 +18,7 @@ export default function Lobby() {
   const { data: user } = useUser();
   const [voucherCode, setVoucherCode] = useState("");
   const [withdrawAmount, setWithdrawAmount] = useState("");
+  const [managerCode, setManagerCode] = useState("");
   const { mutate: redeem, isPending } = useRedeemVoucher();
   const { toast } = useToast();
 
@@ -43,18 +44,23 @@ export default function Lobby() {
       toast({ title: "Error", description: "Minimum withdrawal is UGX 500", variant: "destructive" });
       return;
     }
+    if (!managerCode || managerCode.length !== 6) {
+      toast({ title: "Error", description: "Please enter a valid 6-digit manager code", variant: "destructive" });
+      return;
+    }
 
     try {
       const res = await fetch("/api/withdraw/request", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ amount }),
+        body: JSON.stringify({ amount, managerCode }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.message);
       
-      toast({ title: "Request Sent", description: "Your withdrawal request is pending approval.", className: "bg-green-600 text-white" });
+      toast({ title: "Request Sent", description: "Your withdrawal request has been sent to the manager.", className: "bg-green-600 text-white" });
       setWithdrawAmount("");
+      setManagerCode("");
       queryClient.invalidateQueries({ queryKey: ["/api/user"] });
     } catch (err: any) {
       toast({ title: "Error", description: err.message, variant: "destructive" });
@@ -179,19 +185,34 @@ export default function Lobby() {
                   </div>
                   Withdraw Funds
                 </CardTitle>
-                <CardDescription>Minimum withdrawal: UGX 500</CardDescription>
+                <CardDescription>Enter amount and manager's 6-digit code</CardDescription>
               </CardHeader>
               <CardContent className="relative z-10">
-                <form onSubmit={handleWithdrawRequest} className="flex gap-4">
-                  <Input 
-                    type="number"
-                    placeholder="Amount (UGX)" 
-                    value={withdrawAmount} 
-                    onChange={(e) => setWithdrawAmount(e.target.value)}
-                    className="bg-black/40 border-white/10 focus:border-primary/50 transition-colors h-12"
-                  />
-                  <Button type="submit" variant="luxury" className="h-12 px-8 font-bold">
-                    Request
+                <form onSubmit={handleWithdrawRequest} className="space-y-3">
+                  <div className="flex gap-3">
+                    <Input 
+                      type="number"
+                      placeholder="Amount (UGX)" 
+                      value={withdrawAmount} 
+                      onChange={(e) => setWithdrawAmount(e.target.value)}
+                      className="bg-black/40 border-white/10 focus:border-primary/50 transition-colors h-12 flex-1"
+                      data-testid="input-withdraw-amount"
+                    />
+                    <Input 
+                      type="text"
+                      placeholder="Manager Code" 
+                      value={managerCode}
+                      onChange={(e) => {
+                        const val = e.target.value.replace(/\D/g, '').slice(0, 6);
+                        setManagerCode(val);
+                      }}
+                      maxLength={6}
+                      className="bg-black/40 border-white/10 focus:border-primary/50 transition-colors h-12 w-36 text-center tracking-widest font-mono"
+                      data-testid="input-manager-code"
+                    />
+                  </div>
+                  <Button type="submit" variant="luxury" className="w-full font-bold" data-testid="button-withdraw-request">
+                    Request Withdrawal
                   </Button>
                 </form>
               </CardContent>

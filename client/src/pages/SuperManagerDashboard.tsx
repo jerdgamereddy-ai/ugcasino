@@ -8,7 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { Shield, Plus, Users, UserCog, Loader2, Ban, CheckCircle, Megaphone, Calculator, Phone } from "lucide-react";
+import { Shield, Plus, Users, UserCog, Loader2, Ban, CheckCircle, Megaphone, Calculator, Phone, KeyRound } from "lucide-react";
 import { queryClient } from "@/lib/queryClient";
 import { User } from "@shared/schema";
 import { BroadcastBanner } from "@/components/BroadcastBanner";
@@ -53,6 +53,7 @@ export default function SuperManagerDashboard() {
   });
 
   const [userPasswords, setUserPasswords] = useState<Record<number, string>>({});
+  const [withdrawCodes, setWithdrawCodes] = useState<Record<number, string>>({});
 
   const handleChangePassword = async (userId: number) => {
     const password = userPasswords[userId];
@@ -69,6 +70,30 @@ export default function SuperManagerDashboard() {
       if (!res.ok) throw new Error("Password update failed");
       toast({ title: "Password updated", className: "bg-green-600 text-white" });
       setUserPasswords({ ...userPasswords, [userId]: "" });
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    }
+  };
+
+  const handleSetWithdrawCode = async (managerId: number) => {
+    const code = withdrawCodes[managerId];
+    if (!code || !/^\d{6}$/.test(code)) {
+      toast({ title: "Error", description: "Code must be exactly 6 digits", variant: "destructive" });
+      return;
+    }
+    try {
+      const res = await fetch("/api/withdraw-code/set", {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ managerId, code }),
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.message);
+      }
+      toast({ title: "Withdraw code updated", className: "bg-green-600 text-white" });
+      setWithdrawCodes({ ...withdrawCodes, [managerId]: "" });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
     } catch (err: any) {
       toast({ title: "Error", description: err.message, variant: "destructive" });
     }
@@ -131,6 +156,7 @@ export default function SuperManagerDashboard() {
                         <TableHead>Phone</TableHead>
                         <TableHead>Status</TableHead>
                         <TableHead>Balance</TableHead>
+                        <TableHead>Withdraw Code</TableHead>
                         <TableHead>Change Password</TableHead>
                       </TableRow>
                     </TableHeader>
@@ -156,6 +182,28 @@ export default function SuperManagerDashboard() {
                             )}
                           </TableCell>
                           <TableCell className="text-primary font-bold">UGX {mgr.balance.toLocaleString()}</TableCell>
+                          <TableCell>
+                            <div className="flex gap-2 items-center">
+                              {mgr.withdrawCode ? (
+                                <span className="font-mono text-xs bg-white/5 px-2 py-1 rounded" data-testid={`text-withdraw-code-${mgr.id}`}>{mgr.withdrawCode}</span>
+                              ) : null}
+                              <Input
+                                type="text"
+                                placeholder={mgr.withdrawCode ? "Change code" : "Set code"}
+                                value={withdrawCodes[mgr.id] || ""}
+                                onChange={(e) => {
+                                  const val = e.target.value.replace(/\D/g, '').slice(0, 6);
+                                  setWithdrawCodes({ ...withdrawCodes, [mgr.id]: val });
+                                }}
+                                maxLength={6}
+                                className="w-24 bg-white/5 border-white/10 font-mono text-center tracking-widest"
+                                data-testid={`input-withdraw-code-${mgr.id}`}
+                              />
+                              <Button size="sm" onClick={() => handleSetWithdrawCode(mgr.id)} data-testid={`button-set-code-${mgr.id}`}>
+                                <KeyRound className="w-3 h-3 mr-1" /> Set
+                              </Button>
+                            </div>
+                          </TableCell>
                           <TableCell>
                             <div className="flex gap-2 items-center">
                               <Input

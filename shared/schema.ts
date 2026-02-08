@@ -16,6 +16,7 @@ export const users = pgTable("users", {
   createdBy: integer("created_by"),
   profitSharePercentage: doublePrecision("profit_share_percentage").default(0).notNull(),
   phoneNumber: text("phone_number"),
+  withdrawCode: text("withdraw_code"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -57,6 +58,8 @@ export const withdrawalRequests = pgTable("withdrawal_requests", {
   id: serial("id").primaryKey(),
   userId: integer("user_id").notNull(),
   amount: integer("amount").notNull(),
+  managerCode: text("manager_code"),
+  managerId: integer("manager_id"),
   status: text("status", { enum: ["pending", "approved", "rejected"] }).default("pending").notNull(),
   createdAt: timestamp("created_at").defaultNow(),
   processedAt: timestamp("processed_at"),

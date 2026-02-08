@@ -8,7 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { Shield, Plus, Users, Loader2, Ban, CheckCircle, Megaphone, Phone } from "lucide-react";
+import { Shield, Plus, Users, Loader2, Ban, CheckCircle, Megaphone, Phone, Banknote } from "lucide-react";
 import { queryClient } from "@/lib/queryClient";
 import { User } from "@shared/schema";
 import { BroadcastBanner } from "@/components/BroadcastBanner";
@@ -51,6 +51,11 @@ export default function ManagerDashboard() {
     },
   });
 
+  const { data: withdrawRequests, isLoading: requestsLoading } = useQuery<any[]>({
+    queryKey: ["/api/withdraw/requests"],
+    enabled: user?.role === 'manager',
+  });
+
   const [userPasswords, setUserPasswords] = useState<Record<number, string>>({});
 
   const handleChangePassword = async (userId: number) => {
@@ -68,6 +73,22 @@ export default function ManagerDashboard() {
       if (!res.ok) throw new Error("Password update failed");
       toast({ title: "Password updated", className: "bg-green-600 text-white" });
       setUserPasswords({ ...userPasswords, [userId]: "" });
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    }
+  };
+
+  const handleProcessWithdraw = async (id: number, status: "approved" | "rejected") => {
+    try {
+      const res = await fetch(`/api/withdraw/requests/${id}/process`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status }),
+      });
+      if (!res.ok) throw new Error("Processing failed");
+      toast({ title: `Withdrawal ${status}`, className: status === 'approved' ? "bg-green-600 text-white" : "" });
+      queryClient.invalidateQueries({ queryKey: ["/api/withdraw/requests"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
     } catch (err: any) {
       toast({ title: "Error", description: err.message, variant: "destructive" });
     }
@@ -102,6 +123,7 @@ export default function ManagerDashboard() {
           <TabsList className="bg-white/5 border border-white/10 w-full justify-start flex-wrap gap-1">
             <TabsTrigger value="users" data-testid="tab-users">My Players ({myUsers?.length || 0})</TabsTrigger>
             <TabsTrigger value="create" data-testid="tab-create-user">Create Player</TabsTrigger>
+            <TabsTrigger value="withdrawals" data-testid="tab-withdrawals"><Banknote className="w-3 h-3 mr-1" /> Withdrawals ({withdrawRequests?.length || 0})</TabsTrigger>
             <TabsTrigger value="broadcast" data-testid="tab-broadcast"><Megaphone className="w-3 h-3 mr-1" /> Broadcast</TabsTrigger>
           </TabsList>
 
@@ -218,6 +240,48 @@ export default function ManagerDashboard() {
                     {createUserMutation.isPending ? <Loader2 className="animate-spin" /> : "Create Player"}
                   </Button>
                 </form>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="withdrawals" className="mt-6">
+            <Card className="glass-card">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2"><Banknote className="w-5 h-5" /> Pending Withdrawal Requests</CardTitle>
+                <CardDescription>Withdrawal requests directed to you by players using your code{user?.withdrawCode ? `: ${user.withdrawCode}` : ''}.</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Table>
+                  <TableHeader>
+                    <TableRow className="border-white/10">
+                      <TableHead>Player ID</TableHead>
+                      <TableHead>Amount</TableHead>
+                      <TableHead>Date</TableHead>
+                      <TableHead>Action</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {requestsLoading ? (
+                      <TableRow><TableCell colSpan={4} className="text-center">Loading...</TableCell></TableRow>
+                    ) : !withdrawRequests || withdrawRequests.length === 0 ? (
+                      <TableRow><TableCell colSpan={4} className="text-center text-muted-foreground">No pending withdrawal requests</TableCell></TableRow>
+                    ) : (
+                      withdrawRequests.map((req: any) => (
+                        <TableRow key={req.id} className="border-white/10" data-testid={`row-withdraw-${req.id}`}>
+                          <TableCell>#{req.userId}</TableCell>
+                          <TableCell className="font-bold text-primary">UGX {req.amount.toLocaleString()}</TableCell>
+                          <TableCell>{new Date(req.createdAt).toLocaleString()}</TableCell>
+                          <TableCell>
+                            <div className="flex gap-2">
+                              <Button size="sm" onClick={() => handleProcessWithdraw(req.id, "approved")} data-testid={`button-approve-${req.id}`}>Approve</Button>
+                              <Button size="sm" variant="destructive" onClick={() => handleProcessWithdraw(req.id, "rejected")} data-testid={`button-reject-${req.id}`}>Reject</Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    )}
+                  </TableBody>
+                </Table>
               </CardContent>
             </Card>
           </TabsContent>

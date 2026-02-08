@@ -59,6 +59,15 @@ Preferred communication style: Simple, everyday language.
 - **Hierarchical Access**: Admin sees all; Super Manager sees their network only; Manager sees their players only
 - **Manager Filter**: Admin can filter by any super_manager or manager; Super Manager can filter by their managers
 
+### Withdrawal Request System
+- **Manager Withdraw Codes**: 6-digit codes assigned to managers by their super managers; admin can also change codes
+- **Player Withdrawal Flow**: Players enter amount + manager's 6-digit code → request routed to that specific manager
+- **Manager View**: Managers see only withdrawal requests directed to them (matched by code) in their Withdrawals tab
+- **Admin View**: Admin sees ALL pending withdrawal requests with manager code and manager name
+- **Processing**: Both admin and the assigned manager can approve/reject requests; rejected requests refund balance
+- **Code Uniqueness**: Each 6-digit code must be unique across all managers
+- **API**: `POST /api/withdraw/request`, `GET /api/withdraw/requests`, `POST /api/withdraw/requests/:id/process`, `POST /api/withdraw-code/set`
+
 ### Profit Sharing System
 - **Profit Calculator**: Available in Admin and Super Manager dashboards as a tab
 - **Admin → Super Managers**: Admin sets profit share percentage for each super manager; super manager owes that % of their network's profit (bets - wins)

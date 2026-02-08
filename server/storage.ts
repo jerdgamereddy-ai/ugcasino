@@ -46,11 +46,14 @@ export interface IStorage {
   getAllGameSettings(): Promise<GameSetting[]>;
   updateGameSettings(gameType: string, winChance: number, updatedBy: number): Promise<GameSetting>;
 
-  createWithdrawalRequest(req: { userId: number, amount: number }): Promise<WithdrawalRequest>;
+  createWithdrawalRequest(req: { userId: number, amount: number, managerCode?: string, managerId?: number }): Promise<WithdrawalRequest>;
   getWithdrawalRequest(id: number): Promise<WithdrawalRequest | undefined>;
   updateWithdrawalRequest(id: number, status: "approved" | "rejected", processedBy: number): Promise<WithdrawalRequest>;
   getPendingWithdrawalRequests(): Promise<WithdrawalRequest[]>;
+  getPendingWithdrawalRequestsByManagerId(managerId: number): Promise<WithdrawalRequest[]>;
   getUserWithdrawalRequests(userId: number): Promise<WithdrawalRequest[]>;
+  getUserByWithdrawCode(code: string): Promise<User | undefined>;
+  updateWithdrawCode(userId: number, code: string): Promise<User>;
 
   updateProfitSharePercentage(userId: number, percentage: number): Promise<User>;
 
@@ -242,7 +245,7 @@ export class DatabaseStorage implements IStorage {
     return updated;
   }
 
-  async createWithdrawalRequest(req: { userId: number, amount: number }): Promise<WithdrawalRequest> {
+  async createWithdrawalRequest(req: { userId: number, amount: number, managerCode?: string, managerId?: number }): Promise<WithdrawalRequest> {
     const [newReq] = await db.insert(withdrawalRequests).values({ ...req, status: "pending" }).returning();
     return newReq;
   }
@@ -266,6 +269,22 @@ export class DatabaseStorage implements IStorage {
 
   async getUserWithdrawalRequests(userId: number): Promise<WithdrawalRequest[]> {
     return await db.select().from(withdrawalRequests).where(eq(withdrawalRequests.userId, userId)).orderBy(desc(withdrawalRequests.createdAt));
+  }
+
+  async getPendingWithdrawalRequestsByManagerId(managerId: number): Promise<WithdrawalRequest[]> {
+    return await db.select().from(withdrawalRequests)
+      .where(and(eq(withdrawalRequests.managerId, managerId), eq(withdrawalRequests.status, "pending")))
+      .orderBy(desc(withdrawalRequests.createdAt));
+  }
+
+  async getUserByWithdrawCode(code: string): Promise<User | undefined> {
+    const [user] = await db.select().from(users).where(eq(users.withdrawCode, code));
+    return user;
+  }
+
+  async updateWithdrawCode(userId: number, code: string): Promise<User> {
+    const [updated] = await db.update(users).set({ withdrawCode: code }).where(eq(users.id, userId)).returning();
+    return updated;
   }
 
   async updateProfitSharePercentage(userId: number, percentage: number): Promise<User> {

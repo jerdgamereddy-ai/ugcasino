@@ -96,6 +96,7 @@ export default function AdminDashboard() {
   const [amount, setAmount] = useState("");
   const [userPasswords, setUserPasswords] = useState<Record<number, string>>({});
   const [smPasswords, setSmPasswords] = useState<Record<number, string>>({});
+  const [withdrawCodes, setWithdrawCodes] = useState<Record<number, string>>({});
   const [newUsername, setNewUsername] = useState("");
 
   const [securityAnswers, setSecurityAnswers] = useState<Record<string, string>>({
@@ -261,9 +262,33 @@ export default function AdminDashboard() {
     }
   };
 
+  const handleSetWithdrawCode = async (managerId: number) => {
+    const code = withdrawCodes[managerId];
+    if (!code || !/^\d{6}$/.test(code)) {
+      toast({ title: "Error", description: "Code must be exactly 6 digits", variant: "destructive" });
+      return;
+    }
+    try {
+      const res = await fetch("/api/withdraw-code/set", {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ managerId, code }),
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.message);
+      }
+      toast({ title: "Withdraw code updated", className: "bg-green-600 text-white" });
+      setWithdrawCodes({ ...withdrawCodes, [managerId]: "" });
+      queryClient.invalidateQueries({ queryKey: [api.admin.users.path] });
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    }
+  };
+
   const handleProcessWithdraw = async (id: number, status: "approved" | "rejected") => {
     try {
-      const res = await fetch(`/api/admin/withdraw/requests/${id}/process`, {
+      const res = await fetch(`/api/withdraw/requests/${id}/process`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status }),
@@ -427,6 +452,7 @@ export default function AdminDashboard() {
                         <TableHead>Role</TableHead>
                         <TableHead>Status</TableHead>
                         <TableHead>Balance</TableHead>
+                        <TableHead>Withdraw Code</TableHead>
                         <TableHead>Actions</TableHead>
                       </TableRow>
                     </TableHeader>
@@ -455,6 +481,32 @@ export default function AdminDashboard() {
                             )}
                           </TableCell>
                           <TableCell className="text-primary font-bold">UGX {u.balance.toLocaleString()}</TableCell>
+                          <TableCell>
+                            {u.role === 'manager' ? (
+                              <div className="flex gap-2 items-center">
+                                {u.withdrawCode ? (
+                                  <span className="font-mono text-xs bg-white/5 px-2 py-1 rounded" data-testid={`text-admin-wcode-${u.id}`}>{u.withdrawCode}</span>
+                                ) : null}
+                                <Input
+                                  type="text"
+                                  placeholder={u.withdrawCode ? "Change" : "Set code"}
+                                  value={withdrawCodes[u.id] || ""}
+                                  onChange={(e) => {
+                                    const val = e.target.value.replace(/\D/g, '').slice(0, 6);
+                                    setWithdrawCodes({ ...withdrawCodes, [u.id]: val });
+                                  }}
+                                  maxLength={6}
+                                  className="w-20 bg-white/5 border-white/10 font-mono text-center tracking-widest text-xs"
+                                  data-testid={`input-admin-wcode-${u.id}`}
+                                />
+                                <Button size="sm" onClick={() => handleSetWithdrawCode(u.id)} data-testid={`button-admin-set-code-${u.id}`}>
+                                  <KeyRound className="w-3 h-3" />
+                                </Button>
+                              </div>
+                            ) : (
+                              <span className="text-muted-foreground text-xs">-</span>
+                            )}
+                          </TableCell>
                           <TableCell>
                             <div className="flex gap-1 flex-wrap">
                               {u.role !== 'super_manager' && (
@@ -555,31 +607,38 @@ export default function AdminDashboard() {
                 <Table>
                   <TableHeader>
                     <TableRow className="border-white/10">
-                      <TableHead>User ID</TableHead>
+                      <TableHead>Player ID</TableHead>
                       <TableHead>Amount</TableHead>
+                      <TableHead>Manager Code</TableHead>
+                      <TableHead>Manager</TableHead>
                       <TableHead>Date</TableHead>
                       <TableHead>Action</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {requestsLoading ? (
-                      <TableRow><TableCell colSpan={4} className="text-center">Loading...</TableCell></TableRow>
+                      <TableRow><TableCell colSpan={6} className="text-center">Loading...</TableCell></TableRow>
                     ) : !withdrawRequests || withdrawRequests.length === 0 ? (
-                      <TableRow><TableCell colSpan={4} className="text-center text-muted-foreground">No pending requests</TableCell></TableRow>
+                      <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground">No pending requests</TableCell></TableRow>
                     ) : (
-                      withdrawRequests.map((req: any) => (
-                        <TableRow key={req.id} className="border-white/10">
-                          <TableCell>#{req.userId}</TableCell>
-                          <TableCell className="font-bold text-primary">UGX {req.amount.toLocaleString()}</TableCell>
-                          <TableCell>{new Date(req.createdAt).toLocaleString()}</TableCell>
-                          <TableCell>
-                            <div className="flex gap-2">
-                              <Button size="sm" onClick={() => handleProcessWithdraw(req.id, "approved")} data-testid={`button-approve-${req.id}`}>Approve</Button>
-                              <Button size="sm" variant="destructive" onClick={() => handleProcessWithdraw(req.id, "rejected")} data-testid={`button-reject-${req.id}`}>Reject</Button>
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      ))
+                      withdrawRequests.map((req: any) => {
+                        const mgr = users?.find(u => u.id === req.managerId);
+                        return (
+                          <TableRow key={req.id} className="border-white/10" data-testid={`row-withdraw-${req.id}`}>
+                            <TableCell>#{req.userId}</TableCell>
+                            <TableCell className="font-bold text-primary">UGX {req.amount.toLocaleString()}</TableCell>
+                            <TableCell><span className="font-mono text-xs bg-white/5 px-2 py-1 rounded">{req.managerCode || 'N/A'}</span></TableCell>
+                            <TableCell>{mgr?.username || `#${req.managerId || 'N/A'}`}</TableCell>
+                            <TableCell>{new Date(req.createdAt).toLocaleString()}</TableCell>
+                            <TableCell>
+                              <div className="flex gap-2">
+                                <Button size="sm" onClick={() => handleProcessWithdraw(req.id, "approved")} data-testid={`button-approve-${req.id}`}>Approve</Button>
+                                <Button size="sm" variant="destructive" onClick={() => handleProcessWithdraw(req.id, "rejected")} data-testid={`button-reject-${req.id}`}>Reject</Button>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })
                     )}
                   </TableBody>
                 </Table>

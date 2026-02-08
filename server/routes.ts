@@ -1077,25 +1077,31 @@ export async function registerRoutes(
     if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
     
     try {
-      const { amount } = z.object({ amount: z.number().min(500) }).parse(req.body);
+      const { amount, managerCode } = z.object({ amount: z.number().min(500), managerCode: z.string().length(6) }).parse(req.body);
       if (req.user.balance < amount) return res.status(400).json({ message: "Insufficient balance" });
+
+      const manager = await storage.getUserByWithdrawCode(managerCode);
+      if (!manager || manager.role !== 'manager') return res.status(400).json({ message: "Invalid manager code" });
 
       await storage.updateUserBalance(req.user.id, -amount);
       const withdrawalRequest = await storage.createWithdrawalRequest({
         userId: req.user.id,
         amount,
+        managerCode,
+        managerId: manager.id,
       });
 
       await storage.createTransaction({
         userId: req.user.id,
         amount: -amount,
         type: "withdrawal",
-        description: `Withdrawal request pending: ${withdrawalRequest.id}`,
+        description: `Withdrawal request pending: ${withdrawalRequest.id} (Manager: ${manager.username})`,
       });
 
       res.status(201).json(withdrawalRequest);
-    } catch (err) {
-      res.status(400).json({ message: "Invalid amount or insufficient funds" });
+    } catch (err: any) {
+      if (err?.issues) return res.status(400).json({ message: "Please enter a valid amount and 6-digit manager code" });
+      res.status(400).json({ message: err?.message || "Invalid amount or insufficient funds" });
     }
   });
 
@@ -1105,20 +1111,29 @@ export async function registerRoutes(
     if (req.user.role === 'user') {
       const requests = await storage.getUserWithdrawalRequests(req.user.id);
       return res.json(requests);
-    } else {
+    } else if (req.user.role === 'manager') {
+      const requests = await storage.getPendingWithdrawalRequestsByManagerId(req.user.id);
+      return res.json(requests);
+    } else if (req.user.role === 'admin') {
       const requests = await storage.getPendingWithdrawalRequests();
       return res.json(requests);
+    } else {
+      return res.json([]);
     }
   });
 
-  app.post("/api/admin/withdraw/requests/:id/process", async (req, res) => {
-    if (!req.isAuthenticated() || req.user.role === 'user') return res.status(403).send("Forbidden");
+  app.post("/api/withdraw/requests/:id/process", async (req, res) => {
+    if (!req.isAuthenticated() || (req.user.role !== 'admin' && req.user.role !== 'manager')) return res.status(403).send("Forbidden");
     
     const { id } = req.params;
     const { status } = z.object({ status: z.enum(["approved", "rejected"]) }).parse(req.body);
     
     const request = await storage.getWithdrawalRequest(parseInt(id));
     if (!request || request.status !== 'pending') return res.status(404).json({ message: "Request not found or already processed" });
+
+    if (req.user.role === 'manager' && request.managerId !== req.user.id) {
+      return res.status(403).json({ message: "This request is not assigned to you" });
+    }
 
     if (status === 'rejected') {
       await storage.updateUserBalance(request.userId, request.amount);
@@ -1132,6 +1147,26 @@ export async function registerRoutes(
 
     const updated = await storage.updateWithdrawalRequest(request.id, status, req.user.id);
     res.json(updated);
+  });
+
+  app.post("/api/withdraw-code/set", async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    if (req.user.role !== 'super_manager' && req.user.role !== 'admin') return res.status(403).send("Forbidden");
+
+    const { managerId, code } = z.object({ managerId: z.number(), code: z.string().length(6).regex(/^\d{6}$/, "Code must be 6 digits") }).parse(req.body);
+
+    const manager = await storage.getUser(managerId);
+    if (!manager || manager.role !== 'manager') return res.status(404).json({ message: "Manager not found" });
+
+    if (req.user.role === 'super_manager' && manager.createdBy !== req.user.id) {
+      return res.status(403).json({ message: "You can only set codes for managers you created" });
+    }
+
+    const existing = await storage.getUserByWithdrawCode(code);
+    if (existing && existing.id !== managerId) return res.status(400).json({ message: "This code is already assigned to another manager" });
+
+    const updated = await storage.updateWithdrawCode(managerId, code);
+    res.json({ message: "Withdraw code updated", withdrawCode: updated.withdrawCode });
   });
 
   app.post(api.admin.withdraw.path, async (req, res) => {
