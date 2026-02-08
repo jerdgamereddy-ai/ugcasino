@@ -56,8 +56,11 @@ function GameSettingForm({ setting }: { setting: GameSetting }) {
                 <FormItem>
                   <FormLabel>Win Probability (%)</FormLabel>
                   <FormControl>
-                    <div className="flex gap-2">
-                      <Input type="number" {...field} onChange={e => field.onChange(Number(e.target.value))} />
+                    <div className="flex gap-2 items-center">
+                      <div className="relative flex-1">
+                        <Input type="number" step="1" min={0} max={100} {...field} onChange={e => field.onChange(Number(e.target.value))} className="pr-8" />
+                        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground font-mono text-sm">%</span>
+                      </div>
                       <Button type="submit" disabled={mutation.isPending}>
                         {mutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save"}
                       </Button>

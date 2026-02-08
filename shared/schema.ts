@@ -127,7 +127,7 @@ export const redeemVoucherSchema = z.object({
 });
 
 export const updateGameSettingsSchema = z.object({
-  gameType: z.enum(["slots", "roulette", "dice", "hilo", "coinflip", "plinko", "mines", "wheel", "poker"]),
+  gameType: z.enum(["slots", "roulette", "dice", "hilo", "coinflip", "plinko", "mines", "wheel", "poker", "keno"]),
   winChance: z.number().min(0).max(100),
 });
 
