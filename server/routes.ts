@@ -972,6 +972,23 @@ export async function registerRoutes(
     try {
       const userId = parseInt(req.params.id);
       const { password } = z.object({ password: z.string().min(6) }).parse(req.body);
+
+      const targetUser = await storage.getUser(userId);
+      if (!targetUser) return res.status(404).json({ message: "User not found" });
+
+      if (req.user.role === 'super_manager') {
+        if (targetUser.createdBy !== req.user.id) {
+          const managers = await storage.getUsersByCreator(req.user.id);
+          const managerIds = managers.map(m => m.id);
+          if (!managerIds.includes(targetUser.createdBy!)) {
+            return res.status(403).json({ message: "You can only change passwords for users in your network" });
+          }
+        }
+      } else if (req.user.role === 'manager') {
+        if (targetUser.createdBy !== req.user.id) {
+          return res.status(403).json({ message: "You can only change passwords for your own players" });
+        }
+      }
       
       const hashedPassword = await hashPassword(password);
       await storage.updateUserPassword(userId, hashedPassword);
