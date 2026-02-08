@@ -61,6 +61,21 @@ export const withdrawalRequests = pgTable("withdrawal_requests", {
   processedBy: integer("processed_by"),
 });
 
+export const broadcasts = pgTable("broadcasts", {
+  id: serial("id").primaryKey(),
+  senderId: integer("sender_id").notNull(),
+  senderRole: text("sender_role", { enum: ["admin", "super_manager", "manager"] }).notNull(),
+  targetRole: text("target_role", { enum: ["super_manager", "manager", "user", "all"] }).notNull(),
+  message: text("message").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const broadcastDismissals = pgTable("broadcast_dismissals", {
+  id: serial("id").primaryKey(),
+  broadcastId: integer("broadcast_id").notNull(),
+  userId: integer("user_id").notNull(),
+});
+
 // === RELATIONS ===
 
 export const usersRelations = relations(users, ({ one, many }) => ({
@@ -171,6 +186,15 @@ export type AdminSecurityAnswer = typeof adminSecurityAnswers.$inferSelect;
 
 export type WithdrawalRequest = typeof withdrawalRequests.$inferSelect;
 export type InsertWithdrawalRequest = z.infer<typeof insertWithdrawalRequestSchema>;
+
+export type Broadcast = typeof broadcasts.$inferSelect;
+export type BroadcastDismissal = typeof broadcastDismissals.$inferSelect;
+
+export const insertBroadcastSchema = createInsertSchema(broadcasts).pick({
+  targetRole: true,
+  message: true,
+});
+export type InsertBroadcast = z.infer<typeof insertBroadcastSchema>;
 
 export interface GameResult {
   won: boolean;

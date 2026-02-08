@@ -9,7 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useState, useRef } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { Shield, Plus, Users, Ticket, Copy, Banknote, CheckCircle, Loader2, Ban, Trash2, ArrowUpCircle, KeyRound, UserCog, Lock, BarChart3, Settings2, ChevronUp, ChevronDown } from "lucide-react";
+import { Shield, Plus, Users, Ticket, Copy, Banknote, CheckCircle, Loader2, Ban, Trash2, ArrowUpCircle, KeyRound, UserCog, Lock, BarChart3, Settings2, ChevronUp, ChevronDown, Megaphone } from "lucide-react";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -20,6 +20,8 @@ import { api } from "@shared/routes";
 import { queryClient } from "@/lib/queryClient";
 import { User, ADMIN_SECURITY_QUESTIONS } from "@shared/schema";
 import { Badge } from "@/components/ui/badge";
+import { BroadcastBanner } from "@/components/BroadcastBanner";
+import { BroadcastSender } from "@/components/BroadcastSender";
 
 type GameFormData = z.infer<typeof updateGameSettingsSchema>;
 
@@ -306,6 +308,8 @@ export default function AdminDashboard() {
           </div>
         </div>
 
+        <BroadcastBanner />
+
         <Tabs defaultValue="users" className="w-full">
           <TabsList className="bg-white/5 border border-white/10 w-full justify-start flex-wrap gap-1">
             <TabsTrigger value="users" data-testid="tab-users">User Management</TabsTrigger>
@@ -313,6 +317,7 @@ export default function AdminDashboard() {
             <TabsTrigger value="requests" data-testid="tab-requests">Withdrawals</TabsTrigger>
             <TabsTrigger value="gamecontrol" data-testid="tab-gamecontrol"><Settings2 className="w-3 h-3 mr-1" /> Game Control</TabsTrigger>
             <TabsTrigger value="reports" data-testid="tab-reports">Reports</TabsTrigger>
+            <TabsTrigger value="broadcast" data-testid="tab-broadcast"><Megaphone className="w-3 h-3 mr-1" /> Broadcast</TabsTrigger>
             <TabsTrigger value="security" data-testid="tab-security">Security</TabsTrigger>
             <TabsTrigger value="settings" data-testid="tab-settings">Account</TabsTrigger>
           </TabsList>
@@ -593,6 +598,10 @@ export default function AdminDashboard() {
                 </Button>
               </CardContent>
             </Card>
+          </TabsContent>
+
+          <TabsContent value="broadcast" className="mt-6">
+            <BroadcastSender senderRole="admin" />
           </TabsContent>
 
           <TabsContent value="security" className="mt-6">

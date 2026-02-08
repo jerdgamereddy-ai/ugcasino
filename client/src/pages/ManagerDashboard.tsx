@@ -8,9 +8,11 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { Shield, Plus, Users, Loader2, Ban, CheckCircle } from "lucide-react";
+import { Shield, Plus, Users, Loader2, Ban, CheckCircle, Megaphone } from "lucide-react";
 import { queryClient } from "@/lib/queryClient";
 import { User } from "@shared/schema";
+import { BroadcastBanner } from "@/components/BroadcastBanner";
+import { BroadcastSender } from "@/components/BroadcastSender";
 
 export default function ManagerDashboard() {
   const { data: user } = useUser();
@@ -92,10 +94,13 @@ export default function ManagerDashboard() {
           </div>
         </div>
 
+        <BroadcastBanner />
+
         <Tabs defaultValue="users" className="w-full">
-          <TabsList className="bg-white/5 border border-white/10 w-full justify-start">
+          <TabsList className="bg-white/5 border border-white/10 w-full justify-start flex-wrap gap-1">
             <TabsTrigger value="users" data-testid="tab-users">My Players ({myUsers?.length || 0})</TabsTrigger>
             <TabsTrigger value="create" data-testid="tab-create-user">Create Player</TabsTrigger>
+            <TabsTrigger value="broadcast" data-testid="tab-broadcast"><Megaphone className="w-3 h-3 mr-1" /> Broadcast</TabsTrigger>
           </TabsList>
 
           <TabsContent value="users" className="mt-6">
@@ -192,6 +197,10 @@ export default function ManagerDashboard() {
                 </form>
               </CardContent>
             </Card>
+          </TabsContent>
+
+          <TabsContent value="broadcast" className="mt-6">
+            <BroadcastSender senderRole="manager" />
           </TabsContent>
         </Tabs>
       </div>

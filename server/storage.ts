@@ -1,4 +1,4 @@
-import { users, vouchers, transactions, gameSettings, withdrawalRequests, adminSecurityAnswers, type User, type InsertUser, type Voucher, type InsertVoucher, type Transaction, type GameSetting, type WithdrawalRequest, type InsertWithdrawalRequest, type AdminSecurityAnswer } from "@shared/schema";
+import { users, vouchers, transactions, gameSettings, withdrawalRequests, adminSecurityAnswers, broadcasts, broadcastDismissals, type User, type InsertUser, type Voucher, type InsertVoucher, type Transaction, type GameSetting, type WithdrawalRequest, type InsertWithdrawalRequest, type AdminSecurityAnswer, type Broadcast, type BroadcastDismissal } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, sql, and, inArray, gte, lte, between } from "drizzle-orm";
 import session from "express-session";
@@ -51,6 +51,12 @@ export interface IStorage {
   updateWithdrawalRequest(id: number, status: "approved" | "rejected", processedBy: number): Promise<WithdrawalRequest>;
   getPendingWithdrawalRequests(): Promise<WithdrawalRequest[]>;
   getUserWithdrawalRequests(userId: number): Promise<WithdrawalRequest[]>;
+
+  createBroadcast(data: { senderId: number; senderRole: string; targetRole: string; message: string }): Promise<Broadcast>;
+  getBroadcastsForUser(userId: number, userRole: string, createdBy?: number | null): Promise<Broadcast[]>;
+  dismissBroadcast(broadcastId: number, userId: number): Promise<void>;
+  getDismissedBroadcastIds(userId: number): Promise<number[]>;
+  getSentBroadcasts(senderId: number): Promise<Broadcast[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -258,6 +264,53 @@ export class DatabaseStorage implements IStorage {
 
   async getUserWithdrawalRequests(userId: number): Promise<WithdrawalRequest[]> {
     return await db.select().from(withdrawalRequests).where(eq(withdrawalRequests.userId, userId)).orderBy(desc(withdrawalRequests.createdAt));
+  }
+
+  async createBroadcast(data: { senderId: number; senderRole: string; targetRole: string; message: string }): Promise<Broadcast> {
+    const [broadcast] = await db.insert(broadcasts).values({
+      senderId: data.senderId,
+      senderRole: data.senderRole as "admin" | "super_manager" | "manager",
+      targetRole: data.targetRole as "super_manager" | "manager" | "user" | "all",
+      message: data.message,
+    }).returning();
+    return broadcast;
+  }
+
+  async getBroadcastsForUser(userId: number, userRole: string, createdBy?: number | null): Promise<Broadcast[]> {
+    const allBroadcasts = await db.select().from(broadcasts).orderBy(desc(broadcasts.createdAt));
+    const dismissedIds = await this.getDismissedBroadcastIds(userId);
+
+    return allBroadcasts.filter(b => {
+      if (dismissedIds.includes(b.id)) return false;
+      if (b.targetRole === 'all') return true;
+      if (b.targetRole === userRole) {
+        if (userRole === 'super_manager') return b.senderRole === 'admin';
+        if (userRole === 'manager') {
+          return b.senderRole === 'admin' || (b.senderRole === 'super_manager' && createdBy === b.senderId);
+        }
+        if (userRole === 'user') {
+          return b.senderRole === 'admin' || (b.senderRole === 'manager' && createdBy === b.senderId);
+        }
+      }
+      return false;
+    });
+  }
+
+  async dismissBroadcast(broadcastId: number, userId: number): Promise<void> {
+    const existing = await db.select().from(broadcastDismissals)
+      .where(and(eq(broadcastDismissals.broadcastId, broadcastId), eq(broadcastDismissals.userId, userId)));
+    if (existing.length === 0) {
+      await db.insert(broadcastDismissals).values({ broadcastId, userId });
+    }
+  }
+
+  async getDismissedBroadcastIds(userId: number): Promise<number[]> {
+    const dismissed = await db.select().from(broadcastDismissals).where(eq(broadcastDismissals.userId, userId));
+    return dismissed.map(d => d.broadcastId);
+  }
+
+  async getSentBroadcasts(senderId: number): Promise<Broadcast[]> {
+    return await db.select().from(broadcasts).where(eq(broadcasts.senderId, senderId)).orderBy(desc(broadcasts.createdAt));
   }
 }
 

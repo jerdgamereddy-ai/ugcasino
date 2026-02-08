@@ -1153,5 +1153,81 @@ export async function registerRoutes(
     }
   });
 
+  // === BROADCAST SYSTEM ===
+  app.post("/api/broadcasts", async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    const role = req.user.role;
+
+    if (role !== 'admin' && role !== 'super_manager' && role !== 'manager') {
+      return res.status(403).json({ message: "Only admins, super managers, and managers can broadcast" });
+    }
+
+    try {
+      const { targetRole, message } = z.object({
+        targetRole: z.enum(["super_manager", "manager", "user", "all"]),
+        message: z.string().min(1).max(500),
+      }).parse(req.body);
+
+      if (role === 'super_manager' && targetRole !== 'manager') {
+        return res.status(403).json({ message: "Super managers can only broadcast to their managers" });
+      }
+      if (role === 'manager' && targetRole !== 'user') {
+        return res.status(403).json({ message: "Managers can only broadcast to their players" });
+      }
+
+      const broadcast = await storage.createBroadcast({
+        senderId: req.user.id,
+        senderRole: role,
+        targetRole,
+        message,
+      });
+
+      res.status(201).json(broadcast);
+    } catch (err) {
+      res.status(400).json({ message: "Invalid broadcast input" });
+    }
+  });
+
+  app.get("/api/broadcasts", async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+
+    try {
+      const myBroadcasts = await storage.getBroadcastsForUser(
+        req.user.id,
+        req.user.role,
+        req.user.createdBy
+      );
+      res.json(myBroadcasts);
+    } catch (err) {
+      res.status(500).json({ message: "Failed to fetch broadcasts" });
+    }
+  });
+
+  app.get("/api/broadcasts/sent", async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    const role = req.user.role;
+    if (role !== 'admin' && role !== 'super_manager' && role !== 'manager') {
+      return res.status(403).json({ message: "Forbidden" });
+    }
+
+    try {
+      const sent = await storage.getSentBroadcasts(req.user.id);
+      res.json(sent);
+    } catch (err) {
+      res.status(500).json({ message: "Failed to fetch sent broadcasts" });
+    }
+  });
+
+  app.post("/api/broadcasts/:id/dismiss", async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    try {
+      const broadcastId = parseInt(req.params.id);
+      await storage.dismissBroadcast(broadcastId, req.user.id);
+      res.json({ message: "Broadcast dismissed" });
+    } catch (err) {
+      res.status(400).json({ message: "Failed to dismiss" });
+    }
+  });
+
   return httpServer;
 }

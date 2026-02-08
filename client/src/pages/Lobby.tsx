@@ -12,6 +12,7 @@ import { queryClient } from "@/lib/queryClient";
 import { motion, AnimatePresence } from "framer-motion";
 
 import { playSound } from "@/lib/sounds";
+import { BroadcastBanner } from "@/components/BroadcastBanner";
 
 export default function Lobby() {
   const { data: user } = useUser();
@@ -80,6 +81,7 @@ export default function Lobby() {
 
   return (
     <ProtectedLayout>
+      <BroadcastBanner />
       <motion.div 
         className="space-y-8"
         initial="hidden"

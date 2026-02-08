@@ -8,9 +8,11 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { Shield, Plus, Users, UserCog, Loader2, Ban, CheckCircle } from "lucide-react";
+import { Shield, Plus, Users, UserCog, Loader2, Ban, CheckCircle, Megaphone } from "lucide-react";
 import { queryClient } from "@/lib/queryClient";
 import { User } from "@shared/schema";
+import { BroadcastBanner } from "@/components/BroadcastBanner";
+import { BroadcastSender } from "@/components/BroadcastSender";
 
 export default function SuperManagerDashboard() {
   const { data: user } = useUser();
@@ -95,11 +97,14 @@ export default function SuperManagerDashboard() {
           </div>
         </div>
 
+        <BroadcastBanner />
+
         <Tabs defaultValue="managers" className="w-full">
-          <TabsList className="bg-white/5 border border-white/10 w-full justify-start">
+          <TabsList className="bg-white/5 border border-white/10 w-full justify-start flex-wrap gap-1">
             <TabsTrigger value="managers" data-testid="tab-managers">Managers ({managers.length})</TabsTrigger>
             <TabsTrigger value="players" data-testid="tab-players">Players ({players.length})</TabsTrigger>
             <TabsTrigger value="create" data-testid="tab-create">Create Manager</TabsTrigger>
+            <TabsTrigger value="broadcast" data-testid="tab-broadcast"><Megaphone className="w-3 h-3 mr-1" /> Broadcast</TabsTrigger>
           </TabsList>
 
           <TabsContent value="managers" className="mt-6">
@@ -240,6 +245,10 @@ export default function SuperManagerDashboard() {
                 </form>
               </CardContent>
             </Card>
+          </TabsContent>
+
+          <TabsContent value="broadcast" className="mt-6">
+            <BroadcastSender senderRole="super_manager" />
           </TabsContent>
         </Tabs>
       </div>
