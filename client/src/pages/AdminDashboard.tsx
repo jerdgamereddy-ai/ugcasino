@@ -9,12 +9,81 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { Shield, Plus, Users, Ticket, Copy, Banknote, CheckCircle, Loader2, Ban, Trash2, ArrowUpCircle, KeyRound, UserCog, Lock, BarChart3 } from "lucide-react";
+import { Shield, Plus, Users, Ticket, Copy, Banknote, CheckCircle, Loader2, Ban, Trash2, ArrowUpCircle, KeyRound, UserCog, Lock, BarChart3, Settings2 } from "lucide-react";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { updateGameSettingsSchema, type GameSetting } from "@shared/schema";
+import { z } from "zod";
 import { Link } from "wouter";
 import { api } from "@shared/routes";
 import { queryClient } from "@/lib/queryClient";
 import { User, ADMIN_SECURITY_QUESTIONS } from "@shared/schema";
 import { Badge } from "@/components/ui/badge";
+
+type GameFormData = z.infer<typeof updateGameSettingsSchema>;
+
+function GameSettingCard({ setting }: { setting: GameSetting }) {
+  const { toast } = useToast();
+  const form = useForm<GameFormData>({
+    resolver: zodResolver(updateGameSettingsSchema),
+    defaultValues: {
+      gameType: setting.gameType,
+      winChance: Math.round(setting.winChance * 100),
+    },
+  });
+
+  const mutation = useMutation({
+    mutationFn: async (data: GameFormData) => {
+      const res = await fetch(api.games.settings.update.path, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+      if (!res.ok) throw new Error("Failed to update");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [api.games.settings.get.path] });
+      toast({ title: "Updated", description: `${setting.gameType} win chance saved.` });
+    },
+  });
+
+  return (
+    <Card className="glass-card">
+      <CardHeader className="pb-2">
+        <CardTitle className="capitalize text-base">{setting.gameType}</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <Form {...form}>
+          <form onSubmit={form.handleSubmit((data) => mutation.mutate(data))}>
+            <FormField
+              control={form.control}
+              name="winChance"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="text-xs text-muted-foreground">Win Probability</FormLabel>
+                  <FormControl>
+                    <div className="flex gap-2 items-center">
+                      <div className="relative flex-1">
+                        <Input type="number" step="1" min={0} max={100} {...field} onChange={e => field.onChange(Number(e.target.value))} className="pr-8 bg-white/5 border-white/10" data-testid={`input-winchance-${setting.gameType}`} />
+                        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground font-mono text-sm">%</span>
+                      </div>
+                      <Button type="submit" size="sm" disabled={mutation.isPending} data-testid={`button-save-${setting.gameType}`}>
+                        {mutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save"}
+                      </Button>
+                    </div>
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          </form>
+        </Form>
+      </CardContent>
+    </Card>
+  );
+}
 
 export default function AdminDashboard() {
   const { data: user } = useUser();
@@ -27,6 +96,10 @@ export default function AdminDashboard() {
   const { toast } = useToast();
   const { data: withdrawRequests, isLoading: requestsLoading } = useQuery<any[]>({
     queryKey: ["/api/withdraw/requests"],
+    enabled: user?.role === 'admin',
+  });
+  const { data: gameSettings, isLoading: gameSettingsLoading } = useQuery<GameSetting[]>({
+    queryKey: [api.games.settings.get.path],
     enabled: user?.role === 'admin',
   });
 
@@ -251,6 +324,7 @@ export default function AdminDashboard() {
             <TabsTrigger value="users" data-testid="tab-users">User Management</TabsTrigger>
             <TabsTrigger value="vouchers" data-testid="tab-vouchers">Vouchers</TabsTrigger>
             <TabsTrigger value="requests" data-testid="tab-requests">Withdrawals</TabsTrigger>
+            <TabsTrigger value="gamecontrol" data-testid="tab-gamecontrol"><Settings2 className="w-3 h-3 mr-1" /> Game Control</TabsTrigger>
             <TabsTrigger value="reports" data-testid="tab-reports">Reports</TabsTrigger>
             <TabsTrigger value="security" data-testid="tab-security">Security</TabsTrigger>
             <TabsTrigger value="settings" data-testid="tab-settings">Account</TabsTrigger>
@@ -497,6 +571,25 @@ export default function AdminDashboard() {
                 </Table>
               </CardContent>
             </Card>
+          </TabsContent>
+
+          <TabsContent value="gamecontrol" className="mt-6">
+            <div className="space-y-4">
+              <div className="flex items-center gap-2 mb-2">
+                <Settings2 className="w-5 h-5 text-primary" />
+                <h2 className="text-xl font-bold">Game Win Probabilities</h2>
+              </div>
+              <p className="text-sm text-muted-foreground mb-4">Set the win probability percentage for each game. Higher values mean players win more often.</p>
+              {gameSettingsLoading ? (
+                <div className="flex justify-center py-8"><Loader2 className="h-6 w-6 animate-spin" /></div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {gameSettings?.map((s) => (
+                    <GameSettingCard key={s.id} setting={s} />
+                  ))}
+                </div>
+              )}
+            </div>
           </TabsContent>
 
           <TabsContent value="reports" className="mt-6">
