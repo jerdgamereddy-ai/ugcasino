@@ -1,35 +1,23 @@
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { updateGameSettingsSchema, type GameSetting } from "@shared/schema";
-import { api, buildUrl } from "@shared/routes";
+import { type GameSetting } from "@shared/schema";
+import { api } from "@shared/routes";
 import { queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, Settings2 } from "lucide-react";
-import { z } from "zod";
-
-type FormData = z.infer<typeof updateGameSettingsSchema>;
 
 function GameSettingForm({ setting }: { setting: GameSetting }) {
   const { toast } = useToast();
-  const form = useForm<FormData>({
-    resolver: zodResolver(updateGameSettingsSchema),
-    defaultValues: {
-      gameType: setting.gameType,
-      winChance: setting.winChance * 100,
-    },
-  });
+  const [winValue, setWinValue] = useState(String(Math.round(setting.winChance * 100)));
 
   const mutation = useMutation({
-    mutationFn: async (data: FormData) => {
+    mutationFn: async (val: number) => {
       const res = await fetch(api.games.settings.update.path, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data),
+        body: JSON.stringify({ gameType: setting.gameType, winChance: val }),
       });
       if (!res.ok) throw new Error("Failed to update");
       return res.json();
@@ -40,6 +28,15 @@ function GameSettingForm({ setting }: { setting: GameSetting }) {
     },
   });
 
+  const handleSave = () => {
+    const num = Number(winValue);
+    if (isNaN(num) || num < 0 || num > 100) {
+      toast({ title: "Invalid value", description: "Enter a number between 0 and 100", variant: "destructive" });
+      return;
+    }
+    mutation.mutate(num);
+  };
+
   return (
     <Card>
       <CardHeader>
@@ -47,31 +44,25 @@ function GameSettingForm({ setting }: { setting: GameSetting }) {
         <CardDescription>Adjust the house edge by setting player win probability.</CardDescription>
       </CardHeader>
       <CardContent>
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit((data) => mutation.mutate(data))} className="space-y-4">
-            <FormField
-              control={form.control}
-              name="winChance"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Win Probability (%)</FormLabel>
-                  <FormControl>
-                    <div className="flex gap-2 items-center">
-                      <div className="relative flex-1">
-                        <Input type="number" step="1" min={0} max={100} value={field.value ?? ""} onChange={e => { const v = e.target.value; field.onChange(v === "" ? "" : Number(v)); }} onBlur={() => { if (field.value === "" || isNaN(Number(field.value))) field.onChange(0); }} className="pr-8" />
-                        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground font-mono text-sm">%</span>
-                      </div>
-                      <Button type="submit" disabled={mutation.isPending}>
-                        {mutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save"}
-                      </Button>
-                    </div>
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
+        <label className="text-sm font-medium">Win Probability</label>
+        <div className="flex gap-2 items-center mt-1">
+          <div className="relative flex-1">
+            <input
+              type="number"
+              step="1"
+              min={0}
+              max={100}
+              value={winValue}
+              onChange={e => setWinValue(e.target.value)}
+              className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 pr-8 py-1 text-sm font-mono focus:outline-none focus:ring-1 focus:ring-primary"
+              data-testid={`input-winchance-${setting.gameType}`}
             />
-          </form>
-        </Form>
+            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground font-mono text-sm">%</span>
+          </div>
+          <Button onClick={handleSave} disabled={mutation.isPending}>
+            {mutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save"}
+          </Button>
+        </div>
       </CardContent>
     </Card>
   );

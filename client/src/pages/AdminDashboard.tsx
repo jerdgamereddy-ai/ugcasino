@@ -25,20 +25,14 @@ type GameFormData = z.infer<typeof updateGameSettingsSchema>;
 
 function GameSettingCard({ setting }: { setting: GameSetting }) {
   const { toast } = useToast();
-  const form = useForm<GameFormData>({
-    resolver: zodResolver(updateGameSettingsSchema),
-    defaultValues: {
-      gameType: setting.gameType,
-      winChance: Math.round(setting.winChance * 100),
-    },
-  });
+  const [winValue, setWinValue] = useState(String(Math.round(setting.winChance * 100)));
 
   const mutation = useMutation({
-    mutationFn: async (data: GameFormData) => {
+    mutationFn: async (val: number) => {
       const res = await fetch(api.games.settings.update.path, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data),
+        body: JSON.stringify({ gameType: setting.gameType, winChance: val }),
       });
       if (!res.ok) throw new Error("Failed to update");
       return res.json();
@@ -49,37 +43,40 @@ function GameSettingCard({ setting }: { setting: GameSetting }) {
     },
   });
 
+  const handleSave = () => {
+    const num = Number(winValue);
+    if (isNaN(num) || num < 0 || num > 100) {
+      toast({ title: "Invalid value", description: "Enter a number between 0 and 100", variant: "destructive" });
+      return;
+    }
+    mutation.mutate(num);
+  };
+
   return (
     <Card className="glass-card">
       <CardHeader className="pb-2">
         <CardTitle className="capitalize text-base">{setting.gameType}</CardTitle>
       </CardHeader>
       <CardContent>
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit((data) => mutation.mutate(data))}>
-            <FormField
-              control={form.control}
-              name="winChance"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel className="text-xs text-muted-foreground">Win Probability</FormLabel>
-                  <FormControl>
-                    <div className="flex gap-2 items-center">
-                      <div className="relative flex-1">
-                        <Input type="number" step="1" min={0} max={100} value={field.value ?? ""} onChange={e => { const v = e.target.value; field.onChange(v === "" ? "" : Number(v)); }} onBlur={() => { if (field.value === "" || isNaN(Number(field.value))) field.onChange(0); }} className="pr-8 bg-white/5 border-white/10" data-testid={`input-winchance-${setting.gameType}`} />
-                        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground font-mono text-sm">%</span>
-                      </div>
-                      <Button type="submit" size="sm" disabled={mutation.isPending} data-testid={`button-save-${setting.gameType}`}>
-                        {mutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save"}
-                      </Button>
-                    </div>
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
+        <label className="text-xs text-muted-foreground">Win Probability</label>
+        <div className="flex gap-2 items-center mt-1">
+          <div className="relative flex-1">
+            <input
+              type="number"
+              step="1"
+              min={0}
+              max={100}
+              value={winValue}
+              onChange={e => setWinValue(e.target.value)}
+              className="flex h-9 w-full rounded-md border border-white/10 bg-white/5 px-3 pr-8 py-1 text-sm text-white font-mono focus:outline-none focus:ring-1 focus:ring-primary"
+              data-testid={`input-winchance-${setting.gameType}`}
             />
-          </form>
-        </Form>
+            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground font-mono text-sm">%</span>
+          </div>
+          <Button size="sm" onClick={handleSave} disabled={mutation.isPending} data-testid={`button-save-${setting.gameType}`}>
+            {mutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save"}
+          </Button>
+        </div>
       </CardContent>
     </Card>
   );
