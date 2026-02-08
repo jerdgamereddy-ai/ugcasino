@@ -100,15 +100,15 @@ export function SlotMachine() {
         <div className="mt-8 flex flex-col md:flex-row items-center justify-between gap-6 bg-neutral-900/50 p-6 rounded-xl border border-white/5">
            <div className="flex flex-col gap-2 w-full md:w-auto">
                <label className="text-xs text-muted-foreground uppercase tracking-widest">Bet Amount</label>
-               <div className="flex gap-2">
+               <div className="flex flex-wrap gap-2">
                    {[500, 1000, 2000, 5000, 10000, 20000, 50000].map((amount) => (
                        <button
                            key={amount}
                            onClick={() => setBet(amount)}
                            disabled={isSpinning || isPending}
-                           className={`px-3 py-1 rounded text-sm font-mono border transition-all ${bet === amount ? "bg-primary text-black border-primary" : "bg-transparent text-muted-foreground border-white/10 hover:border-primary/50"}`}
+                           className={`px-3 py-1.5 rounded text-sm font-mono border transition-all ${bet === amount ? "bg-primary text-black border-primary font-bold" : "bg-transparent text-muted-foreground border-white/10 hover:border-primary/50"}`}
                        >
-                           {amount}
+                           {amount.toLocaleString()}
                        </button>
                    ))}
                </div>

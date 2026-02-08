@@ -87,17 +87,9 @@ export default function GameKeno() {
             <CardContent className="p-0 space-y-6">
               <div className="space-y-2">
                 <label className="text-xs uppercase font-bold text-[#D4AF37]">Bet Amount (UGX)</label>
-                <input 
-                  type="number" 
-                  value={bet} 
-                  onChange={(e) => setBet(Number(e.target.value))}
-                  className="w-full h-10 px-3 bg-black/40 border border-white/10 rounded-md text-white focus:outline-none focus:ring-1 focus:ring-primary"
-                  disabled={isSpinning}
-                  min={500}
-                />
-                <div className="flex flex-wrap gap-1.5 mt-2">
+                <div className="flex flex-wrap gap-1.5">
                   {[500, 1000, 2000, 5000, 10000, 20000, 50000].map(amt => (
-                    <button key={amt} onClick={() => setBet(amt)} disabled={isSpinning} className={`px-2 py-1 rounded text-xs font-mono border transition-colors ${bet === amt ? "bg-primary text-black border-primary" : "border-white/10 text-muted-foreground"}`}>{amt.toLocaleString()}</button>
+                    <button key={amt} onClick={() => setBet(amt)} disabled={isSpinning} className={`px-3 py-1.5 rounded text-xs font-mono border transition-colors ${bet === amt ? "bg-primary text-black border-primary font-bold" : "border-white/10 text-muted-foreground"}`}>{amt.toLocaleString()}</button>
                   ))}
                 </div>
               </div>

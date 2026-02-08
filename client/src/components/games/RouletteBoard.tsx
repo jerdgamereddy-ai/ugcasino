@@ -167,14 +167,14 @@ export function RouletteBoard() {
 
       {/* Controls */}
       <div className="flex flex-col md:flex-row gap-4 items-center w-full justify-between bg-neutral-900/50 p-6 rounded-xl border border-white/5">
-         <div className="flex gap-2">
+         <div className="flex flex-wrap gap-2">
              {[500, 1000, 2000, 5000, 10000, 20000, 50000].map(amt => (
                  <button
                     key={amt}
                     onClick={() => setBetAmount(amt)}
-                    className={cn("px-4 py-2 rounded font-mono text-sm border transition-colors", betAmount === amt ? "bg-primary text-black border-primary" : "border-white/10 text-muted-foreground hover:border-primary/50")}
+                    className={cn("px-3 py-1.5 rounded font-mono text-sm border transition-colors", betAmount === amt ? "bg-primary text-black border-primary font-bold" : "border-white/10 text-muted-foreground hover:border-primary/50")}
                  >
-                     {amt}
+                     {amt.toLocaleString()}
                  </button>
              ))}
          </div>

@@ -96,15 +96,6 @@ export default function CoinFlip() {
           <Card className="glass-card border-white/10 p-8 space-y-6">
             <div className="space-y-4">
               <label className="text-sm font-bold uppercase tracking-widest text-muted-foreground">Bet Amount (UGX)</label>
-              <div className="relative">
-                <Coins className="absolute left-4 top-1/2 -translate-y-1/2 text-primary w-5 h-5" />
-                <Input
-                  type="number"
-                  value={bet}
-                  onChange={(e) => setBet(Number(e.target.value))}
-                  className="bg-black/40 border-white/10 h-14 pl-12 text-xl font-mono text-white"
-                />
-              </div>
               <div className="flex flex-wrap gap-2">
                 {[500, 1000, 2000, 5000, 10000, 20000, 50000].map(amt => (
                   <Button 
@@ -113,6 +104,7 @@ export default function CoinFlip() {
                     size="sm"
                     onClick={() => setBet(amt)}
                     className="border-white/5 transition-colors"
+                    disabled={isFlipping}
                   >
                     {amt.toLocaleString()}
                   </Button>

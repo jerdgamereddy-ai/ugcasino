@@ -122,20 +122,9 @@ export function DiceGame() {
 
             <div className="space-y-2">
               <label className="text-xs uppercase text-muted-foreground tracking-widest">Bet Amount (UGX)</label>
-              <div className="relative">
-                <Coins className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-primary" />
-                <Input 
-                  type="number"
-                  value={bet}
-                  onChange={(e) => setBet(Number(e.target.value))}
-                  className="pl-10 bg-black/30 border-white/10 text-white font-mono"
-                  min={500}
-                  disabled={rolling}
-                />
-              </div>
               <div className="flex flex-wrap gap-1.5">
                 {[500, 1000, 2000, 5000, 10000, 20000, 50000].map(amt => (
-                  <button key={amt} onClick={() => setBet(amt)} disabled={rolling} className={`px-2 py-1 rounded text-xs font-mono border transition-colors ${bet === amt ? "bg-primary text-black border-primary" : "border-white/10 text-muted-foreground"}`}>{amt.toLocaleString()}</button>
+                  <button key={amt} onClick={() => setBet(amt)} disabled={rolling} className={`px-3 py-1.5 rounded text-xs font-mono border transition-colors ${bet === amt ? "bg-primary text-black border-primary font-bold" : "border-white/10 text-muted-foreground"}`}>{amt.toLocaleString()}</button>
                 ))}
               </div>
             </div>
