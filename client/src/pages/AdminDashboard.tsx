@@ -9,7 +9,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { Shield, Plus, Users, Ticket, Copy, Banknote, CheckCircle, Loader2, Ban, Trash2, ArrowUpCircle, KeyRound, UserCog, Lock } from "lucide-react";
+import { Shield, Plus, Users, Ticket, Copy, Banknote, CheckCircle, Loader2, Ban, Trash2, ArrowUpCircle, KeyRound, UserCog, Lock, BarChart3 } from "lucide-react";
+import { Link } from "wouter";
 import { api } from "@shared/routes";
 import { queryClient } from "@/lib/queryClient";
 import { User, ADMIN_SECURITY_QUESTIONS } from "@shared/schema";
@@ -250,6 +251,7 @@ export default function AdminDashboard() {
             <TabsTrigger value="users" data-testid="tab-users">User Management</TabsTrigger>
             <TabsTrigger value="vouchers" data-testid="tab-vouchers">Vouchers</TabsTrigger>
             <TabsTrigger value="requests" data-testid="tab-requests">Withdrawals</TabsTrigger>
+            <TabsTrigger value="reports" data-testid="tab-reports">Reports</TabsTrigger>
             <TabsTrigger value="security" data-testid="tab-security">Security</TabsTrigger>
             <TabsTrigger value="settings" data-testid="tab-settings">Account</TabsTrigger>
           </TabsList>
@@ -493,6 +495,22 @@ export default function AdminDashboard() {
                     )}
                   </TableBody>
                 </Table>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="reports" className="mt-6">
+            <Card className="glass-card">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2"><BarChart3 className="w-5 h-5" /> Business Reports</CardTitle>
+                <CardDescription>View detailed financial reports with time-based filtering, manager filtering, and key business metrics.</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Button asChild>
+                  <Link href="/reports" data-testid="link-open-reports">
+                    <BarChart3 className="w-4 h-4 mr-2" /> Open Full Reports
+                  </Link>
+                </Button>
               </CardContent>
             </Card>
           </TabsContent>
