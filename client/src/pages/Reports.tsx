@@ -24,7 +24,7 @@ import {
   Filter,
   RefreshCw,
 } from "lucide-react";
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, Legend } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, Legend, Cell, PieChart, Pie } from 'recharts';
 
 type PeriodPreset = "15min" | "30min" | "1hour" | "6hours" | "today" | "yesterday" | "7days" | "30days" | "3months" | "6months" | "1year" | "custom";
 
@@ -318,17 +318,89 @@ export default function Reports() {
               ))}
             </div>
 
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2"><BarChart3 className="h-5 w-5" /> Financial Overview</CardTitle>
+                </CardHeader>
+                <CardContent className="h-[300px]">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={[
+                      { name: 'Deposited', value: reports.totalDeposits, fill: '#22c55e' },
+                      { name: 'Withdrawn', value: reports.totalWithdrawals, fill: '#f97316' },
+                      { name: 'Bets', value: reports.totalBets, fill: '#3b82f6' },
+                      { name: 'Wins', value: reports.totalWins, fill: '#eab308' },
+                      { name: 'Profit', value: Math.max(0, reports.profit), fill: '#10b981' },
+                      { name: 'Loss', value: Math.max(0, -reports.profit), fill: '#ef4444' },
+                    ]}>
+                      <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+                      <XAxis dataKey="name" tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} />
+                      <YAxis tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} />
+                      <RechartsTooltip
+                        contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '8px' }}
+                        itemStyle={{ color: 'hsl(var(--foreground))' }}
+                        labelStyle={{ color: 'hsl(var(--foreground))', fontWeight: 'bold' }}
+                        formatter={(value: number) => [`UGX ${value.toLocaleString()}`, undefined]}
+                      />
+                      <Bar dataKey="value" name="Amount" radius={[4, 4, 0, 0]}>
+                        {[
+                          { name: 'Deposited', fill: '#22c55e' },
+                          { name: 'Withdrawn', fill: '#f97316' },
+                          { name: 'Bets', fill: '#3b82f6' },
+                          { name: 'Wins', fill: '#eab308' },
+                          { name: 'Profit', fill: '#10b981' },
+                          { name: 'Loss', fill: '#ef4444' },
+                        ].map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={entry.fill} />
+                        ))}
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2"><DollarSign className="h-5 w-5" /> Bets vs Wins</CardTitle>
+                </CardHeader>
+                <CardContent className="h-[300px]">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={[
+                      { name: 'Total Bets', amount: reports.totalBets },
+                      { name: 'Total Wins', amount: reports.totalWins },
+                      { name: 'House Profit', amount: Math.max(0, reports.profit) },
+                    ]} layout="vertical">
+                      <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+                      <XAxis type="number" tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} />
+                      <YAxis dataKey="name" type="category" tick={{ fontSize: 12, fill: 'hsl(var(--muted-foreground))' }} width={100} />
+                      <RechartsTooltip
+                        contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '8px' }}
+                        itemStyle={{ color: 'hsl(var(--foreground))' }}
+                        labelStyle={{ color: 'hsl(var(--foreground))', fontWeight: 'bold' }}
+                        formatter={(value: number) => [`UGX ${value.toLocaleString()}`, undefined]}
+                      />
+                      <Bar dataKey="amount" name="UGX" radius={[0, 4, 4, 0]}>
+                        <Cell fill="#3b82f6" />
+                        <Cell fill="#eab308" />
+                        <Cell fill={reports.profit >= 0 ? '#10b981' : '#ef4444'} />
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                </CardContent>
+              </Card>
+            </div>
+
             {reports.dailyStats.length > 0 && (
               <Card>
                 <CardHeader>
-                  <CardTitle className="flex items-center gap-2"><BarChart3 className="h-5 w-5" /> Activity Trend</CardTitle>
+                  <CardTitle className="flex items-center gap-2"><BarChart3 className="h-5 w-5" /> Daily Activity Trend</CardTitle>
                 </CardHeader>
                 <CardContent className="h-[320px]">
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart data={reports.dailyStats}>
                       <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-                      <XAxis dataKey="date" className="text-muted-foreground" tick={{ fontSize: 11 }} />
-                      <YAxis className="text-muted-foreground" tick={{ fontSize: 11 }} />
+                      <XAxis dataKey="date" tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} />
+                      <YAxis tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} />
                       <RechartsTooltip
                         contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '8px' }}
                         itemStyle={{ color: 'hsl(var(--foreground))' }}
