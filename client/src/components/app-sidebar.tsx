@@ -1,5 +1,5 @@
 import { Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarGroupLabel, SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarFooter } from "@/components/ui/sidebar"
-import { Home, Dice5, Target, Dices, Settings, FileText, Users, LogOut, Club, Shield, LayoutDashboard, Coins, Zap, RotateCcw, Gem } from "lucide-react"
+import { Home, Dice5, Target, Dices, Settings, FileText, Users, LogOut, Club, Shield, LayoutDashboard, Coins, Zap, RotateCcw, Gem, Wallet, BarChart3, UserCog } from "lucide-react"
 import { Link, useLocation } from "wouter"
 import { useQuery, useMutation } from "@tanstack/react-query"
 import { User } from "@shared/schema"
@@ -36,17 +36,38 @@ export function AppSidebar() {
     { title: "Keno", url: "/keno", icon: Target },
   ];
 
-  const adminItems = [
-    { title: "Admin Panel", url: "/admin", icon: Shield },
-    { title: "Game Control", url: "/game-control", icon: Settings },
-  ];
-
-  const filteredAdminItems = adminItems.filter(item => {
-    if (user?.role === 'manager') {
-      return item.title !== "Game Control";
+  const getRoleLabel = (role: string) => {
+    switch (role) {
+      case 'admin': return 'Admin';
+      case 'super_manager': return 'Super Manager';
+      case 'manager': return 'Manager';
+      default: return 'Player';
     }
-    return true;
-  });
+  };
+
+  const getManagementItems = () => {
+    if (!user) return [];
+    const items = [];
+
+    if (user.role === 'admin') {
+      items.push({ title: "Admin Panel", url: "/admin", icon: Shield });
+      items.push({ title: "Game Control", url: "/game-control", icon: Settings });
+      items.push({ title: "Business Reports", url: "/reports", icon: BarChart3 });
+    }
+
+    if (user.role === 'super_manager') {
+      items.push({ title: "Management Panel", url: "/super-manager", icon: UserCog });
+      items.push({ title: "Reports", url: "/sm-reports", icon: BarChart3 });
+    }
+
+    if (user.role === 'manager') {
+      items.push({ title: "Manager Panel", url: "/manager", icon: Users });
+    }
+
+    return items;
+  };
+
+  const managementItems = getManagementItems();
 
   return (
     <Sidebar className="border-r border-white/5 bg-black/95">
@@ -61,27 +82,12 @@ export function AppSidebar() {
             </div>
         </div>
 
-        <SidebarGroup>
-          <SidebarMenu>
-            {playerItems.map((item) => (
-              <SidebarMenuItem key={item.title}>
-                <SidebarMenuButton asChild isActive={location === item.url} className="hover:bg-primary/10 transition-colors">
-                  <Link href={item.url}>
-                    <item.icon className={location === item.url ? "text-primary" : "text-muted-foreground"} />
-                    <span className={location === item.url ? "text-primary font-medium" : "text-muted-foreground"}>{item.title}</span>
-                  </Link>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-            ))}
-          </SidebarMenu>
-        </SidebarGroup>
-
-        {(user?.role === 'admin' || user?.role === 'manager') && (
-          <SidebarGroup className="mt-4 pt-4 border-t border-white/5">
+        {(user?.role === 'user' || !user) && (
+          <SidebarGroup>
             <SidebarMenu>
-              {filteredAdminItems.map((item) => (
+              {playerItems.map((item) => (
                 <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton asChild isActive={location === item.url} className="hover:bg-primary/10 transition-colors">
+                  <SidebarMenuButton asChild isActive={location === item.url} className="transition-colors">
                     <Link href={item.url}>
                       <item.icon className={location === item.url ? "text-primary" : "text-muted-foreground"} />
                       <span className={location === item.url ? "text-primary font-medium" : "text-muted-foreground"}>{item.title}</span>
@@ -90,6 +96,46 @@ export function AppSidebar() {
                 </SidebarMenuItem>
               ))}
             </SidebarMenu>
+          </SidebarGroup>
+        )}
+
+        {managementItems.length > 0 && (
+          <SidebarGroup className={user?.role === 'user' ? "mt-4 pt-4 border-t border-white/5" : ""}>
+            <SidebarGroupLabel className="text-[10px] uppercase tracking-wider text-muted-foreground">Management</SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                {managementItems.map((item) => (
+                  <SidebarMenuItem key={item.title}>
+                    <SidebarMenuButton asChild isActive={location === item.url} className="transition-colors">
+                      <Link href={item.url}>
+                        <item.icon className={location === item.url ? "text-primary" : "text-muted-foreground"} />
+                        <span className={location === item.url ? "text-primary font-medium" : "text-muted-foreground"}>{item.title}</span>
+                      </Link>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                ))}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        )}
+
+        {(user?.role === 'admin' || user?.role === 'super_manager' || user?.role === 'manager') && (
+          <SidebarGroup className="mt-4 pt-4 border-t border-white/5">
+            <SidebarGroupLabel className="text-[10px] uppercase tracking-wider text-muted-foreground">Games</SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                {playerItems.map((item) => (
+                  <SidebarMenuItem key={item.title}>
+                    <SidebarMenuButton asChild isActive={location === item.url} className="transition-colors">
+                      <Link href={item.url}>
+                        <item.icon className={location === item.url ? "text-primary" : "text-muted-foreground"} />
+                        <span className={location === item.url ? "text-primary font-medium" : "text-muted-foreground"}>{item.title}</span>
+                      </Link>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                ))}
+              </SidebarMenu>
+            </SidebarGroupContent>
           </SidebarGroup>
         )}
       </SidebarContent>
@@ -104,7 +150,7 @@ export function AppSidebar() {
                     </Avatar>
                     <div className="flex flex-col">
                         <span className="text-sm font-medium">{user.username}</span>
-                        <span className="text-[10px] text-primary uppercase font-bold tracking-tighter">{user.role}</span>
+                        <span className="text-[10px] text-primary uppercase font-bold tracking-tighter">{getRoleLabel(user.role)}</span>
                     </div>
                 </div>
                 <div className="flex items-center justify-between mb-3 bg-black/40 p-2 rounded-lg">
@@ -124,8 +170,9 @@ export function AppSidebar() {
                     <Button 
                         variant="ghost" 
                         size="sm" 
-                        className="flex-1 h-8 text-[10px] hover:bg-destructive/10 hover:text-destructive"
+                        className="flex-1 h-8 text-[10px]"
                         onClick={() => logoutMutation.mutate()}
+                        data-testid="button-logout"
                     >
                         <LogOut className="w-3 h-3 mr-1" /> Exit
                     </Button>
@@ -136,5 +183,3 @@ export function AppSidebar() {
     </Sidebar>
   )
 }
-
-import { Wallet } from "lucide-react"

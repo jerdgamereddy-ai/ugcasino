@@ -6,6 +6,7 @@ import { api } from "@shared/routes";
 import { z } from "zod";
 import { randomBytes } from "crypto";
 import { hashPassword } from "./auth";
+import { adminPasswordSchema, securityAnswersSchema, securityVerifySchema, ADMIN_SECURITY_QUESTIONS } from "@shared/schema";
 
 export async function registerRoutes(
   httpServer: Server,
@@ -13,9 +14,343 @@ export async function registerRoutes(
 ): Promise<Server> {
   setupAuth(app);
 
-  // === ADMIN REPORTS ===
+  // === ADMIN SECURITY QUESTIONS ===
+  app.post("/api/admin/security-questions", async (req, res) => {
+    if (!req.isAuthenticated() || req.user.role !== 'admin') return res.status(403).send("Forbidden");
+    try {
+      const answers = securityAnswersSchema.parse(req.body.answers);
+      const loweredAnswers = answers.map(a => ({ question: a.question, answer: a.answer.toLowerCase().trim() }));
+      await storage.setSecurityAnswers(req.user.id, loweredAnswers);
+      res.json({ message: "Security questions saved successfully" });
+    } catch (err) {
+      res.status(400).json({ message: "Invalid security questions" });
+    }
+  });
+
+  app.get("/api/admin/security-questions", async (req, res) => {
+    if (!req.isAuthenticated() || req.user.role !== 'admin') return res.status(403).send("Forbidden");
+    const answers = await storage.getSecurityAnswers(req.user.id);
+    res.json(answers.map(a => ({ question: a.question, hasAnswer: true })));
+  });
+
+  app.post("/api/admin/verify-security", async (req, res) => {
+    try {
+      const { username, answers } = z.object({
+        username: z.string(),
+        answers: securityVerifySchema,
+      }).parse(req.body);
+
+      const admin = await storage.getUserByUsername(username);
+      if (!admin || admin.role !== 'admin') return res.status(404).json({ message: "Admin account not found" });
+
+      const storedAnswers = await storage.getSecurityAnswers(admin.id);
+      if (storedAnswers.length === 0) return res.status(400).json({ message: "Security questions not set up" });
+
+      let correctCount = 0;
+      for (const provided of answers) {
+        const stored = storedAnswers.find(s => s.question === provided.question);
+        if (stored && stored.answer === provided.answer.toLowerCase().trim()) {
+          correctCount++;
+        }
+      }
+
+      if (correctCount < 2) {
+        return res.status(400).json({ message: "At least 2 security answers must be correct" });
+      }
+
+      res.json({ verified: true, userId: admin.id });
+    } catch (err) {
+      res.status(400).json({ message: "Invalid input" });
+    }
+  });
+
+  app.post("/api/admin/reset-password", async (req, res) => {
+    try {
+      const { userId, newPassword } = z.object({
+        userId: z.number(),
+        newPassword: adminPasswordSchema,
+      }).parse(req.body);
+
+      const user = await storage.getUser(userId);
+      if (!user || user.role !== 'admin') return res.status(404).json({ message: "Admin not found" });
+
+      const hashedPassword = await hashPassword(newPassword);
+      await storage.updateUserPassword(userId, hashedPassword);
+      res.json({ message: "Password reset successfully" });
+    } catch (err: any) {
+      res.status(400).json({ message: err.message || "Invalid password format" });
+    }
+  });
+
+  // === ADMIN USERNAME MANAGEMENT ===
+  app.post("/api/admin/update-username", async (req, res) => {
+    if (!req.isAuthenticated() || req.user.role !== 'admin') return res.status(403).send("Forbidden");
+    try {
+      const { newUsername } = z.object({ newUsername: z.string().min(2) }).parse(req.body);
+
+      if (newUsername !== "Admin") {
+        const existing = await storage.getUserByUsername(newUsername);
+        if (existing) return res.status(400).json({ message: "Username already taken" });
+      }
+
+      const updatedUser = await storage.updateUsername(req.user.id, newUsername);
+      res.json(updatedUser);
+    } catch (err) {
+      res.status(400).json({ message: "Invalid username" });
+    }
+  });
+
+  // === ADMIN: MANAGE SUPER MANAGERS ===
+  app.post("/api/admin/promote-to-super-manager", async (req, res) => {
+    if (!req.isAuthenticated() || req.user.role !== 'admin') return res.status(403).send("Forbidden");
+    try {
+      const { userId } = z.object({ userId: z.number() }).parse(req.body);
+      const user = await storage.getUser(userId);
+      if (!user) return res.status(404).json({ message: "User not found" });
+      if (user.role === 'admin') return res.status(400).json({ message: "Cannot change admin role" });
+
+      const updatedUser = await storage.updateUserRole(userId, "super_manager");
+      await storage.approveUser(userId);
+      res.json(updatedUser);
+    } catch (err) {
+      res.status(400).json({ message: "Invalid input" });
+    }
+  });
+
+  app.post("/api/admin/suspend-user", async (req, res) => {
+    if (!req.isAuthenticated() || req.user.role !== 'admin') return res.status(403).send("Forbidden");
+    try {
+      const { userId } = z.object({ userId: z.number() }).parse(req.body);
+      const user = await storage.getUser(userId);
+      if (!user) return res.status(404).json({ message: "User not found" });
+      if (user.role === 'admin') return res.status(400).json({ message: "Cannot suspend admin" });
+
+      await storage.suspendUser(userId);
+
+      if (user.role === 'super_manager') {
+        const managers = await storage.getUsersByCreator(userId);
+        for (const mgr of managers) {
+          await storage.suspendUser(mgr.id);
+          const mgrUsers = await storage.getUsersByCreator(mgr.id);
+          for (const u of mgrUsers) {
+            await storage.suspendUser(u.id);
+          }
+        }
+      } else if (user.role === 'manager') {
+        const mgrUsers = await storage.getUsersByCreator(userId);
+        for (const u of mgrUsers) {
+          await storage.suspendUser(u.id);
+        }
+      }
+
+      res.json({ message: "User and subordinates suspended" });
+    } catch (err) {
+      res.status(400).json({ message: "Invalid input" });
+    }
+  });
+
+  app.post("/api/admin/unsuspend-user", async (req, res) => {
+    if (!req.isAuthenticated() || req.user.role !== 'admin') return res.status(403).send("Forbidden");
+    try {
+      const { userId } = z.object({ userId: z.number() }).parse(req.body);
+      const user = await storage.getUser(userId);
+      if (!user) return res.status(404).json({ message: "User not found" });
+
+      await storage.unsuspendUser(userId);
+
+      if (user.role === 'super_manager') {
+        const managers = await storage.getUsersByCreator(userId);
+        for (const mgr of managers) {
+          await storage.unsuspendUser(mgr.id);
+          const mgrUsers = await storage.getUsersByCreator(mgr.id);
+          for (const u of mgrUsers) {
+            await storage.unsuspendUser(u.id);
+          }
+        }
+      } else if (user.role === 'manager') {
+        const mgrUsers = await storage.getUsersByCreator(userId);
+        for (const u of mgrUsers) {
+          await storage.unsuspendUser(u.id);
+        }
+      }
+
+      res.json({ message: "User and subordinates unsuspended" });
+    } catch (err) {
+      res.status(400).json({ message: "Invalid input" });
+    }
+  });
+
+  app.post("/api/admin/delete-user", async (req, res) => {
+    if (!req.isAuthenticated() || req.user.role !== 'admin') return res.status(403).send("Forbidden");
+    try {
+      const { userId } = z.object({ userId: z.number() }).parse(req.body);
+      const user = await storage.getUser(userId);
+      if (!user) return res.status(404).json({ message: "User not found" });
+      if (user.role === 'admin') return res.status(400).json({ message: "Cannot delete admin" });
+
+      if (user.role === 'super_manager') {
+        const managers = await storage.getUsersByCreator(userId);
+        for (const mgr of managers) {
+          const mgrUsers = await storage.getUsersByCreator(mgr.id);
+          for (const u of mgrUsers) {
+            await storage.suspendUser(u.id);
+          }
+          await storage.suspendUser(mgr.id);
+        }
+      } else if (user.role === 'manager') {
+        const mgrUsers = await storage.getUsersByCreator(userId);
+        for (const u of mgrUsers) {
+          await storage.suspendUser(u.id);
+        }
+      }
+
+      await storage.deleteUser(userId);
+      res.json({ message: "User deleted and subordinates suspended" });
+    } catch (err) {
+      res.status(400).json({ message: "Invalid input" });
+    }
+  });
+
+  app.post("/api/admin/reset-super-manager-password", async (req, res) => {
+    if (!req.isAuthenticated() || req.user.role !== 'admin') return res.status(403).send("Forbidden");
+    try {
+      const { userId, newPassword } = z.object({
+        userId: z.number(),
+        newPassword: z.string().min(6),
+      }).parse(req.body);
+
+      const user = await storage.getUser(userId);
+      if (!user) return res.status(404).json({ message: "User not found" });
+      if (user.role !== 'super_manager') return res.status(400).json({ message: "Can only reset super manager passwords" });
+
+      const hashedPassword = await hashPassword(newPassword);
+      await storage.updateUserPassword(userId, hashedPassword);
+      res.json({ message: "Password reset successfully" });
+    } catch (err) {
+      res.status(400).json({ message: "Invalid input" });
+    }
+  });
+
+  // === SUPER MANAGER: Create managers ===
+  app.post("/api/super-manager/create-manager", async (req, res) => {
+    if (!req.isAuthenticated() || req.user.role !== 'super_manager') return res.status(403).send("Forbidden");
+    try {
+      const { username, password } = z.object({
+        username: z.string().min(2),
+        password: z.string().min(6),
+      }).parse(req.body);
+
+      const existing = await storage.getUserByUsername(username);
+      if (existing) return res.status(400).json({ message: "Username already exists" });
+
+      const hashedPassword = await hashPassword(password);
+      const manager = await storage.createUser({
+        username,
+        password: hashedPassword,
+        role: "manager",
+        isApproved: true,
+        isSuspended: false,
+        createdBy: req.user.id,
+      });
+
+      res.status(201).json(manager);
+    } catch (err) {
+      res.status(400).json({ message: "Invalid input" });
+    }
+  });
+
+  // === MANAGER: Create users ===
+  app.post("/api/manager/create-user", async (req, res) => {
+    if (!req.isAuthenticated() || req.user.role !== 'manager') return res.status(403).send("Forbidden");
+    try {
+      const { username, password } = z.object({
+        username: z.string().min(2),
+        password: z.string().min(6),
+      }).parse(req.body);
+
+      const existing = await storage.getUserByUsername(username);
+      if (existing) return res.status(400).json({ message: "Username already exists" });
+
+      const hashedPassword = await hashPassword(password);
+      const user = await storage.createUser({
+        username,
+        password: hashedPassword,
+        role: "user",
+        isApproved: true,
+        isSuspended: false,
+        createdBy: req.user.id,
+      });
+
+      res.status(201).json(user);
+    } catch (err) {
+      res.status(400).json({ message: "Invalid input" });
+    }
+  });
+
+  // === SUPER MANAGER REPORTS ===
+  app.get("/api/super-manager/reports", async (req, res) => {
+    if (!req.isAuthenticated() || req.user.role !== 'super_manager') return res.status(403).send("Forbidden");
+
+    const managers = await storage.getUsersByCreator(req.user.id);
+    const managerIds = managers.map(m => m.id);
+
+    let allUserIds = [...managerIds];
+    for (const mgr of managers) {
+      const mgrUsers = await storage.getUsersByCreator(mgr.id);
+      allUserIds = allUserIds.concat(mgrUsers.map(u => u.id));
+    }
+
+    const allTransactions = allUserIds.length > 0 ? await storage.getTransactionsByUserIds(allUserIds) : [];
+    const allUsers = await storage.getAllUsers();
+    const relevantUsers = allUsers.filter(u => allUserIds.includes(u.id));
+
+    const report = allTransactions.reduce((acc, tx) => {
+      const date = tx.createdAt ? new Date(tx.createdAt).toISOString().split('T')[0] : 'unknown';
+      if (!acc.dailyStats[date]) {
+        acc.dailyStats[date] = { date, bets: 0, wins: 0, deposits: 0 };
+      }
+
+      if (tx.type === 'deposit' || tx.type === 'voucher_redemption') {
+        acc.totalDeposits += tx.amount;
+        acc.dailyStats[date].deposits += tx.amount;
+      }
+      if (tx.type === 'withdrawal') acc.totalWithdrawals += Math.abs(tx.amount);
+      if (tx.type === 'bet') {
+        acc.totalBets += Math.abs(tx.amount);
+        acc.dailyStats[date].bets += Math.abs(tx.amount);
+      }
+      if (tx.type === 'win') {
+        acc.totalWins += tx.amount;
+        acc.dailyStats[date].wins += tx.amount;
+      }
+      return acc;
+    }, {
+      totalDeposits: 0,
+      totalWithdrawals: 0,
+      totalBets: 0,
+      totalWins: 0,
+      dailyStats: {} as Record<string, { date: string; bets: number; wins: number; deposits: number }>,
+    });
+
+    const totalPendingBalance = relevantUsers.reduce((sum, u) => sum + u.balance, 0);
+    const playersCount = relevantUsers.filter(u => u.role === 'user').length;
+
+    res.json({
+      totalDeposits: report.totalDeposits,
+      totalWithdrawals: report.totalWithdrawals,
+      totalBets: report.totalBets,
+      totalWins: report.totalWins,
+      totalPendingBalance,
+      netRevenue: report.totalBets - report.totalWins,
+      playersCount,
+      transactions: allTransactions.slice(0, 100),
+      dailyStats: Object.values(report.dailyStats).sort((a, b) => b.date.localeCompare(a.date)),
+    });
+  });
+
+  // === ADMIN REPORTS (general business report - admin only) ===
   app.get(api.admin.reports.path, async (req, res) => {
-    if (!req.isAuthenticated() || req.user.role === 'user') return res.status(403).send("Forbidden");
+    if (!req.isAuthenticated() || req.user.role !== 'admin') return res.status(403).send("Forbidden");
     
     const transactions = await storage.getAllTransactions();
     
@@ -47,19 +382,21 @@ export async function registerRoutes(
       dailyStats: {} as Record<string, { date: string; bets: number; wins: number; deposits: number }>,
     });
 
-    const users = await storage.getAllUsers();
-    const totalPendingBalance = users.reduce((sum, u) => sum + u.balance, 0);
+    const allUsers = await storage.getAllUsers();
+    const totalPendingBalance = allUsers.reduce((sum, u) => sum + u.balance, 0);
+    const playersCount = allUsers.filter(u => u.role === 'user').length;
 
     res.json({
       ...report,
       totalPendingBalance,
+      playersCount,
       netRevenue: report.totalBets - report.totalWins,
       transactions: transactions.slice(0, 100),
       dailyStats: Object.values(report.dailyStats).sort((a, b) => b.date.localeCompare(a.date)),
     });
   });
 
-  // === GAME SETTINGS ===
+  // === GAME SETTINGS (admin only for changing) ===
   app.get(api.games.settings.get.path, async (req, res) => {
     if (!req.isAuthenticated() || req.user.role === 'user') return res.status(403).send("Forbidden");
     
@@ -67,7 +404,6 @@ export async function registerRoutes(
     const gameTypes = ["slots", "roulette", "dice", "hilo", "coinflip", "plinko", "mines", "wheel", "poker", "keno"] as const;
     const existingTypes = settings.map(s => s.gameType);
     
-    // Seed missing settings on the fly
     for (const type of gameTypes) {
       if (!existingTypes.includes(type)) {
         const defaultChance = (type === "dice" || type === "hilo" || type === "coinflip" || type === "plinko" || type === "mines" || type === "wheel" || type === "poker" || type === "keno") ? 0.48 : 0.3;
@@ -94,9 +430,10 @@ export async function registerRoutes(
       res.status(400).json({ message: "Invalid input" });
     }
   });
+
+  // === HILO GAME ===
   app.post("/api/games/hilo/play", async (req, res) => {
     if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
-
     try {
       const { bet, prediction, lastCard } = z.object({ 
         bet: z.number().min(100),
@@ -121,12 +458,9 @@ export async function registerRoutes(
             ? Math.floor(Math.random() * ((lastCard || 7) - 1)) + 1
             : Math.floor(Math.random() * (13 - (lastCard || 7))) + (lastCard || 7) + 1);
       
-      // Clamp card between 1 and 13
       const card = Math.max(1, Math.min(13, nextCard));
-      
       const payout = won ? bet * 2 : 0;
       const user = won ? await storage.updateUserBalance(req.user.id, payout) : await storage.getUser(req.user.id);
-      
       if (won) await storage.createTransaction({ userId: req.user.id, amount: payout, type: "win", description: "HiLo win" });
 
       res.json({ won, payout, balance: user?.balance ?? 0, card });
@@ -138,11 +472,10 @@ export async function registerRoutes(
   // === DICE GAME ===
   app.post("/api/games/dice/roll", async (req, res) => {
     if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
-
     try {
       const { bet, choice } = z.object({ 
         bet: z.number().min(100),
-        choice: z.enum(["low", "high"]) // low: 1-3, high: 4-6
+        choice: z.enum(["low", "high"])
       }).parse(req.body);
 
       if (req.user.balance < bet) return res.status(400).json({ message: "Insufficient balance" });
@@ -160,7 +493,6 @@ export async function registerRoutes(
       
       const payout = won ? bet * 2 : 0;
       const user = won ? await storage.updateUserBalance(req.user.id, payout) : await storage.getUser(req.user.id);
-      
       if (won) await storage.createTransaction({ userId: req.user.id, amount: payout, type: "win", description: "Dice win" });
 
       res.json({ won, payout, balance: user?.balance ?? 0, roll });
@@ -172,7 +504,6 @@ export async function registerRoutes(
   // === COIN FLIP GAME ===
   app.post("/api/games/coinflip/play", async (req, res) => {
     if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
-
     try {
       const { bet, choice } = z.object({ 
         bet: z.number().min(100),
@@ -190,9 +521,8 @@ export async function registerRoutes(
       const won = Math.random() < winChance;
       const result = won ? choice : (choice === "heads" ? "tails" : "heads");
       
-      const payout = won ? bet * 1.95 : 0; // 1.95 payout for coin flip
+      const payout = won ? bet * 1.95 : 0;
       const user = won ? await storage.updateUserBalance(req.user.id, Math.floor(payout)) : await storage.getUser(req.user.id);
-      
       if (won) await storage.createTransaction({ userId: req.user.id, amount: Math.floor(payout), type: "win", description: "Coin Flip win" });
 
       res.json({ won, payout: Math.floor(payout), balance: user?.balance ?? 0, result });
@@ -296,7 +626,7 @@ export async function registerRoutes(
       if (req.user.balance < bet) return res.status(400).json({ message: "Insufficient balance" });
       await storage.updateUserBalance(req.user.id, -bet);
       await storage.createTransaction({ userId: req.user.id, amount: -bet, type: "bet", description: "Poker deal" });
-      const suits = ["♠", "♣", "♥", "♦"];
+      const suits = ["spades", "clubs", "hearts", "diamonds"];
       const values = ["A", "2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K"];
       const hand = Array.from({ length: 5 }).map(() => ({
         value: values[Math.floor(Math.random() * values.length)],
@@ -318,7 +648,7 @@ export async function registerRoutes(
       const settings = await storage.getGameSettings("poker");
       const winChance = settings?.winChance ?? 0.3;
       
-      const suits = ["♠", "♣", "♥", "♦"];
+      const suits = ["spades", "clubs", "hearts", "diamonds"];
       const values = ["A", "2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K"];
       
       const newHand = hand.map((card, i) => holds[i] ? card : {
@@ -340,22 +670,6 @@ export async function registerRoutes(
     } catch (err) { res.status(500).send("Error"); }
   });
 
-  app.post(api.games.settings.update.path, async (req, res) => {
-    if (!req.isAuthenticated() || req.user.role !== 'admin') return res.status(403).send("Forbidden");
-    
-    try {
-      const { gameType, winChance } = z.object({
-        gameType: z.enum(["slots", "roulette", "dice", "hilo", "coinflip", "plinko", "mines", "wheel", "poker", "keno"]),
-        winChance: z.number().min(0).max(100)
-      }).parse(req.body);
-      
-      const settings = await storage.updateGameSettings(gameType as any, winChance / 100, req.user.id);
-      res.json(settings);
-    } catch (err) {
-      res.status(400).json({ message: "Invalid input" });
-    }
-  });
-
   app.post("/api/login/voucher", async (req, res) => {
     try {
       const { code } = z.object({ code: z.string() }).parse(req.body);
@@ -365,21 +679,19 @@ export async function registerRoutes(
         return res.status(400).json({ message: "Invalid or already redeemed voucher" });
       }
 
-      // Create a guest user
       const guestUsername = `Guest_${randomBytes(3).toString("hex").toUpperCase()}`;
       const guestUser = await storage.createUser({
         username: guestUsername,
-        password: randomBytes(16).toString("hex"), // Random password for internal use
+        password: randomBytes(16).toString("hex"),
         role: "user",
         isApproved: true,
+        isSuspended: false,
       });
 
-      // Log in the user
       req.login(guestUser, async (err) => {
         if (err) return res.status(500).json({ message: "Login failed" });
 
         try {
-          // Redeem the voucher immediately
           await storage.redeemVoucher(voucher.id, guestUser.id);
           await storage.updateUserBalance(guestUser.id, voucher.amount);
           await storage.createTransaction({
@@ -448,7 +760,7 @@ export async function registerRoutes(
     res.json(vouchers);
   });
 
-  // === GAMES ===
+  // === KENO GAME ===
   app.post("/api/games/keno/play", async (req, res) => {
     if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
     
@@ -465,11 +777,9 @@ export async function registerRoutes(
       const settings = await storage.getGameSettings("keno");
       const winChance = settings?.winChance ?? 0.48;
 
-      // Draw 20 numbers from 1 to 80
       const allNumbers = Array.from({ length: 80 }, (_, i) => i + 1);
       const drawnNumbers: number[] = [];
       
-      // Simulate drawing
       const availableNumbers = [...allNumbers];
       for (let i = 0; i < 20; i++) {
         const randomIndex = Math.floor(Math.random() * availableNumbers.length);
@@ -478,7 +788,6 @@ export async function registerRoutes(
 
       const hits = selectedNumbers.filter(num => drawnNumbers.includes(num)).length;
       
-      // Payout logic based on hits and number of selections
       const hitRatios: Record<number, Record<number, number>> = {
         1: { 1: 3 },
         2: { 1: 1, 2: 9 },
@@ -520,6 +829,7 @@ export async function registerRoutes(
     }
   });
 
+  // === SLOTS ===
   app.post(api.games.slots.spin.path, async (req, res) => {
     if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
 
@@ -534,7 +844,7 @@ export async function registerRoutes(
       await storage.createTransaction({ userId: req.user.id, amount: -bet, type: "bet", description: "Slots spin" });
 
       const won = Math.random() < winChance;
-      const symbols = ["🍒", "🍋", "🍊", "🍇", "🔔", "💎", "7️⃣"];
+      const symbols = ["cherry", "lemon", "orange", "grape", "bell", "diamond", "seven"];
       
       let reels: string[];
       let payout = 0;
@@ -549,7 +859,6 @@ export async function registerRoutes(
           symbols[Math.floor(Math.random() * symbols.length)],
           symbols[Math.floor(Math.random() * symbols.length)],
         ];
-        // Ensure not all 3 match
         while(reels[0] === reels[1] && reels[1] === reels[2]) {
            reels[2] = symbols[(symbols.indexOf(reels[2]) + 1) % symbols.length];
         }
@@ -564,6 +873,7 @@ export async function registerRoutes(
     }
   });
 
+  // === ROULETTE ===
   app.post(api.games.roulette.spin.path, async (req, res) => {
     if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
 
@@ -572,20 +882,17 @@ export async function registerRoutes(
       if (req.user.balance < bet) return res.status(400).json({ message: "Insufficient balance" });
 
       const settings = await storage.getGameSettings("roulette");
-      const houseEdgeChance = settings?.winChance ?? 0.45; // Actually this is the player's general win chance
+      const houseEdgeChance = settings?.winChance ?? 0.45;
 
       await storage.updateUserBalance(req.user.id, -bet);
       await storage.createTransaction({ userId: req.user.id, amount: -bet, type: "bet", description: "Roulette spin" });
 
-      // Determine if player SHOULD win based on admin settings
       const shouldWin = Math.random() < houseEdgeChance;
       
       let number: number;
       const colors: Record<number, string> = { 0: 'green', 1: 'red', 2: 'black', 3: 'red', 4: 'black', 5: 'red', 6: 'black', 7: 'red', 8: 'black', 9: 'red', 10: 'black', 11: 'black', 12: 'red', 13: 'black', 14: 'red', 15: 'black', 16: 'red', 17: 'black', 18: 'red', 19: 'red', 20: 'black', 21: 'red', 22: 'black', 23: 'red', 24: 'black', 25: 'red', 26: 'black', 27: 'red', 28: 'black', 29: 'black', 30: 'red', 31: 'black', 32: 'red', 33: 'black', 34: 'red', 35: 'black', 36: 'red' };
 
-      // Simplified logic: pick a number that satisfies shouldWin
       if (shouldWin) {
-        // Find a winning number
         const winningNumbers = Object.keys(colors).map(Number).filter(n => {
           if (type === 'number') return n === Number(value);
           if (type === 'color') return colors[n] === value;
@@ -597,12 +904,11 @@ export async function registerRoutes(
         });
         number = winningNumbers.length > 0 ? winningNumbers[Math.floor(Math.random() * winningNumbers.length)] : Math.floor(Math.random() * 37);
       } else {
-        // Find a losing number
         const losingNumbers = Object.keys(colors).map(Number).filter(n => {
           if (type === 'number') return n !== Number(value);
           if (type === 'color') return colors[n] !== value;
           if (type === 'parity') {
-             if (n === 0) return true; // House win
+             if (n === 0) return true;
              return value !== (n % 2 === 0 ? 'even' : 'odd');
           }
           return true;
@@ -632,20 +938,36 @@ export async function registerRoutes(
 
   // === ADMIN USERS ===
   app.get(api.admin.users.path, async (req, res) => {
-    if (!req.isAuthenticated() || (req.user.role !== 'admin' && req.user.role !== 'manager')) return res.status(403).send("Forbidden");
-    const usersList = await storage.getAllUsers();
-    res.json(usersList);
+    if (!req.isAuthenticated()) return res.status(403).send("Forbidden");
+    
+    if (req.user.role === 'admin') {
+      const usersList = await storage.getAllUsers();
+      return res.json(usersList);
+    } else if (req.user.role === 'super_manager') {
+      const managers = await storage.getUsersByCreator(req.user.id);
+      let allUsers = [...managers];
+      for (const mgr of managers) {
+        const mgrUsers = await storage.getUsersByCreator(mgr.id);
+        allUsers = allUsers.concat(mgrUsers);
+      }
+      return res.json(allUsers);
+    } else if (req.user.role === 'manager') {
+      const mgrUsers = await storage.getUsersByCreator(req.user.id);
+      return res.json(mgrUsers);
+    }
+    
+    return res.status(403).send("Forbidden");
   });
 
   app.post("/api/admin/users/:id/approve", async (req, res) => {
-    if (!req.isAuthenticated() || (req.user.role !== 'admin' && req.user.role !== 'manager')) return res.status(403).send("Forbidden");
+    if (!req.isAuthenticated() || (req.user.role !== 'admin' && req.user.role !== 'super_manager' && req.user.role !== 'manager')) return res.status(403).send("Forbidden");
     const userId = parseInt(req.params.id);
     const updatedUser = await storage.approveUser(userId);
     res.json(updatedUser);
   });
 
   app.post("/api/admin/users/:id/password", async (req, res) => {
-    if (!req.isAuthenticated() || (req.user.role !== 'admin' && req.user.role !== 'manager')) return res.status(403).send("Forbidden");
+    if (!req.isAuthenticated() || (req.user.role !== 'admin' && req.user.role !== 'super_manager' && req.user.role !== 'manager')) return res.status(403).send("Forbidden");
     
     try {
       const userId = parseInt(req.params.id);
@@ -663,12 +985,18 @@ export async function registerRoutes(
     if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
     
     try {
-      const { password } = z.object({ password: z.string().min(6) }).parse(req.body);
-      const hashedPassword = await hashPassword(password);
-      await storage.updateUserPassword(req.user.id, hashedPassword);
+      if (req.user.role === 'admin') {
+        const { password } = z.object({ password: adminPasswordSchema }).parse(req.body);
+        const hashedPassword = await hashPassword(password);
+        await storage.updateUserPassword(req.user.id, hashedPassword);
+      } else {
+        const { password } = z.object({ password: z.string().min(6) }).parse(req.body);
+        const hashedPassword = await hashPassword(password);
+        await storage.updateUserPassword(req.user.id, hashedPassword);
+      }
       res.json({ message: "Password updated successfully" });
-    } catch (err) {
-      res.status(400).json({ message: "Invalid password" });
+    } catch (err: any) {
+      res.status(400).json({ message: err.message || "Invalid password" });
     }
   });
 
@@ -680,7 +1008,6 @@ export async function registerRoutes(
       const { amount } = z.object({ amount: z.number().min(500) }).parse(req.body);
       if (req.user.balance < amount) return res.status(400).json({ message: "Insufficient balance" });
 
-      // Deduct immediately and create request
       await storage.updateUserBalance(req.user.id, -amount);
       const withdrawalRequest = await storage.createWithdrawalRequest({
         userId: req.user.id,
@@ -722,7 +1049,6 @@ export async function registerRoutes(
     if (!request || request.status !== 'pending') return res.status(404).json({ message: "Request not found or already processed" });
 
     if (status === 'rejected') {
-      // Refund balance
       await storage.updateUserBalance(request.userId, request.amount);
       await storage.createTransaction({
         userId: request.userId,

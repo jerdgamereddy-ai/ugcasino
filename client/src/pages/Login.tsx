@@ -139,6 +139,9 @@ export default function Login() {
                   <Button type="submit" className="w-full" variant="luxury" disabled={isLoginPending}>
                     {isLoginPending ? <Loader2 className="animate-spin" /> : "Access Account"}
                   </Button>
+                  <div className="text-center pt-2">
+                    <a href="/forgot-password" className="text-xs text-primary underline" data-testid="link-forgot-password">Forgot Admin Password?</a>
+                  </div>
                 </form>
               </Form>
             </TabsContent>

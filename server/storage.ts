@@ -1,6 +1,6 @@
-import { users, vouchers, transactions, gameSettings, withdrawalRequests, type User, type InsertUser, type Voucher, type InsertVoucher, type Transaction, type GameSetting, type WithdrawalRequest, type InsertWithdrawalRequest } from "@shared/schema";
+import { users, vouchers, transactions, gameSettings, withdrawalRequests, adminSecurityAnswers, type User, type InsertUser, type Voucher, type InsertVoucher, type Transaction, type GameSetting, type WithdrawalRequest, type InsertWithdrawalRequest, type AdminSecurityAnswer } from "@shared/schema";
 import { db } from "./db";
-import { eq, desc, sql, and } from "drizzle-orm";
+import { eq, desc, sql, and, inArray } from "drizzle-orm";
 import session from "express-session";
 import connectPg from "connect-pg-simple";
 import { pool } from "./db";
@@ -8,34 +8,39 @@ import { pool } from "./db";
 const PostgresSessionStore = connectPg(session);
 
 export interface IStorage {
-  // Session Store
   sessionStore: session.Store;
-  // User
+
   getUser(id: number): Promise<User | undefined>;
   getUserByUsername(username: string): Promise<User | undefined>;
-  createUser(user: InsertUser): Promise<User>;
+  createUser(user: any): Promise<User>;
   updateUserBalance(userId: number, amount: number): Promise<User>;
   approveUser(userId: number): Promise<User>;
   updateUserPassword(userId: number, password: string): Promise<User>;
+  updateUserRole(userId: number, role: string): Promise<User>;
+  updateUsername(userId: number, username: string): Promise<User>;
+  suspendUser(userId: number): Promise<User>;
+  unsuspendUser(userId: number): Promise<User>;
+  deleteUser(userId: number): Promise<void>;
+  getUsersByCreator(creatorId: number): Promise<User[]>;
   getAllUsers(): Promise<User[]>;
 
-  // Vouchers
+  setSecurityAnswers(userId: number, answers: { question: string; answer: string }[]): Promise<void>;
+  getSecurityAnswers(userId: number): Promise<AdminSecurityAnswer[]>;
+
   createVoucher(voucher: InsertVoucher & { createdBy: number, code: string }): Promise<Voucher>;
   getVoucherByCode(code: string): Promise<Voucher | undefined>;
   redeemVoucher(voucherId: number, userId: number): Promise<Voucher>;
   getAllVouchers(): Promise<Voucher[]>;
 
-  // Transactions
   createTransaction(transaction: { userId: number, amount: number, type: string, description?: string }): Promise<Transaction>;
   getUserTransactions(userId: number): Promise<Transaction[]>;
   getAllTransactions(): Promise<Transaction[]>;
+  getTransactionsByUserIds(userIds: number[]): Promise<Transaction[]>;
 
-  // Game Settings
   getGameSettings(gameType: string): Promise<GameSetting | undefined>;
   getAllGameSettings(): Promise<GameSetting[]>;
   updateGameSettings(gameType: string, winChance: number, updatedBy: number): Promise<GameSetting>;
 
-  // Withdrawal Requests
   createWithdrawalRequest(req: { userId: number, amount: number }): Promise<WithdrawalRequest>;
   getWithdrawalRequest(id: number): Promise<WithdrawalRequest | undefined>;
   updateWithdrawalRequest(id: number, status: "approved" | "rejected", processedBy: number): Promise<WithdrawalRequest>;
@@ -63,7 +68,7 @@ export class DatabaseStorage implements IStorage {
     return user;
   }
 
-  async createUser(insertUser: InsertUser): Promise<User> {
+  async createUser(insertUser: any): Promise<User> {
     const [user] = await db.insert(users).values(insertUser).returning();
     return user;
   }
@@ -86,8 +91,47 @@ export class DatabaseStorage implements IStorage {
     return updatedUser;
   }
 
+  async updateUserRole(userId: number, role: string): Promise<User> {
+    const [updatedUser] = await db.update(users).set({ role: role as any }).where(eq(users.id, userId)).returning();
+    return updatedUser;
+  }
+
+  async updateUsername(userId: number, username: string): Promise<User> {
+    const [updatedUser] = await db.update(users).set({ username }).where(eq(users.id, userId)).returning();
+    return updatedUser;
+  }
+
+  async suspendUser(userId: number): Promise<User> {
+    const [updatedUser] = await db.update(users).set({ isSuspended: true }).where(eq(users.id, userId)).returning();
+    return updatedUser;
+  }
+
+  async unsuspendUser(userId: number): Promise<User> {
+    const [updatedUser] = await db.update(users).set({ isSuspended: false }).where(eq(users.id, userId)).returning();
+    return updatedUser;
+  }
+
+  async deleteUser(userId: number): Promise<void> {
+    await db.delete(users).where(eq(users.id, userId));
+  }
+
+  async getUsersByCreator(creatorId: number): Promise<User[]> {
+    return await db.select().from(users).where(eq(users.createdBy, creatorId));
+  }
+
   async getAllUsers(): Promise<User[]> {
     return await db.select().from(users).orderBy(users.id);
+  }
+
+  async setSecurityAnswers(userId: number, answers: { question: string; answer: string }[]): Promise<void> {
+    await db.delete(adminSecurityAnswers).where(eq(adminSecurityAnswers.userId, userId));
+    for (const ans of answers) {
+      await db.insert(adminSecurityAnswers).values({ userId, question: ans.question, answer: ans.answer });
+    }
+  }
+
+  async getSecurityAnswers(userId: number): Promise<AdminSecurityAnswer[]> {
+    return await db.select().from(adminSecurityAnswers).where(eq(adminSecurityAnswers.userId, userId));
   }
 
   async createVoucher(voucher: InsertVoucher & { createdBy: number, code: string }): Promise<Voucher> {
@@ -123,7 +167,11 @@ export class DatabaseStorage implements IStorage {
     return await db.select().from(transactions).orderBy(desc(transactions.createdAt));
   }
 
-  // Game Settings
+  async getTransactionsByUserIds(userIds: number[]): Promise<Transaction[]> {
+    if (userIds.length === 0) return [];
+    return await db.select().from(transactions).where(inArray(transactions.userId, userIds)).orderBy(desc(transactions.createdAt));
+  }
+
   async getGameSettings(gameType: string): Promise<GameSetting | undefined> {
     const [settings] = await db.select().from(gameSettings).where(eq(gameSettings.gameType, gameType as any));
     return settings;
@@ -144,7 +192,6 @@ export class DatabaseStorage implements IStorage {
     return updated;
   }
 
-  // Withdrawal Requests
   async createWithdrawalRequest(req: { userId: number, amount: number }): Promise<WithdrawalRequest> {
     const [newReq] = await db.insert(withdrawalRequests).values({ ...req, status: "pending" }).returning();
     return newReq;

@@ -10,6 +10,9 @@ import { ThemeToggle } from "@/components/theme-toggle"
 import Login from "@/pages/Login";
 import Lobby from "@/pages/Lobby";
 import AdminDashboard from "@/pages/AdminDashboard";
+import SuperManagerDashboard from "@/pages/SuperManagerDashboard";
+import SuperManagerReports from "@/pages/SuperManagerReports";
+import ManagerDashboard from "@/pages/ManagerDashboard";
 import GameSlots from "@/pages/GameSlots";
 import GameRoulette from "@/pages/GameRoulette";
 import GameDice from "@/pages/GameDice";
@@ -22,14 +25,19 @@ import GamePoker from "@/pages/GamePoker";
 import GameKeno from "@/pages/GameKeno";
 import Reports from "@/pages/Reports";
 import GameControl from "@/pages/GameControl";
+import ForgotPassword from "@/pages/ForgotPassword";
 import NotFound from "@/pages/not-found";
 
 function Router() {
   return (
     <Switch>
       <Route path="/login" component={Login} />
+      <Route path="/forgot-password" component={ForgotPassword} />
       <Route path="/" component={Lobby} />
       <Route path="/admin" component={AdminDashboard} />
+      <Route path="/super-manager" component={SuperManagerDashboard} />
+      <Route path="/sm-reports" component={SuperManagerReports} />
+      <Route path="/manager" component={ManagerDashboard} />
       <Route path="/slots" component={GameSlots} />
       <Route path="/roulette" component={GameRoulette} />
       <Route path="/dice" component={GameDice} />

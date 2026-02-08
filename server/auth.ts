@@ -28,6 +28,21 @@ async function comparePasswords(supplied: string, stored: string) {
   return timingSafeEqual(hashedBuf, suppliedBuf);
 }
 
+export async function seedAdmin() {
+  const existingAdmin = await storage.getUserByUsername("Admin");
+  if (!existingAdmin) {
+    const hashedPassword = await hashPassword("Admin100%-0");
+    await storage.createUser({
+      username: "Admin",
+      password: hashedPassword,
+      role: "admin",
+      isApproved: true,
+      isSuspended: false,
+    });
+    console.log("Admin account created with default credentials");
+  }
+}
+
 export function setupAuth(app: Express) {
   const sessionSettings: session.SessionOptions = {
     secret: process.env.SESSION_SECRET || "secret",
@@ -49,6 +64,14 @@ export function setupAuth(app: Express) {
       const user = await storage.getUserByUsername(username);
       if (!user || !(await comparePasswords(password, user.password))) {
         return done(null, false);
+      } else if (user.isSuspended) {
+        if (user.role === "manager") {
+          return done(null, false, { message: "Your account has been suspended. Please contact your Super Manager." });
+        } else if (user.role === "user") {
+          return done(null, false, { message: "Your account has been suspended. Please contact your Manager." });
+        } else {
+          return done(null, false, { message: "Your account has been suspended. Please contact the Admin." });
+        }
       } else if (user.role !== 'admin' && !user.isApproved) {
         return done(null, false, { message: "Account pending approval" });
       } else {
@@ -70,6 +93,10 @@ export function setupAuth(app: Express) {
         return res.status(400).send("Username already exists");
       }
 
+      if (req.body.username === "Admin") {
+        return res.status(400).send("Username 'Admin' is reserved");
+      }
+
       const hashedPassword = await hashPassword(req.body.password);
       const user = await storage.createUser({
         ...req.body,
@@ -85,8 +112,17 @@ export function setupAuth(app: Express) {
     }
   });
 
-  app.post("/api/login", passport.authenticate("local"), (req, res) => {
-    res.status(200).json(req.user);
+  app.post("/api/login", (req, res, next) => {
+    passport.authenticate("local", (err: any, user: any, info: any) => {
+      if (err) return next(err);
+      if (!user) {
+        return res.status(401).json({ message: info?.message || "Invalid credentials" });
+      }
+      req.login(user, (err) => {
+        if (err) return next(err);
+        res.status(200).json(user);
+      });
+    })(req, res, next);
   });
 
   app.post("/api/logout", (req, res, next) => {

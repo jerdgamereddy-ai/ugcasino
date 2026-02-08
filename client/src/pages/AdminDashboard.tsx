@@ -1,6 +1,5 @@
 import { ProtectedLayout } from "@/components/layout/ProtectedLayout";
 import { useUser } from "@/hooks/use-auth";
-import { useUsersList } from "@/hooks/use-admin";
 import { useCreateVoucher, useVouchers } from "@/hooks/use-vouchers";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -10,69 +9,49 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { Shield, Plus, Users, Ticket, Copy, Banknote, CheckCircle, Wallet, TrendingDown, Dice5, Trophy, TrendingUp, BarChart3, Loader2 } from "lucide-react";
+import { Shield, Plus, Users, Ticket, Copy, Banknote, CheckCircle, Loader2, Ban, Trash2, ArrowUpCircle, KeyRound, UserCog, Lock } from "lucide-react";
 import { api } from "@shared/routes";
 import { queryClient } from "@/lib/queryClient";
-import { ReportsResponse } from "@shared/schema";
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, Legend, LineChart, Line } from 'recharts';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { User, ADMIN_SECURITY_QUESTIONS } from "@shared/schema";
+import { Badge } from "@/components/ui/badge";
 
 export default function AdminDashboard() {
   const { data: user } = useUser();
-  const [timeFilter, setTimeFilter] = useState<"day" | "week" | "month" | "year" | "custom">("day");
-  const [startDate, setStartDate] = useState("");
-  const [endDate, setEndDate] = useState("");
-  const { data: users, isLoading: usersLoading } = useUsersList();
+  const { data: users, isLoading: usersLoading } = useQuery<User[]>({
+    queryKey: [api.admin.users.path],
+    enabled: user?.role === 'admin',
+  });
   const { data: vouchers, isLoading: vouchersLoading } = useVouchers();
   const { mutate: createVoucher, isPending: creatingVoucher } = useCreateVoucher();
   const { toast } = useToast();
   const { data: withdrawRequests, isLoading: requestsLoading } = useQuery<any[]>({
     queryKey: ["/api/withdraw/requests"],
-  });
-  const { data: reports, isLoading: reportsLoading } = useQuery<ReportsResponse>({
-    queryKey: [api.admin.reports.path],
-    enabled: user?.role === 'admin' || user?.role === 'manager'
+    enabled: user?.role === 'admin',
   });
 
-  const { data: gameSettings, isLoading: settingsLoading } = useQuery<any[]>({
-    queryKey: [api.games.settings.get.path],
-  });
-
-  const updateSettingMutation = useMutation({
-    mutationFn: async ({ gameType, winChance }: { gameType: string, winChance: number }) => {
-      const res = await fetch(api.games.settings.update.path, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ gameType, winChance }),
-      });
-      if (!res.ok) throw new Error("Failed to update setting");
-      return res.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [api.games.settings.get.path] });
-      toast({ title: "Setting Updated", className: "bg-green-600 text-white" });
-    },
-    onError: (err: any) => {
-      toast({ title: "Error", description: err.message, variant: "destructive" });
-    }
-  });
-
-  const handleUpdateWinChance = (gameType: string, chance: string) => {
-    const value = parseInt(chance);
-    if (isNaN(value) || value < 0 || value > 100) return;
-    updateSettingMutation.mutate({ gameType, winChance: value });
-  };
-  
   const [amount, setAmount] = useState("");
-  const [withdrawAmount, setWithdrawAmount] = useState<Record<number, string>>({});
   const [userPasswords, setUserPasswords] = useState<Record<number, string>>({});
+  const [smPasswords, setSmPasswords] = useState<Record<number, string>>({});
+  const [newUsername, setNewUsername] = useState("");
 
-  if (user?.role !== "admin" && user?.role !== "manager") {
+  const [securityAnswers, setSecurityAnswers] = useState<Record<string, string>>({
+    [ADMIN_SECURITY_QUESTIONS[0]]: "",
+    [ADMIN_SECURITY_QUESTIONS[1]]: "",
+    [ADMIN_SECURITY_QUESTIONS[2]]: "",
+    [ADMIN_SECURITY_QUESTIONS[3]]: "",
+  });
+
+  const { data: existingQuestions } = useQuery<any[]>({
+    queryKey: ["/api/admin/security-questions"],
+    enabled: user?.role === 'admin',
+  });
+
+  if (user?.role !== "admin") {
     return (
       <div className="text-center py-20">
         <Shield className="w-16 h-16 text-destructive mx-auto mb-4" />
-        <h1 className="text-2xl font-bold">Access Denied</h1>
-        <p className="text-muted-foreground">You do not have permission to view this page.</p>
+        <h1 className="text-2xl font-bold" data-testid="text-access-denied">Access Denied</h1>
+        <p className="text-muted-foreground">Admin only access.</p>
       </div>
     );
   }
@@ -80,7 +59,6 @@ export default function AdminDashboard() {
   const handleCreateVoucher = (e: React.FormEvent) => {
     e.preventDefault();
     if (!amount) return;
-    
     createVoucher({ amount: parseInt(amount) }, {
       onSuccess: () => {
         toast({ title: "Voucher Created", className: "bg-green-600 text-white" });
@@ -92,57 +70,128 @@ export default function AdminDashboard() {
     });
   };
 
-  const handleWithdraw = async (userId: number) => {
-    const val = withdrawAmount[userId];
-    if (!val) return;
-    
+  const handlePromoteToSuperManager = async (userId: number) => {
     try {
-      const res = await fetch(api.admin.withdraw.path, {
+      const res = await fetch("/api/admin/promote-to-super-manager", {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId, amount: parseInt(val) }),
+        body: JSON.stringify({ userId }),
       });
-      
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.message);
-      
-      toast({ title: "Success", description: data.message });
-      setWithdrawAmount({ ...withdrawAmount, [userId]: "" });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.message);
+      }
+      toast({ title: "User promoted to Super Manager", className: "bg-green-600 text-white" });
       queryClient.invalidateQueries({ queryKey: [api.admin.users.path] });
     } catch (err: any) {
       toast({ title: "Error", description: err.message, variant: "destructive" });
     }
   };
 
-  const handleApprove = async (userId: number) => {
+  const handleSuspend = async (userId: number) => {
     try {
-      const res = await fetch(`/api/admin/users/${userId}/approve`, {
+      const res = await fetch("/api/admin/suspend-user", {
         method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId }),
       });
-      if (!res.ok) throw new Error("Approval failed");
-      toast({ title: "User Approved", className: "bg-green-600 text-white" });
+      if (!res.ok) throw new Error("Suspension failed");
+      toast({ title: "User and subordinates suspended", className: "bg-green-600 text-white" });
       queryClient.invalidateQueries({ queryKey: [api.admin.users.path] });
     } catch (err: any) {
       toast({ title: "Error", description: err.message, variant: "destructive" });
     }
   };
 
-  const handleChangePassword = async (userId: number) => {
-    const password = userPasswords[userId];
+  const handleUnsuspend = async (userId: number) => {
+    try {
+      const res = await fetch("/api/admin/unsuspend-user", {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId }),
+      });
+      if (!res.ok) throw new Error("Unsuspension failed");
+      toast({ title: "User and subordinates unsuspended", className: "bg-green-600 text-white" });
+      queryClient.invalidateQueries({ queryKey: [api.admin.users.path] });
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    }
+  };
+
+  const handleDelete = async (userId: number) => {
+    try {
+      const res = await fetch("/api/admin/delete-user", {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId }),
+      });
+      if (!res.ok) throw new Error("Deletion failed");
+      toast({ title: "User deleted and subordinates suspended", className: "bg-green-600 text-white" });
+      queryClient.invalidateQueries({ queryKey: [api.admin.users.path] });
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    }
+  };
+
+  const handleResetSmPassword = async (userId: number) => {
+    const password = smPasswords[userId];
     if (!password || password.length < 6) {
       toast({ title: "Error", description: "Password must be at least 6 characters", variant: "destructive" });
       return;
     }
-
     try {
-      const res = await fetch(`/api/admin/users/${userId}/password`, {
+      const res = await fetch("/api/admin/reset-super-manager-password", {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ password }),
+        body: JSON.stringify({ userId, newPassword: password }),
       });
-      if (!res.ok) throw new Error("Password update failed");
-      toast({ title: "Success", description: "Password updated successfully", className: "bg-green-600 text-white" });
-      setUserPasswords({ ...userPasswords, [userId]: "" });
+      if (!res.ok) throw new Error("Password reset failed");
+      toast({ title: "Password reset", className: "bg-green-600 text-white" });
+      setSmPasswords({ ...smPasswords, [userId]: "" });
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    }
+  };
+
+  const handleSaveSecurityQuestions = async () => {
+    const answers = ADMIN_SECURITY_QUESTIONS.map(q => ({ question: q, answer: securityAnswers[q] || "" }));
+    const emptyCount = answers.filter(a => !a.answer.trim()).length;
+    if (emptyCount > 0) {
+      toast({ title: "Error", description: "All 4 security questions must be answered", variant: "destructive" });
+      return;
+    }
+    try {
+      const res = await fetch("/api/admin/security-questions", {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ answers }),
+      });
+      if (!res.ok) throw new Error("Failed to save");
+      toast({ title: "Security questions saved", className: "bg-green-600 text-white" });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/security-questions"] });
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    }
+  };
+
+  const handleUpdateUsername = async () => {
+    if (!newUsername || newUsername.length < 2) {
+      toast({ title: "Error", description: "Username must be at least 2 characters", variant: "destructive" });
+      return;
+    }
+    try {
+      const res = await fetch("/api/admin/update-username", {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ newUsername }),
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.message);
+      }
+      toast({ title: "Username updated", className: "bg-green-600 text-white" });
+      queryClient.invalidateQueries({ queryKey: [api.auth.me.path] });
+      setNewUsername("");
     } catch (err: any) {
       toast({ title: "Error", description: err.message, variant: "destructive" });
     }
@@ -169,193 +218,178 @@ export default function AdminDashboard() {
     toast({ title: "Copied!", description: code });
   };
 
-    const filteredStats = reports ? reports.dailyStats.filter(stat => {
-      const statDate = new Date(stat.date);
-      const now = new Date();
-      
-      if (timeFilter === "custom") {
-        if (!startDate && !endDate) return true;
-        const start = startDate ? new Date(startDate) : new Date(0);
-        const end = endDate ? new Date(endDate) : new Date();
-        // Set end to end of day
-        end.setHours(23, 59, 59, 999);
-        return statDate >= start && statDate <= end;
-      }
+  const superManagers = users?.filter(u => u.role === 'super_manager') || [];
+  const managers = users?.filter(u => u.role === 'manager') || [];
+  const players = users?.filter(u => u.role === 'user') || [];
+  const allNonAdmin = users?.filter(u => u.role !== 'admin') || [];
 
-      if (timeFilter === "day") {
-        return statDate.toDateString() === now.toDateString();
-      } else if (timeFilter === "week") {
-        const lastWeek = new Date();
-        lastWeek.setDate(now.getDate() - 7);
-        return statDate >= lastWeek;
-      } else if (timeFilter === "month") {
-        const lastMonth = new Date();
-        lastMonth.setMonth(now.getMonth() - 1);
-        return statDate >= lastMonth;
-      } else if (timeFilter === "year") {
-        const lastYear = new Date();
-        lastYear.setFullYear(now.getFullYear() - 1);
-        return statDate >= lastYear;
-      }
-      return true;
-    }) : [];
-
-    const totals = filteredStats.reduce((acc, stat) => ({
-      deposits: acc.deposits + stat.deposits,
-      bets: acc.bets + stat.bets,
-      wins: acc.wins + stat.wins
-    }), { deposits: 0, bets: 0, wins: 0 });
-
-    const reportStats = reports ? [
-      { title: "Filtered Deposits", value: totals.deposits, icon: Wallet, color: "text-green-500" },
-      { title: "Filtered Bets", value: totals.bets, icon: Dice5, color: "text-blue-500" },
-      { title: "Filtered Wins", value: totals.wins, icon: Trophy, color: "text-yellow-500" },
-      { title: "Net Revenue", value: totals.bets - totals.wins, icon: TrendingUp, color: (totals.bets - totals.wins) >= 0 ? "text-green-500" : "text-red-500" },
-      { title: "Player Balances", value: reports.totalPendingBalance, icon: Users, color: "text-purple-500" },
-    ] : [];
+  const getRoleBadge = (role: string) => {
+    switch (role) {
+      case 'super_manager': return <Badge variant="outline" className="text-[10px] border-yellow-500/30 text-yellow-500">Super Manager</Badge>;
+      case 'manager': return <Badge variant="outline" className="text-[10px] border-blue-500/30 text-blue-500">Manager</Badge>;
+      case 'user': return <Badge variant="outline" className="text-[10px] border-green-500/30 text-green-500">Player</Badge>;
+      default: return <Badge variant="outline" className="text-[10px]">{role}</Badge>;
+    }
+  };
 
   return (
     <ProtectedLayout>
       <div className="space-y-6">
         <div className="flex items-center gap-4">
           <div className="bg-primary/20 p-3 rounded-xl">
-             <Shield className="w-8 h-8 text-primary" />
+            <Shield className="w-8 h-8 text-primary" />
           </div>
           <div>
-            <h1 className="text-3xl font-display font-bold text-primary">Admin Dashboard</h1>
-            <p className="text-muted-foreground">Manage users, vouchers, and view performance reports.</p>
+            <h1 className="text-3xl font-display font-bold text-primary" data-testid="text-admin-title">Admin Dashboard</h1>
+            <p className="text-muted-foreground">Full control over the platform.</p>
           </div>
         </div>
 
-        <Tabs defaultValue="reports" className="w-full">
-          <TabsList className="bg-white/5 border border-white/10 w-full justify-start">
-            <TabsTrigger value="reports">Performance Reports</TabsTrigger>
-            <TabsTrigger value="vouchers">Voucher Management</TabsTrigger>
-            <TabsTrigger value="requests">Withdrawal Requests</TabsTrigger>
-            <TabsTrigger value="users">User Management</TabsTrigger>
-            <TabsTrigger value="games">Game Controls</TabsTrigger>
+        <Tabs defaultValue="users" className="w-full">
+          <TabsList className="bg-white/5 border border-white/10 w-full justify-start flex-wrap gap-1">
+            <TabsTrigger value="users" data-testid="tab-users">User Management</TabsTrigger>
+            <TabsTrigger value="vouchers" data-testid="tab-vouchers">Vouchers</TabsTrigger>
+            <TabsTrigger value="requests" data-testid="tab-requests">Withdrawals</TabsTrigger>
+            <TabsTrigger value="security" data-testid="tab-security">Security</TabsTrigger>
+            <TabsTrigger value="settings" data-testid="tab-settings">Account</TabsTrigger>
           </TabsList>
 
-          <TabsContent value="reports" className="mt-6 space-y-6">
-            <div className="flex flex-wrap gap-4 justify-end items-end">
-              {timeFilter === "custom" && (
-                <div className="flex gap-2 items-end">
-                  <div className="space-y-1">
-                    <label className="text-[10px] uppercase text-muted-foreground font-bold">Start Date</label>
-                    <Input 
-                      type="date" 
-                      value={startDate} 
-                      onChange={(e) => setStartDate(e.target.value)}
-                      className="w-[150px] bg-black/30 border-white/10 h-9 text-xs"
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-[10px] uppercase text-muted-foreground font-bold">End Date</label>
-                    <Input 
-                      type="date" 
-                      value={endDate} 
-                      onChange={(e) => setEndDate(e.target.value)}
-                      className="w-[150px] bg-black/30 border-white/10 h-9 text-xs"
-                    />
-                  </div>
-                </div>
-              )}
-              <div className="space-y-1">
-                <label className="text-[10px] uppercase text-muted-foreground font-bold">Period</label>
-                <Select value={timeFilter} onValueChange={(v: any) => setTimeFilter(v)}>
-                  <SelectTrigger className="w-[150px] bg-black/30 border-white/10 h-9 text-xs">
-                    <SelectValue placeholder="Filter by time" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="day">Today</SelectItem>
-                    <SelectItem value="week">Last 7 Days</SelectItem>
-                    <SelectItem value="month">Last 30 Days</SelectItem>
-                    <SelectItem value="year">Last Year</SelectItem>
-                    <SelectItem value="custom">Custom Range</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-            {reportsLoading ? (
-              <div className="flex justify-center p-12"><Loader2 className="w-8 h-8 animate-spin" /></div>
-            ) : reports ? (
-              <>
-                <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
-                  {reportStats.map((stat) => (
-                    <Card key={stat.title} className="glass-card">
-                      <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-                        <CardTitle className="text-sm font-medium">{stat.title}</CardTitle>
-                        <stat.icon className={`h-4 w-4 ${stat.color}`} />
-                      </CardHeader>
-                      <CardContent>
-                        <div className="text-2xl font-bold text-primary">UGX {stat.value.toLocaleString()}</div>
-                      </CardContent>
-                    </Card>
-                  ))}
-                </div>
-
-                <Card className="glass-card">
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <BarChart3 className="h-5 w-5" /> Activity Trend
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="h-[300px]">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <BarChart data={filteredStats}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="#333" />
-                        <XAxis dataKey="date" stroke="#888" />
-                        <YAxis stroke="#888" />
-                        <RechartsTooltip 
-                          contentStyle={{ backgroundColor: '#1a1a1a', border: '1px solid #333' }}
-                          itemStyle={{ color: '#fff' }}
-                        />
-                        <Legend />
-                        <Bar dataKey="bets" name="Bets" fill="#3b82f6" />
-                        <Bar dataKey="wins" name="Wins" fill="#eab308" />
-                        <Bar dataKey="deposits" name="Deposits" fill="#22c55e" />
-                      </BarChart>
-                    </ResponsiveContainer>
-                  </CardContent>
-                </Card>
-
-                <Card className="glass-card">
-                  <CardHeader>
-                    <CardTitle>Recent Transactions</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <Table>
-                      <TableHeader>
-                        <TableRow className="border-white/10">
-                          <TableHead>Date</TableHead>
-                          <TableHead>User ID</TableHead>
-                          <TableHead>Type</TableHead>
-                          <TableHead>Description</TableHead>
-                          <TableHead className="text-right">Amount</TableHead>
+          <TabsContent value="users" className="mt-6 space-y-6">
+            <Card className="glass-card">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2"><UserCog className="w-5 h-5" /> Super Managers ({superManagers.length})</CardTitle>
+                <CardDescription>Manage super managers, suspend/delete, reset passwords.</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {usersLoading ? (
+                  <div className="flex justify-center p-8"><Loader2 className="w-6 h-6 animate-spin" /></div>
+                ) : superManagers.length === 0 ? (
+                  <p className="text-center text-muted-foreground py-4">No super managers. Promote a user below.</p>
+                ) : (
+                  <Table>
+                    <TableHeader>
+                      <TableRow className="border-white/10">
+                        <TableHead>ID</TableHead>
+                        <TableHead>Username</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead>Balance</TableHead>
+                        <TableHead>Reset Password</TableHead>
+                        <TableHead>Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {superManagers.map((sm) => (
+                        <TableRow key={sm.id} className="border-white/10" data-testid={`row-sm-${sm.id}`}>
+                          <TableCell>#{sm.id}</TableCell>
+                          <TableCell className="font-medium">{sm.username}</TableCell>
+                          <TableCell>
+                            {sm.isSuspended ? (
+                              <span className="flex items-center gap-1 text-red-500 text-xs"><Ban className="w-3 h-3" /> Suspended</span>
+                            ) : (
+                              <span className="flex items-center gap-1 text-green-500 text-xs"><CheckCircle className="w-3 h-3" /> Active</span>
+                            )}
+                          </TableCell>
+                          <TableCell className="text-primary font-bold">UGX {sm.balance.toLocaleString()}</TableCell>
+                          <TableCell>
+                            <div className="flex gap-1 items-center">
+                              <Input
+                                type="password"
+                                placeholder="New password"
+                                value={smPasswords[sm.id] || ""}
+                                onChange={(e) => setSmPasswords({ ...smPasswords, [sm.id]: e.target.value })}
+                                className="w-28 bg-white/5 border-white/10"
+                                data-testid={`input-sm-pw-${sm.id}`}
+                              />
+                              <Button size="sm" onClick={() => handleResetSmPassword(sm.id)} data-testid={`button-reset-sm-pw-${sm.id}`}>
+                                <KeyRound className="w-3 h-3" />
+                              </Button>
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex gap-1">
+                              {sm.isSuspended ? (
+                                <Button size="sm" variant="outline" onClick={() => handleUnsuspend(sm.id)} data-testid={`button-unsuspend-${sm.id}`}>
+                                  <CheckCircle className="w-3 h-3 mr-1" /> Activate
+                                </Button>
+                              ) : (
+                                <Button size="sm" variant="outline" onClick={() => handleSuspend(sm.id)} data-testid={`button-suspend-${sm.id}`}>
+                                  <Ban className="w-3 h-3 mr-1" /> Suspend
+                                </Button>
+                              )}
+                              <Button size="sm" variant="destructive" onClick={() => handleDelete(sm.id)} data-testid={`button-delete-${sm.id}`}>
+                                <Trash2 className="w-3 h-3" />
+                              </Button>
+                            </div>
+                          </TableCell>
                         </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {reports.transactions.map((tx: any) => (
-                          <TableRow key={tx.id} className="border-white/10 hover:bg-white/5">
-                            <TableCell className="text-sm">{new Date(tx.createdAt!).toLocaleString()}</TableCell>
-                            <TableCell className="font-mono">#{tx.userId}</TableCell>
-                            <TableCell className="capitalize text-xs">
-                              <span className="px-2 py-0.5 rounded-full bg-white/5">{tx.type.replace('_', ' ')}</span>
-                            </TableCell>
-                            <TableCell className="text-sm text-muted-foreground">{tx.description}</TableCell>
-                            <TableCell className={`text-right font-bold ${tx.amount >= 0 ? 'text-green-500' : 'text-red-500'}`}>
-                              UGX {Math.abs(tx.amount).toLocaleString()}
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </CardContent>
-                </Card>
-              </>
-            ) : (
-              <div className="text-center p-12 text-muted-foreground">No reporting data available.</div>
-            )}
+                      ))}
+                    </TableBody>
+                  </Table>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card className="glass-card">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2"><Users className="w-5 h-5" /> All Users ({allNonAdmin.length})</CardTitle>
+                <CardDescription>Promote any user to Super Manager.</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {usersLoading ? (
+                  <div className="flex justify-center p-8"><Loader2 className="w-6 h-6 animate-spin" /></div>
+                ) : (
+                  <Table>
+                    <TableHeader>
+                      <TableRow className="border-white/10">
+                        <TableHead>ID</TableHead>
+                        <TableHead>Username</TableHead>
+                        <TableHead>Role</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead>Balance</TableHead>
+                        <TableHead>Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {allNonAdmin.map((u) => (
+                        <TableRow key={u.id} className="border-white/10" data-testid={`row-user-${u.id}`}>
+                          <TableCell>#{u.id}</TableCell>
+                          <TableCell className="font-medium">{u.username}</TableCell>
+                          <TableCell>{getRoleBadge(u.role)}</TableCell>
+                          <TableCell>
+                            {u.isSuspended ? (
+                              <span className="flex items-center gap-1 text-red-500 text-xs"><Ban className="w-3 h-3" /> Suspended</span>
+                            ) : !u.isApproved ? (
+                              <span className="text-yellow-500 text-xs">Pending</span>
+                            ) : (
+                              <span className="flex items-center gap-1 text-green-500 text-xs"><CheckCircle className="w-3 h-3" /> Active</span>
+                            )}
+                          </TableCell>
+                          <TableCell className="text-primary font-bold">UGX {u.balance.toLocaleString()}</TableCell>
+                          <TableCell>
+                            <div className="flex gap-1 flex-wrap">
+                              {u.role !== 'super_manager' && (
+                                <Button size="sm" variant="outline" onClick={() => handlePromoteToSuperManager(u.id)} data-testid={`button-promote-${u.id}`}>
+                                  <ArrowUpCircle className="w-3 h-3 mr-1" /> Promote
+                                </Button>
+                              )}
+                              {!u.isSuspended ? (
+                                <Button size="sm" variant="outline" onClick={() => handleSuspend(u.id)} data-testid={`button-suspend-user-${u.id}`}>
+                                  <Ban className="w-3 h-3" />
+                                </Button>
+                              ) : (
+                                <Button size="sm" variant="outline" onClick={() => handleUnsuspend(u.id)} data-testid={`button-unsuspend-user-${u.id}`}>
+                                  <CheckCircle className="w-3 h-3" />
+                                </Button>
+                              )}
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                )}
+              </CardContent>
+            </Card>
           </TabsContent>
 
           <TabsContent value="vouchers" className="mt-6 space-y-6">
@@ -368,16 +402,10 @@ export default function AdminDashboard() {
                 <CardContent>
                   <form onSubmit={handleCreateVoucher} className="space-y-4">
                     <div className="space-y-2">
-                        <label className="text-xs uppercase text-muted-foreground">Amount (UGX)</label>
-                        <Input 
-                            type="number" 
-                            placeholder="e.g. 5000" 
-                            value={amount}
-                            onChange={(e) => setAmount(e.target.value)}
-                            className="bg-black/30 border-white/10"
-                        />
+                      <label className="text-xs uppercase text-muted-foreground">Amount (UGX)</label>
+                      <Input type="number" placeholder="e.g. 5000" value={amount} onChange={(e) => setAmount(e.target.value)} className="bg-black/30 border-white/10" data-testid="input-voucher-amount" />
                     </div>
-                    <Button type="submit" className="w-full" disabled={creatingVoucher}>
+                    <Button type="submit" className="w-full" disabled={creatingVoucher} data-testid="button-create-voucher">
                       {creatingVoucher ? "Generating..." : <><Plus className="w-4 h-4 mr-2" /> Generate Code</>}
                     </Button>
                   </form>
@@ -386,14 +414,12 @@ export default function AdminDashboard() {
 
               <Card className="md:col-span-2 glass-card">
                 <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                      <Ticket className="w-5 h-5" /> Recent Vouchers
-                  </CardTitle>
+                  <CardTitle className="flex items-center gap-2"><Ticket className="w-5 h-5" /> Recent Vouchers</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <Table>
                     <TableHeader>
-                      <TableRow className="border-white/10 hover:bg-white/5">
+                      <TableRow className="border-white/10">
                         <TableHead>Code</TableHead>
                         <TableHead>Amount</TableHead>
                         <TableHead>Status</TableHead>
@@ -404,10 +430,10 @@ export default function AdminDashboard() {
                       {vouchersLoading ? (
                         <TableRow><TableCell colSpan={4} className="text-center">Loading...</TableCell></TableRow>
                       ) : vouchers?.length === 0 ? (
-                        <TableRow><TableCell colSpan={4} className="text-center text-muted-foreground">No vouchers created yet</TableCell></TableRow>
+                        <TableRow><TableCell colSpan={4} className="text-center text-muted-foreground">No vouchers yet</TableCell></TableRow>
                       ) : (
                         vouchers?.map((v) => (
-                          <TableRow key={v.id} className="border-white/10 hover:bg-white/5">
+                          <TableRow key={v.id} className="border-white/10">
                             <TableCell className="font-mono">{v.code}</TableCell>
                             <TableCell className="text-primary font-bold">UGX {v.amount.toLocaleString()}</TableCell>
                             <TableCell>
@@ -416,9 +442,9 @@ export default function AdminDashboard() {
                               </span>
                             </TableCell>
                             <TableCell>
-                                <Button size="sm" variant="ghost" onClick={() => copyToClipboard(v.code)}>
-                                    <Copy className="w-4 h-4" />
-                                </Button>
+                              <Button size="icon" variant="ghost" onClick={() => copyToClipboard(v.code)} data-testid={`button-copy-${v.id}`}>
+                                <Copy className="w-4 h-4" />
+                              </Button>
                             </TableCell>
                           </TableRow>
                         ))
@@ -433,8 +459,7 @@ export default function AdminDashboard() {
           <TabsContent value="requests" className="mt-6">
             <Card className="glass-card">
               <CardHeader>
-                <CardTitle className="flex items-center gap-2"><Banknote className="w-5 h-5"/> Pending Withdrawals</CardTitle>
-                <CardDescription>Review and approve player withdrawal requests.</CardDescription>
+                <CardTitle className="flex items-center gap-2"><Banknote className="w-5 h-5" /> Pending Withdrawals</CardTitle>
               </CardHeader>
               <CardContent>
                 <Table>
@@ -459,8 +484,8 @@ export default function AdminDashboard() {
                           <TableCell>{new Date(req.createdAt).toLocaleString()}</TableCell>
                           <TableCell>
                             <div className="flex gap-2">
-                              <Button size="sm" onClick={() => handleProcessWithdraw(req.id, "approved")} className="bg-green-600 hover:bg-green-700">Approve</Button>
-                              <Button size="sm" variant="destructive" onClick={() => handleProcessWithdraw(req.id, "rejected")}>Reject</Button>
+                              <Button size="sm" onClick={() => handleProcessWithdraw(req.id, "approved")} data-testid={`button-approve-${req.id}`}>Approve</Button>
+                              <Button size="sm" variant="destructive" onClick={() => handleProcessWithdraw(req.id, "rejected")} data-testid={`button-reject-${req.id}`}>Reject</Button>
                             </div>
                           </TableCell>
                         </TableRow>
@@ -472,126 +497,62 @@ export default function AdminDashboard() {
             </Card>
           </TabsContent>
 
-          <TabsContent value="games" className="mt-6">
-            <Card className="glass-card">
+          <TabsContent value="security" className="mt-6">
+            <Card className="glass-card max-w-lg">
               <CardHeader>
-                <CardTitle className="flex items-center gap-2"><Dice5 className="w-5 h-5"/> Win Probability Control</CardTitle>
-                <CardDescription>Adjust winning percentages for each game (0-100%). Higher values mean more player wins.</CardDescription>
+                <CardTitle className="flex items-center gap-2"><Lock className="w-5 h-5" /> Security Questions</CardTitle>
+                <CardDescription>
+                  Set up your 4 security questions. At least 2 correct answers are required for password recovery.
+                  {existingQuestions && existingQuestions.length > 0 && (
+                    <span className="block mt-1 text-green-500 text-xs">Security questions are already set up. You can update them below.</span>
+                  )}
+                </CardDescription>
               </CardHeader>
-              <CardContent>
-                <Table>
-                  <TableHeader>
-                    <TableRow className="border-white/10">
-                      <TableHead>Game Name</TableHead>
-                      <TableHead>Current Win Chance (%)</TableHead>
-                      <TableHead>Adjust Level</TableHead>
-                      <TableHead>Action</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {settingsLoading ? (
-                      <TableRow><TableCell colSpan={4} className="text-center">Loading...</TableCell></TableRow>
-                    ) : gameSettings?.map((setting) => (
-                      <TableRow key={setting.id} className="border-white/10">
-                        <TableCell className="capitalize font-bold text-primary">{setting.gameType}</TableCell>
-                        <TableCell className="font-mono">{Math.round(setting.winChance * 100)}%</TableCell>
-                        <TableCell>
-                          <Input 
-                            type="number" 
-                            min="0" 
-                            max="100"
-                            defaultValue={Math.round(setting.winChance * 100)}
-                            className="w-24 bg-black/30 border-white/10"
-                            onBlur={(e) => handleUpdateWinChance(setting.gameType, e.target.value)}
-                          />
-                        </TableCell>
-                        <TableCell>
-                           <span className="text-xs text-muted-foreground italic">Auto-saves on blur</span>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
+              <CardContent className="space-y-4">
+                {ADMIN_SECURITY_QUESTIONS.map((q) => (
+                  <div key={q} className="space-y-1">
+                    <label className="text-xs text-muted-foreground">{q}</label>
+                    <Input
+                      placeholder="Your answer"
+                      value={securityAnswers[q] || ""}
+                      onChange={(e) => setSecurityAnswers({ ...securityAnswers, [q]: e.target.value })}
+                      className="bg-white/5 border-white/10"
+                      data-testid={`input-security-${q.substring(0, 10).replace(/\s/g, '-')}`}
+                    />
+                  </div>
+                ))}
+                <Button className="w-full" onClick={handleSaveSecurityQuestions} data-testid="button-save-security">
+                  Save Security Questions
+                </Button>
               </CardContent>
             </Card>
           </TabsContent>
 
-          <TabsContent value="users" className="mt-6">
-            <Card className="glass-card">
+          <TabsContent value="settings" className="mt-6">
+            <Card className="glass-card max-w-lg">
               <CardHeader>
-                 <CardTitle className="flex items-center gap-2"><Users className="w-5 h-5"/> User Database</CardTitle>
+                <CardTitle className="flex items-center gap-2"><UserCog className="w-5 h-5" /> Account Settings</CardTitle>
+                <CardDescription>Change your login username. "Admin" will always remain available as a login name.</CardDescription>
               </CardHeader>
-              <CardContent>
-                <Table>
-                    <TableHeader>
-                      <TableRow className="border-white/10 hover:bg-white/5">
-                        <TableHead>ID</TableHead>
-                        <TableHead>Username</TableHead>
-                        <TableHead>Role</TableHead>
-                        <TableHead>Balance</TableHead>
-                        <TableHead>Status</TableHead>
-                        <TableHead>Action</TableHead>
-                        <TableHead>Joined</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                        {usersLoading ? (
-                            <TableRow><TableCell colSpan={7} className="text-center">Loading...</TableCell></TableRow>
-                        ) : (
-                            users?.map((u) => (
-                                <TableRow key={u.id} className="border-white/10 hover:bg-white/5">
-                                    <TableCell className="font-mono text-muted-foreground">#{u.id}</TableCell>
-                                    <TableCell className="font-medium">{u.username}</TableCell>
-                                    <TableCell className="capitalize">{u.role}</TableCell>
-                                    <TableCell className="font-mono">UGX {u.balance.toLocaleString()}</TableCell>
-                                    <TableCell>
-                                      <span className={`px-2 py-1 rounded text-xs ${u.isApproved ? "bg-green-500/20 text-green-500" : "bg-red-500/20 text-red-500"}`}>
-                                        {u.isApproved ? "Approved" : "Pending"}
-                                      </span>
-                                    </TableCell>
-                                    <TableCell>
-                                      <div className="flex gap-2 items-center">
-                                        {!u.isApproved && (u.role === 'user' || user?.role === 'admin') && (
-                                          <Button size="sm" variant="luxury" onClick={() => handleApprove(u.id)} className="h-8">
-                                            <CheckCircle className="w-4 h-4 mr-1" /> Approve
-                                          </Button>
-                                        )}
-                                        {user?.role === 'admin' && u.role === 'user' && (
-                                          <>
-                                            <Input 
-                                              type="number" 
-                                              placeholder="UGX" 
-                                              className="w-24 h-8 text-xs bg-black/30 border-white/10" 
-                                              value={withdrawAmount[u.id] || ""}
-                                              onChange={(e) => setWithdrawAmount({...withdrawAmount, [u.id]: e.target.value})}
-                                            />
-                                            <Button size="sm" variant="outline" onClick={() => handleWithdraw(u.id)} className="h-8">
-                                              <Banknote className="w-4 h-4 mr-1" /> Withdraw
-                                            </Button>
-                                            <div className="flex gap-1 ml-2">
-                                              <Input 
-                                                type="text" 
-                                                placeholder="New Pwd" 
-                                                className="w-24 h-8 text-xs bg-black/30 border-white/10" 
-                                                value={userPasswords[u.id] || ""}
-                                                onChange={(e) => setUserPasswords({...userPasswords, [u.id]: e.target.value})}
-                                              />
-                                              <Button size="sm" variant="outline" onClick={() => handleChangePassword(u.id)} className="h-8">
-                                                Update
-                                              </Button>
-                                            </div>
-                                          </>
-                                        )}
-                                      </div>
-                                    </TableCell>
-                                    <TableCell className="text-muted-foreground text-sm">
-                                        {u.createdAt ? new Date(u.createdAt).toLocaleDateString() : '-'}
-                                    </TableCell>
-                                </TableRow>
-                            ))
-                        )}
-                    </TableBody>
-                </Table>
+              <CardContent className="space-y-4">
+                <div className="space-y-2">
+                  <label className="text-xs uppercase text-muted-foreground font-bold">Current Username</label>
+                  <p className="text-sm font-medium" data-testid="text-current-username">{user?.username}</p>
+                </div>
+                <div className="space-y-2">
+                  <label className="text-xs uppercase text-muted-foreground font-bold">New Username</label>
+                  <Input
+                    placeholder="Enter new username"
+                    value={newUsername}
+                    onChange={(e) => setNewUsername(e.target.value)}
+                    className="bg-white/5 border-white/10"
+                    data-testid="input-new-username"
+                  />
+                </div>
+                <Button onClick={handleUpdateUsername} className="w-full" data-testid="button-update-username">
+                  Update Username
+                </Button>
+                <p className="text-[10px] text-muted-foreground">Note: You can always switch back to "Admin" as your username.</p>
               </CardContent>
             </Card>
           </TabsContent>
