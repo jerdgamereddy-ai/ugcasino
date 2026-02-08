@@ -57,11 +57,12 @@ export function AppSidebar() {
 
     if (user.role === 'super_manager') {
       items.push({ title: "Management Panel", url: "/super-manager", icon: UserCog });
-      items.push({ title: "Reports", url: "/sm-reports", icon: BarChart3 });
+      items.push({ title: "Reports", url: "/reports", icon: BarChart3 });
     }
 
     if (user.role === 'manager') {
       items.push({ title: "Manager Panel", url: "/manager", icon: Users });
+      items.push({ title: "Reports", url: "/reports", icon: BarChart3 });
     }
 
     return items;

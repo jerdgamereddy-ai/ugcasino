@@ -11,7 +11,6 @@ import Login from "@/pages/Login";
 import Lobby from "@/pages/Lobby";
 import AdminDashboard from "@/pages/AdminDashboard";
 import SuperManagerDashboard from "@/pages/SuperManagerDashboard";
-import SuperManagerReports from "@/pages/SuperManagerReports";
 import ManagerDashboard from "@/pages/ManagerDashboard";
 import GameSlots from "@/pages/GameSlots";
 import GameRoulette from "@/pages/GameRoulette";
@@ -36,7 +35,7 @@ function Router() {
       <Route path="/" component={Lobby} />
       <Route path="/admin" component={AdminDashboard} />
       <Route path="/super-manager" component={SuperManagerDashboard} />
-      <Route path="/sm-reports" component={SuperManagerReports} />
+      <Route path="/sm-reports" component={Reports} />
       <Route path="/manager" component={ManagerDashboard} />
       <Route path="/slots" component={GameSlots} />
       <Route path="/roulette" component={GameRoulette} />

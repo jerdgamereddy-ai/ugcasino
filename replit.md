@@ -2,7 +2,7 @@
 
 ## Overview
 
-UG Casino is a full-stack web application providing an online casino experience with slot machine and roulette games. The platform features a role-based user system (admin, manager, user), voucher-based currency deposits, real-time game mechanics with configurable win probabilities, and comprehensive financial reporting for administrators.
+UG Casino is a full-stack web application providing an online casino experience with slot machine and roulette games. The platform features a 4-tier role-based user system (admin, super_manager, manager, user), voucher-based currency deposits, real-time game mechanics with configurable win probabilities, and comprehensive time-based financial reporting with hierarchical access control.
 
 The application uses Ugandan Shillings (UGX) as its currency and features a luxury gold-and-black visual theme designed for an upscale gambling experience.
 
@@ -46,10 +46,18 @@ Preferred communication style: Simple, everyday language.
 - **Roulette**: European-style with number, color, and parity betting options
 - **House Edge**: Administrators can adjust win probabilities per game type through the Game Control panel
 
-### Role-Based Access Control
+### Role-Based Access Control (4-tier hierarchy)
 - **User**: Play games, redeem vouchers, view balance
-- **Manager**: All user permissions + create vouchers, view user list
-- **Admin**: All manager permissions + modify game settings, view financial reports
+- **Manager**: All user permissions + create players, manage their players' passwords, view performance reports for their players
+- **Super Manager**: All manager permissions + create managers, view network-wide reports (their managers and players), filter by specific manager
+- **Admin**: All permissions + modify game settings (admin-only), view full business reports with filter by any manager, manage all users, security questions for password recovery
+
+### Reporting System
+- **Unified Reports API** (`GET /api/reports`): Server-side time filtering with `from`/`to` ISO timestamps, `managerId` filter
+- **Time Presets**: 15min, 30min, 1hour, 6hours, today, yesterday, 7days, 30days, 3months, 6months, 1year, custom date range
+- **Metrics**: Profit/Loss, Amount in User Accounts, Total Deposited, Total Withdrawn, Amount Won, Amount Bet
+- **Hierarchical Access**: Admin sees all; Super Manager sees their network only; Manager sees their players only
+- **Manager Filter**: Admin can filter by any super_manager or manager; Super Manager can filter by their managers
 
 ## External Dependencies
 

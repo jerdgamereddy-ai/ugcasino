@@ -287,113 +287,164 @@ export async function registerRoutes(
     }
   });
 
-  // === SUPER MANAGER REPORTS ===
-  app.get("/api/super-manager/reports", async (req, res) => {
-    if (!req.isAuthenticated() || req.user.role !== 'super_manager') return res.status(403).send("Forbidden");
+  // === UNIFIED REPORTS API ===
+  // Supports: admin (all data, can filter by manager), super_manager (their network), manager (their players)
+  // Query params: from, to (ISO timestamps), managerId (admin/super_manager only)
+  app.get("/api/reports", async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    const role = req.user.role;
+    if (role !== 'admin' && role !== 'super_manager' && role !== 'manager') return res.status(403).send("Forbidden");
 
-    const managers = await storage.getUsersByCreator(req.user.id);
-    const managerIds = managers.map(m => m.id);
+    const fromParam = req.query.from as string | undefined;
+    const toParam = req.query.to as string | undefined;
+    const managerIdParam = req.query.managerId as string | undefined;
 
-    let allUserIds = [...managerIds];
-    for (const mgr of managers) {
-      const mgrUsers = await storage.getUsersByCreator(mgr.id);
-      allUserIds = allUserIds.concat(mgrUsers.map(u => u.id));
+    const from = fromParam ? new Date(fromParam) : undefined;
+    const to = toParam ? new Date(toParam) : undefined;
+
+    try {
+      let relevantUserIds: number[] = [];
+      let allRelevantUsers: any[] = [];
+      let managersList: { id: number; username: string; role: string }[] = [];
+
+      if (role === 'admin') {
+        const allUsers = await storage.getAllUsers();
+
+        // Build managers list for the filter dropdown (super managers + managers)
+        managersList = allUsers
+          .filter(u => u.role === 'super_manager' || u.role === 'manager')
+          .map(u => ({ id: u.id, username: u.username, role: u.role }));
+
+        if (managerIdParam) {
+          const filterId = parseInt(managerIdParam);
+          const filterUser = allUsers.find(u => u.id === filterId);
+          if (!filterUser) return res.status(404).json({ message: "Manager not found" });
+
+          if (filterUser.role === 'super_manager') {
+            const smManagers = await storage.getUsersByCreator(filterId);
+            relevantUserIds = smManagers.map(m => m.id);
+            for (const mgr of smManagers) {
+              const mgrPlayers = await storage.getUsersByCreator(mgr.id);
+              relevantUserIds = relevantUserIds.concat(mgrPlayers.map(u => u.id));
+            }
+            allRelevantUsers = allUsers.filter(u => relevantUserIds.includes(u.id));
+          } else if (filterUser.role === 'manager') {
+            const mgrPlayers = await storage.getUsersByCreator(filterId);
+            relevantUserIds = mgrPlayers.map(u => u.id);
+            allRelevantUsers = mgrPlayers;
+          }
+        } else {
+          relevantUserIds = allUsers.filter(u => u.role !== 'admin').map(u => u.id);
+          allRelevantUsers = allUsers.filter(u => u.role !== 'admin');
+        }
+      } else if (role === 'super_manager') {
+        const myManagers = await storage.getUsersByCreator(req.user.id);
+        managersList = myManagers.map(m => ({ id: m.id, username: m.username, role: m.role }));
+        
+        let userIds = myManagers.map(m => m.id);
+        for (const mgr of myManagers) {
+          const mgrPlayers = await storage.getUsersByCreator(mgr.id);
+          userIds = userIds.concat(mgrPlayers.map(u => u.id));
+        }
+
+        if (managerIdParam) {
+          const filterId = parseInt(managerIdParam);
+          if (!myManagers.find(m => m.id === filterId)) {
+            return res.status(403).json({ message: "This manager is not in your network" });
+          }
+          const mgrPlayers = await storage.getUsersByCreator(filterId);
+          relevantUserIds = mgrPlayers.map(u => u.id);
+          allRelevantUsers = mgrPlayers;
+        } else {
+          relevantUserIds = userIds;
+          const allUsers = await storage.getAllUsers();
+          allRelevantUsers = allUsers.filter(u => userIds.includes(u.id));
+        }
+      } else if (role === 'manager') {
+        const myPlayers = await storage.getUsersByCreator(req.user.id);
+        relevantUserIds = myPlayers.map(u => u.id);
+        allRelevantUsers = myPlayers;
+      }
+
+      // Fetch transactions with time filtering
+      let txns: any[];
+      if (role === 'admin' && !managerIdParam) {
+        txns = await storage.getTransactionsByDateRange(from, to);
+      } else {
+        txns = await storage.getTransactionsByUserIdsAndDateRange(relevantUserIds, from, to);
+      }
+
+      // Fetch withdrawals with time filtering
+      let withdrawals: any[];
+      if (role === 'admin' && !managerIdParam) {
+        withdrawals = await storage.getAllWithdrawalsByDateRange(from, to);
+      } else {
+        withdrawals = await storage.getWithdrawalsByUserIdsAndDateRange(relevantUserIds, from, to);
+      }
+
+      const approvedWithdrawals = withdrawals.filter((w: any) => w.status === 'approved');
+      const totalWithdrawn = approvedWithdrawals.reduce((sum: number, w: any) => sum + w.amount, 0);
+
+      // Compute report metrics
+      const report = txns.reduce((acc, tx) => {
+        const date = tx.createdAt ? new Date(tx.createdAt).toISOString().split('T')[0] : 'unknown';
+        if (!acc.dailyStats[date]) {
+          acc.dailyStats[date] = { date, bets: 0, wins: 0, deposits: 0, withdrawals: 0 };
+        }
+
+        if (tx.type === 'deposit' || tx.type === 'voucher_redemption') {
+          acc.totalDeposits += tx.amount;
+          acc.dailyStats[date].deposits += tx.amount;
+        }
+        if (tx.type === 'withdrawal') {
+          acc.totalWithdrawals += Math.abs(tx.amount);
+          acc.dailyStats[date].withdrawals += Math.abs(tx.amount);
+        }
+        if (tx.type === 'bet') {
+          acc.totalBets += Math.abs(tx.amount);
+          acc.dailyStats[date].bets += Math.abs(tx.amount);
+        }
+        if (tx.type === 'win') {
+          acc.totalWins += tx.amount;
+          acc.dailyStats[date].wins += tx.amount;
+        }
+        return acc;
+      }, {
+        totalDeposits: 0,
+        totalWithdrawals: 0,
+        totalBets: 0,
+        totalWins: 0,
+        dailyStats: {} as Record<string, { date: string; bets: number; wins: number; deposits: number; withdrawals: number }>,
+      });
+
+      const totalAccountBalances = allRelevantUsers.reduce((sum: number, u: any) => sum + u.balance, 0);
+      const playersCount = allRelevantUsers.filter((u: any) => u.role === 'user').length;
+      const managersCount = allRelevantUsers.filter((u: any) => u.role === 'manager').length;
+      const profit = report.totalBets - report.totalWins;
+
+      res.json({
+        totalDeposits: report.totalDeposits,
+        totalWithdrawals: totalWithdrawn,
+        totalBets: report.totalBets,
+        totalWins: report.totalWins,
+        totalAccountBalances,
+        profit,
+        playersCount,
+        managersCount,
+        transactions: txns.slice(0, 200),
+        dailyStats: Object.values(report.dailyStats).sort((a: any, b: any) => a.date.localeCompare(b.date)),
+        managers: managersList,
+      });
+    } catch (err) {
+      console.error("Reports error:", err);
+      res.status(500).json({ message: "Failed to generate report" });
     }
-
-    const allTransactions = allUserIds.length > 0 ? await storage.getTransactionsByUserIds(allUserIds) : [];
-    const allUsers = await storage.getAllUsers();
-    const relevantUsers = allUsers.filter(u => allUserIds.includes(u.id));
-
-    const report = allTransactions.reduce((acc, tx) => {
-      const date = tx.createdAt ? new Date(tx.createdAt).toISOString().split('T')[0] : 'unknown';
-      if (!acc.dailyStats[date]) {
-        acc.dailyStats[date] = { date, bets: 0, wins: 0, deposits: 0 };
-      }
-
-      if (tx.type === 'deposit' || tx.type === 'voucher_redemption') {
-        acc.totalDeposits += tx.amount;
-        acc.dailyStats[date].deposits += tx.amount;
-      }
-      if (tx.type === 'withdrawal') acc.totalWithdrawals += Math.abs(tx.amount);
-      if (tx.type === 'bet') {
-        acc.totalBets += Math.abs(tx.amount);
-        acc.dailyStats[date].bets += Math.abs(tx.amount);
-      }
-      if (tx.type === 'win') {
-        acc.totalWins += tx.amount;
-        acc.dailyStats[date].wins += tx.amount;
-      }
-      return acc;
-    }, {
-      totalDeposits: 0,
-      totalWithdrawals: 0,
-      totalBets: 0,
-      totalWins: 0,
-      dailyStats: {} as Record<string, { date: string; bets: number; wins: number; deposits: number }>,
-    });
-
-    const totalPendingBalance = relevantUsers.reduce((sum, u) => sum + u.balance, 0);
-    const playersCount = relevantUsers.filter(u => u.role === 'user').length;
-
-    res.json({
-      totalDeposits: report.totalDeposits,
-      totalWithdrawals: report.totalWithdrawals,
-      totalBets: report.totalBets,
-      totalWins: report.totalWins,
-      totalPendingBalance,
-      netRevenue: report.totalBets - report.totalWins,
-      playersCount,
-      transactions: allTransactions.slice(0, 100),
-      dailyStats: Object.values(report.dailyStats).sort((a, b) => b.date.localeCompare(a.date)),
-    });
   });
 
-  // === ADMIN REPORTS (general business report - admin only) ===
+  // Keep legacy endpoint for backwards compat
   app.get(api.admin.reports.path, async (req, res) => {
     if (!req.isAuthenticated() || req.user.role !== 'admin') return res.status(403).send("Forbidden");
-    
-    const transactions = await storage.getAllTransactions();
-    
-    const report = transactions.reduce((acc, tx) => {
-      const date = tx.createdAt ? new Date(tx.createdAt).toISOString().split('T')[0] : 'unknown';
-      if (!acc.dailyStats[date]) {
-        acc.dailyStats[date] = { date, bets: 0, wins: 0, deposits: 0 };
-      }
-
-      if (tx.type === 'deposit' || tx.type === 'voucher_redemption') {
-        acc.totalDeposits += tx.amount;
-        acc.dailyStats[date].deposits += tx.amount;
-      }
-      if (tx.type === 'withdrawal') acc.totalWithdrawals += Math.abs(tx.amount);
-      if (tx.type === 'bet') {
-        acc.totalBets += Math.abs(tx.amount);
-        acc.dailyStats[date].bets += Math.abs(tx.amount);
-      }
-      if (tx.type === 'win') {
-        acc.totalWins += tx.amount;
-        acc.dailyStats[date].wins += tx.amount;
-      }
-      return acc;
-    }, {
-      totalDeposits: 0,
-      totalWithdrawals: 0,
-      totalBets: 0,
-      totalWins: 0,
-      dailyStats: {} as Record<string, { date: string; bets: number; wins: number; deposits: number }>,
-    });
-
-    const allUsers = await storage.getAllUsers();
-    const totalPendingBalance = allUsers.reduce((sum, u) => sum + u.balance, 0);
-    const playersCount = allUsers.filter(u => u.role === 'user').length;
-
-    res.json({
-      ...report,
-      totalPendingBalance,
-      playersCount,
-      netRevenue: report.totalBets - report.totalWins,
-      transactions: transactions.slice(0, 100),
-      dailyStats: Object.values(report.dailyStats).sort((a, b) => b.date.localeCompare(a.date)),
-    });
+    res.redirect('/api/reports');
   });
 
   // === GAME SETTINGS (admin only for changing) ===

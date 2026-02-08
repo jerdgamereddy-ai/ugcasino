@@ -1,6 +1,6 @@
 import { users, vouchers, transactions, gameSettings, withdrawalRequests, adminSecurityAnswers, type User, type InsertUser, type Voucher, type InsertVoucher, type Transaction, type GameSetting, type WithdrawalRequest, type InsertWithdrawalRequest, type AdminSecurityAnswer } from "@shared/schema";
 import { db } from "./db";
-import { eq, desc, sql, and, inArray } from "drizzle-orm";
+import { eq, desc, sql, and, inArray, gte, lte, between } from "drizzle-orm";
 import session from "express-session";
 import connectPg from "connect-pg-simple";
 import { pool } from "./db";
@@ -36,6 +36,11 @@ export interface IStorage {
   getUserTransactions(userId: number): Promise<Transaction[]>;
   getAllTransactions(): Promise<Transaction[]>;
   getTransactionsByUserIds(userIds: number[]): Promise<Transaction[]>;
+  getTransactionsByUserIdsAndDateRange(userIds: number[], from?: Date, to?: Date): Promise<Transaction[]>;
+  getTransactionsByDateRange(from?: Date, to?: Date): Promise<Transaction[]>;
+  getWithdrawalsByUserIds(userIds: number[]): Promise<WithdrawalRequest[]>;
+  getWithdrawalsByUserIdsAndDateRange(userIds: number[], from?: Date, to?: Date): Promise<WithdrawalRequest[]>;
+  getAllWithdrawalsByDateRange(from?: Date, to?: Date): Promise<WithdrawalRequest[]>;
 
   getGameSettings(gameType: string): Promise<GameSetting | undefined>;
   getAllGameSettings(): Promise<GameSetting[]>;
@@ -170,6 +175,43 @@ export class DatabaseStorage implements IStorage {
   async getTransactionsByUserIds(userIds: number[]): Promise<Transaction[]> {
     if (userIds.length === 0) return [];
     return await db.select().from(transactions).where(inArray(transactions.userId, userIds)).orderBy(desc(transactions.createdAt));
+  }
+
+  async getTransactionsByUserIdsAndDateRange(userIds: number[], from?: Date, to?: Date): Promise<Transaction[]> {
+    if (userIds.length === 0) return [];
+    const conditions = [inArray(transactions.userId, userIds)];
+    if (from) conditions.push(gte(transactions.createdAt, from));
+    if (to) conditions.push(lte(transactions.createdAt, to));
+    return await db.select().from(transactions).where(and(...conditions)).orderBy(desc(transactions.createdAt));
+  }
+
+  async getTransactionsByDateRange(from?: Date, to?: Date): Promise<Transaction[]> {
+    const conditions = [];
+    if (from) conditions.push(gte(transactions.createdAt, from));
+    if (to) conditions.push(lte(transactions.createdAt, to));
+    if (conditions.length === 0) return await this.getAllTransactions();
+    return await db.select().from(transactions).where(and(...conditions)).orderBy(desc(transactions.createdAt));
+  }
+
+  async getWithdrawalsByUserIds(userIds: number[]): Promise<WithdrawalRequest[]> {
+    if (userIds.length === 0) return [];
+    return await db.select().from(withdrawalRequests).where(inArray(withdrawalRequests.userId, userIds)).orderBy(desc(withdrawalRequests.createdAt));
+  }
+
+  async getWithdrawalsByUserIdsAndDateRange(userIds: number[], from?: Date, to?: Date): Promise<WithdrawalRequest[]> {
+    if (userIds.length === 0) return [];
+    const conditions = [inArray(withdrawalRequests.userId, userIds)];
+    if (from) conditions.push(gte(withdrawalRequests.createdAt, from));
+    if (to) conditions.push(lte(withdrawalRequests.createdAt, to));
+    return await db.select().from(withdrawalRequests).where(and(...conditions)).orderBy(desc(withdrawalRequests.createdAt));
+  }
+
+  async getAllWithdrawalsByDateRange(from?: Date, to?: Date): Promise<WithdrawalRequest[]> {
+    const conditions = [];
+    if (from) conditions.push(gte(withdrawalRequests.createdAt, from));
+    if (to) conditions.push(lte(withdrawalRequests.createdAt, to));
+    if (conditions.length === 0) return await db.select().from(withdrawalRequests).orderBy(desc(withdrawalRequests.createdAt));
+    return await db.select().from(withdrawalRequests).where(and(...conditions)).orderBy(desc(withdrawalRequests.createdAt));
   }
 
   async getGameSettings(gameType: string): Promise<GameSetting | undefined> {
