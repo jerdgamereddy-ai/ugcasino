@@ -15,7 +15,7 @@ const DiceIcons = [Dice1, Dice2, Dice3, Dice4, Dice5, Dice6];
 export function DiceGame() {
   const { data: user } = useUser();
   const { toast } = useToast();
-  const [bet, setBet] = useState(100);
+  const [bet, setBet] = useState(500);
   const [choice, setChoice] = useState<"low" | "high">("low");
   const [rolling, setRolling] = useState(false);
   const [result, setResult] = useState<number | null>(null);
@@ -62,7 +62,7 @@ export function DiceGame() {
   });
 
   const handleRoll = () => {
-    if (bet < 100) return;
+    if (bet < 500) return;
     setRolling(true);
     setResult(null);
     rollMutation.mutate();
@@ -129,9 +129,14 @@ export function DiceGame() {
                   value={bet}
                   onChange={(e) => setBet(Number(e.target.value))}
                   className="pl-10 bg-black/30 border-white/10 text-white font-mono"
-                  min={100}
+                  min={500}
                   disabled={rolling}
                 />
+              </div>
+              <div className="flex flex-wrap gap-1.5">
+                {[500, 1000, 2000, 5000, 10000, 20000, 50000].map(amt => (
+                  <button key={amt} onClick={() => setBet(amt)} disabled={rolling} className={`px-2 py-1 rounded text-xs font-mono border transition-colors ${bet === amt ? "bg-primary text-black border-primary" : "border-white/10 text-muted-foreground"}`}>{amt.toLocaleString()}</button>
+                ))}
               </div>
             </div>
 

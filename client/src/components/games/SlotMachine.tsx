@@ -12,7 +12,7 @@ import { playSound } from "@/lib/sounds";
 
 export function SlotMachine() {
   const [reels, setReels] = useState(["🎰", "🎰", "🎰"]);
-  const [bet, setBet] = useState(100);
+  const [bet, setBet] = useState(500);
   const [isSpinning, setIsSpinning] = useState(false);
   const { mutate: spin, isPending } = useSpinSlots();
   const { toast } = useToast();
@@ -101,7 +101,7 @@ export function SlotMachine() {
            <div className="flex flex-col gap-2 w-full md:w-auto">
                <label className="text-xs text-muted-foreground uppercase tracking-widest">Bet Amount</label>
                <div className="flex gap-2">
-                   {[100, 500, 1000, 5000].map((amount) => (
+                   {[500, 1000, 2000, 5000, 10000, 20000, 50000].map((amount) => (
                        <button
                            key={amount}
                            onClick={() => setBet(amount)}
@@ -136,7 +136,7 @@ export function SlotMachine() {
       </div>
       
       <div className="text-center text-muted-foreground text-sm">
-          <p>Min Bet: UGX 100 • 3 Matching Symbols Wins</p>
+          <p>Min Bet: UGX 500 • 3 Matching Symbols Wins</p>
       </div>
     </div>
   );

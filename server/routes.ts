@@ -487,7 +487,7 @@ export async function registerRoutes(
     if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
     try {
       const { bet, prediction, lastCard } = z.object({ 
-        bet: z.number().min(100),
+        bet: z.number().min(500),
         prediction: z.enum(["higher", "lower"]),
         lastCard: z.number().nullable()
       }).parse(req.body);
@@ -525,7 +525,7 @@ export async function registerRoutes(
     if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
     try {
       const { bet, choice } = z.object({ 
-        bet: z.number().min(100),
+        bet: z.number().min(500),
         choice: z.enum(["low", "high"])
       }).parse(req.body);
 
@@ -557,7 +557,7 @@ export async function registerRoutes(
     if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
     try {
       const { bet, choice } = z.object({ 
-        bet: z.number().min(100),
+        bet: z.number().min(500),
         choice: z.enum(["heads", "tails"])
       }).parse(req.body);
 
@@ -586,7 +586,7 @@ export async function registerRoutes(
   app.post("/api/games/plinko/play", async (req, res) => {
     if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
     try {
-      const { bet } = z.object({ bet: z.number().min(100) }).parse(req.body);
+      const { bet } = z.object({ bet: z.number().min(500) }).parse(req.body);
       if (req.user.balance < bet) return res.status(400).json({ message: "Insufficient balance" });
       const settings = await storage.getGameSettings("plinko");
       const winChance = settings?.winChance ?? 0.48;
@@ -619,7 +619,7 @@ export async function registerRoutes(
     if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
     try {
       const { bet, minesCount, selectedCells } = z.object({ 
-        bet: z.number().min(100),
+        bet: z.number().min(500),
         minesCount: z.number().min(1).max(24),
         selectedCells: z.array(z.number())
       }).parse(req.body);
@@ -646,7 +646,7 @@ export async function registerRoutes(
   app.post("/api/games/wheel/play", async (req, res) => {
     if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
     try {
-      const { bet } = z.object({ bet: z.number().min(100) }).parse(req.body);
+      const { bet } = z.object({ bet: z.number().min(500) }).parse(req.body);
       if (req.user.balance < bet) return res.status(400).json({ message: "Insufficient balance" });
       
       const settings = await storage.getGameSettings("wheel");
@@ -673,7 +673,7 @@ export async function registerRoutes(
   app.post("/api/games/poker/deal", async (req, res) => {
     if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
     try {
-      const { bet } = z.object({ bet: z.number().min(100) }).parse(req.body);
+      const { bet } = z.object({ bet: z.number().min(500) }).parse(req.body);
       if (req.user.balance < bet) return res.status(400).json({ message: "Insufficient balance" });
       await storage.updateUserBalance(req.user.id, -bet);
       await storage.createTransaction({ userId: req.user.id, amount: -bet, type: "bet", description: "Poker deal" });
@@ -817,7 +817,7 @@ export async function registerRoutes(
     
     try {
       const { bet, selectedNumbers } = z.object({
-        bet: z.number().min(100),
+        bet: z.number().min(500),
         selectedNumbers: z.array(z.number()).min(1).max(10)
       }).parse(req.body);
 

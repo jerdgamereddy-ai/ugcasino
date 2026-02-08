@@ -13,7 +13,7 @@ const SUITS = ["♠", "♣", "♥", "♦"];
 const VALUES = ["A", "2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K"];
 
 export default function GamePoker() {
-  const [bet, setBet] = useState(100);
+  const [bet, setBet] = useState(500);
   const [gameState, setGameState] = useState<"betting" | "playing" | "ended">("betting");
   const [hand, setHand] = useState<{ value: string; suit: string; held: boolean }[]>([]);
   const [result, setResult] = useState<string>("");
@@ -126,7 +126,13 @@ export default function GamePoker() {
                   onChange={(e) => setBet(Number(e.target.value))}
                   className="bg-black/40 border-white/10 text-white w-48"
                   disabled={gameState === "playing"}
+                  min={500}
                 />
+                <div className="flex flex-wrap gap-1.5 mt-2">
+                  {[500, 1000, 2000, 5000, 10000, 20000, 50000].map(amt => (
+                    <button key={amt} onClick={() => setBet(amt)} disabled={gameState === "playing"} className={`px-2 py-1 rounded text-xs font-mono border transition-colors ${bet === amt ? "bg-primary text-black border-primary" : "border-white/10 text-muted-foreground"}`}>{amt.toLocaleString()}</button>
+                  ))}
+                </div>
               </div>
               
               <div className="flex-1 text-center">

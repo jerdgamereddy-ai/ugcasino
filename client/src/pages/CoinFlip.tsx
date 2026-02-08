@@ -12,13 +12,13 @@ import { Coins, RotateCw } from "lucide-react";
 export default function CoinFlip() {
   const { data: user } = useUser();
   const { toast } = useToast();
-  const [bet, setBet] = useState(100);
+  const [bet, setBet] = useState(500);
   const [isFlipping, setIsFlipping] = useState(false);
   const [result, setResult] = useState<string | null>(null);
   const [lastWon, setLastWon] = useState<boolean | null>(null);
 
   const play = async (choice: "heads" | "tails") => {
-    if (bet < 100) return toast({ title: "Minimum bet is UGX 100", variant: "destructive" });
+    if (bet < 500) return toast({ title: "Minimum bet is UGX 500", variant: "destructive" });
     if (user && user.balance < bet) return toast({ title: "Insufficient balance", variant: "destructive" });
 
     setIsFlipping(true);
@@ -105,13 +105,14 @@ export default function CoinFlip() {
                   className="bg-black/40 border-white/10 h-14 pl-12 text-xl font-mono text-white"
                 />
               </div>
-              <div className="grid grid-cols-2 gap-2">
-                {[500, 1000, 5000, 10000].map(amt => (
+              <div className="flex flex-wrap gap-2">
+                {[500, 1000, 2000, 5000, 10000, 20000, 50000].map(amt => (
                   <Button 
                     key={amt} 
-                    variant="outline" 
+                    variant={bet === amt ? "default" : "outline"}
+                    size="sm"
                     onClick={() => setBet(amt)}
-                    className="border-white/5 hover:border-primary/50 transition-colors"
+                    className="border-white/5 transition-colors"
                   >
                     {amt.toLocaleString()}
                   </Button>

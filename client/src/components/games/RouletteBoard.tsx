@@ -11,7 +11,7 @@ const RED_NUMBERS = [1, 3, 5, 7, 9, 12, 14, 16, 18, 19, 21, 23, 25, 27, 30, 32, 
 
 export function RouletteBoard() {
   const [selectedBet, setSelectedBet] = useState<{ type: 'number' | 'color' | 'parity', value: number | string } | null>(null);
-  const [betAmount, setBetAmount] = useState(100);
+  const [betAmount, setBetAmount] = useState(500);
   const { mutate: spin, isPending } = useSpinRoulette();
   const { toast } = useToast();
   const [lastResult, setLastResult] = useState<{ number: number; color: string } | null>(null);
@@ -168,7 +168,7 @@ export function RouletteBoard() {
       {/* Controls */}
       <div className="flex flex-col md:flex-row gap-4 items-center w-full justify-between bg-neutral-900/50 p-6 rounded-xl border border-white/5">
          <div className="flex gap-2">
-             {[100, 500, 1000, 5000].map(amt => (
+             {[500, 1000, 2000, 5000, 10000, 20000, 50000].map(amt => (
                  <button
                     key={amt}
                     onClick={() => setBetAmount(amt)}

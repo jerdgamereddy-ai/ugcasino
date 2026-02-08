@@ -10,7 +10,7 @@ import { queryClient } from "@/lib/queryClient";
 import { Input } from "@/components/ui/input";
 
 export default function GameWheel() {
-  const [bet, setBet] = useState(100);
+  const [bet, setBet] = useState(500);
   const [isSpinning, setIsSpinning] = useState(false);
   const [rotation, setRotation] = useState(0);
   const { toast } = useToast();
@@ -72,7 +72,13 @@ export default function GameWheel() {
                   onChange={(e) => setBet(Number(e.target.value))}
                   className="bg-black/40 border-white/10 text-white text-xl h-14"
                   disabled={isSpinning}
+                  min={500}
                 />
+                <div className="flex flex-wrap gap-1.5 mt-2">
+                  {[500, 1000, 2000, 5000, 10000, 20000, 50000].map(amt => (
+                    <button key={amt} onClick={() => setBet(amt)} disabled={isSpinning} className={`px-2 py-1 rounded text-xs font-mono border transition-colors ${bet === amt ? "bg-primary text-black border-primary" : "border-white/10 text-muted-foreground"}`}>{amt.toLocaleString()}</button>
+                  ))}
+                </div>
               </div>
               <Button 
                 onClick={handleSpin} 

@@ -11,7 +11,7 @@ import { queryClient } from "@/lib/queryClient";
 import { playSound } from "@/lib/sounds";
 
 export default function GameKeno() {
-  const [bet, setBet] = useState(100);
+  const [bet, setBet] = useState(500);
   const [selectedNumbers, setSelectedNumbers] = useState<number[]>([]);
   const [isSpinning, setIsSpinning] = useState(false);
   const [results, setResults] = useState<number[]>([]);
@@ -93,7 +93,13 @@ export default function GameKeno() {
                   onChange={(e) => setBet(Number(e.target.value))}
                   className="w-full h-10 px-3 bg-black/40 border border-white/10 rounded-md text-white focus:outline-none focus:ring-1 focus:ring-primary"
                   disabled={isSpinning}
+                  min={500}
                 />
+                <div className="flex flex-wrap gap-1.5 mt-2">
+                  {[500, 1000, 2000, 5000, 10000, 20000, 50000].map(amt => (
+                    <button key={amt} onClick={() => setBet(amt)} disabled={isSpinning} className={`px-2 py-1 rounded text-xs font-mono border transition-colors ${bet === amt ? "bg-primary text-black border-primary" : "border-white/10 text-muted-foreground"}`}>{amt.toLocaleString()}</button>
+                  ))}
+                </div>
               </div>
 
               <div className="p-4 bg-primary/10 rounded-lg border border-primary/20 text-center">

@@ -9,7 +9,7 @@ import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
 
 export default function GamePlinko() {
-  const [bet, setBet] = useState(100);
+  const [bet, setBet] = useState(500);
   const [isDropping, setIsDropping] = useState(false);
   const [ballPath, setBallPath] = useState<number[]>([]);
   const [multiplier, setMultiplier] = useState<number | null>(null);
@@ -72,7 +72,7 @@ export default function GamePlinko() {
               <div className="space-y-2">
                 <label className="text-xs uppercase font-bold text-[#D4AF37]">Bet Amount (UGX)</label>
                 <div className="grid grid-cols-2 gap-2">
-                  {[100, 500, 1000, 5000].map((amt) => (
+                  {[500, 1000, 2000, 5000, 10000, 20000, 50000].map((amt) => (
                     <Button 
                       key={amt} 
                       variant={bet === amt ? "luxury" : "outline"}

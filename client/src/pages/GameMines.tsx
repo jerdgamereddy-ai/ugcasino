@@ -12,7 +12,7 @@ import { Input } from "@/components/ui/input";
 import { playSound } from "@/lib/sounds";
 
 export default function GameMines() {
-  const [bet, setBet] = useState(100);
+  const [bet, setBet] = useState(500);
   const [minesCount, setMinesCount] = useState(3);
   const [gameState, setGameState] = useState<"betting" | "playing" | "ended">("betting");
   const [selectedCells, setSelectedCells] = useState<number[]>([]);
@@ -81,14 +81,19 @@ export default function GameMines() {
                 <Input 
                   type="number" 
                   value={bet} 
-                  onChange={(e) => setBet(Math.max(100, parseInt(e.target.value) || 0))}
-                  onBlur={(e) => setBet(Math.max(100, parseInt(e.target.value) || 100))}
+                  onChange={(e) => setBet(Math.max(500, parseInt(e.target.value) || 0))}
+                  onBlur={(e) => setBet(Math.max(500, parseInt(e.target.value) || 500))}
                   className="bg-white/10 border-white/20 text-white placeholder:text-white/50 focus:bg-white/20 transition-all h-12 text-lg font-mono"
                   style={{ color: 'white', opacity: 1 }}
                   disabled={gameState === "playing"}
-                  step={100}
-                  min={100}
+                  step={500}
+                  min={500}
                 />
+                <div className="flex flex-wrap gap-1.5 mt-2">
+                  {[500, 1000, 2000, 5000, 10000, 20000, 50000].map(amt => (
+                    <button key={amt} onClick={() => setBet(amt)} disabled={gameState === "playing"} className={`px-2 py-1 rounded text-xs font-mono border transition-colors ${bet === amt ? "bg-primary text-black border-primary" : "border-white/10 text-muted-foreground"}`}>{amt.toLocaleString()}</button>
+                  ))}
+                </div>
               </div>
               <div className="space-y-2">
                 <label className="text-xs uppercase font-bold text-[#D4AF37]">Mines Count</label>
