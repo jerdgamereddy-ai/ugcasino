@@ -229,9 +229,14 @@ export default function GameWheel() {
       
       const targetSegment = data.segmentIndex;
       const segmentCenter = targetSegment * SEGMENT_ANGLE + SEGMENT_ANGLE / 2;
-      const fullSpins = 360 * 6 + (Math.random() * 20);
-      const targetRotation = fullSpins + (360 - segmentCenter);
-      setRotation(prev => prev + targetRotation);
+      const fullSpins = 360 * 6;
+      setRotation(prev => {
+        const currentAngle = prev % 360;
+        const targetAngle = (360 - segmentCenter) % 360;
+        let additionalRotation = targetAngle - currentAngle;
+        if (additionalRotation < 0) additionalRotation += 360;
+        return prev + fullSpins + additionalRotation;
+      });
 
       const tickInterval = setInterval(() => {
         tickCountRef.current++;
