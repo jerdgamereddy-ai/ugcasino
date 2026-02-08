@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { Shield, Plus, Users, Ticket, Copy, Banknote, CheckCircle, Loader2, Ban, Trash2, ArrowUpCircle, KeyRound, UserCog, Lock, BarChart3, Settings2 } from "lucide-react";
@@ -25,7 +25,7 @@ type GameFormData = z.infer<typeof updateGameSettingsSchema>;
 
 function GameSettingCard({ setting }: { setting: GameSetting }) {
   const { toast } = useToast();
-  const [winValue, setWinValue] = useState(String(Math.round(setting.winChance * 100)));
+  const inputRef = useRef<HTMLInputElement>(null);
 
   const mutation = useMutation({
     mutationFn: async (val: number) => {
@@ -44,7 +44,8 @@ function GameSettingCard({ setting }: { setting: GameSetting }) {
   });
 
   const handleSave = () => {
-    const num = Number(winValue);
+    const val = inputRef.current?.value ?? "";
+    const num = Number(val);
     if (isNaN(num) || num < 0 || num > 100) {
       toast({ title: "Invalid value", description: "Enter a number between 0 and 100", variant: "destructive" });
       return;
@@ -61,14 +62,13 @@ function GameSettingCard({ setting }: { setting: GameSetting }) {
         <label className="text-xs text-muted-foreground">Win Probability</label>
         <div className="flex gap-2 items-center mt-1">
           <div className="relative flex-1">
-            <input
-              type="number"
-              step="1"
-              min={0}
-              max={100}
-              value={winValue}
-              onChange={e => setWinValue(e.target.value)}
-              className="flex h-9 w-full rounded-md border border-white/10 bg-white/5 px-3 pr-8 py-1 text-sm text-white font-mono focus:outline-none focus:ring-1 focus:ring-primary"
+            <Input
+              ref={inputRef}
+              type="text"
+              inputMode="numeric"
+              pattern="[0-9]*"
+              defaultValue={Math.round(setting.winChance * 100)}
+              className="pr-8 bg-white/5 border-white/10"
               data-testid={`input-winchance-${setting.gameType}`}
             />
             <span className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground font-mono text-sm">%</span>
