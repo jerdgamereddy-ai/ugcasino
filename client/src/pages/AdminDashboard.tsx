@@ -9,7 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useState, useRef } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { Shield, Plus, Users, Ticket, Copy, Banknote, CheckCircle, Loader2, Ban, Trash2, ArrowUpCircle, KeyRound, UserCog, Lock, BarChart3, Settings2, ChevronUp, ChevronDown, Megaphone } from "lucide-react";
+import { Shield, Plus, Users, Ticket, Copy, Banknote, CheckCircle, Loader2, Ban, Trash2, ArrowUpCircle, KeyRound, UserCog, Lock, BarChart3, Settings2, ChevronUp, ChevronDown, Megaphone, Calculator } from "lucide-react";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -22,6 +22,7 @@ import { User, ADMIN_SECURITY_QUESTIONS } from "@shared/schema";
 import { Badge } from "@/components/ui/badge";
 import { BroadcastBanner } from "@/components/BroadcastBanner";
 import { BroadcastSender } from "@/components/BroadcastSender";
+import { ProfitCalculator } from "@/components/ProfitCalculator";
 
 type GameFormData = z.infer<typeof updateGameSettingsSchema>;
 
@@ -317,6 +318,7 @@ export default function AdminDashboard() {
             <TabsTrigger value="requests" data-testid="tab-requests">Withdrawals</TabsTrigger>
             <TabsTrigger value="gamecontrol" data-testid="tab-gamecontrol"><Settings2 className="w-3 h-3 mr-1" /> Game Control</TabsTrigger>
             <TabsTrigger value="reports" data-testid="tab-reports">Reports</TabsTrigger>
+            <TabsTrigger value="profit" data-testid="tab-profit"><Calculator className="w-3 h-3 mr-1" /> Profit Calculator</TabsTrigger>
             <TabsTrigger value="broadcast" data-testid="tab-broadcast"><Megaphone className="w-3 h-3 mr-1" /> Broadcast</TabsTrigger>
             <TabsTrigger value="security" data-testid="tab-security">Security</TabsTrigger>
             <TabsTrigger value="settings" data-testid="tab-settings">Account</TabsTrigger>
@@ -598,6 +600,10 @@ export default function AdminDashboard() {
                 </Button>
               </CardContent>
             </Card>
+          </TabsContent>
+
+          <TabsContent value="profit" className="mt-6">
+            <ProfitCalculator viewerRole="admin" />
           </TabsContent>
 
           <TabsContent value="broadcast" className="mt-6">

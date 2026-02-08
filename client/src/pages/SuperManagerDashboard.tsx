@@ -8,11 +8,12 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { Shield, Plus, Users, UserCog, Loader2, Ban, CheckCircle, Megaphone } from "lucide-react";
+import { Shield, Plus, Users, UserCog, Loader2, Ban, CheckCircle, Megaphone, Calculator } from "lucide-react";
 import { queryClient } from "@/lib/queryClient";
 import { User } from "@shared/schema";
 import { BroadcastBanner } from "@/components/BroadcastBanner";
 import { BroadcastSender } from "@/components/BroadcastSender";
+import { ProfitCalculator } from "@/components/ProfitCalculator";
 
 export default function SuperManagerDashboard() {
   const { data: user } = useUser();
@@ -104,6 +105,7 @@ export default function SuperManagerDashboard() {
             <TabsTrigger value="managers" data-testid="tab-managers">Managers ({managers.length})</TabsTrigger>
             <TabsTrigger value="players" data-testid="tab-players">Players ({players.length})</TabsTrigger>
             <TabsTrigger value="create" data-testid="tab-create">Create Manager</TabsTrigger>
+            <TabsTrigger value="profit" data-testid="tab-profit"><Calculator className="w-3 h-3 mr-1" /> Profit Calculator</TabsTrigger>
             <TabsTrigger value="broadcast" data-testid="tab-broadcast"><Megaphone className="w-3 h-3 mr-1" /> Broadcast</TabsTrigger>
           </TabsList>
 
@@ -245,6 +247,10 @@ export default function SuperManagerDashboard() {
                 </form>
               </CardContent>
             </Card>
+          </TabsContent>
+
+          <TabsContent value="profit" className="mt-6">
+            <ProfitCalculator viewerRole="super_manager" />
           </TabsContent>
 
           <TabsContent value="broadcast" className="mt-6">
