@@ -52,6 +52,8 @@ export interface IStorage {
   getPendingWithdrawalRequests(): Promise<WithdrawalRequest[]>;
   getUserWithdrawalRequests(userId: number): Promise<WithdrawalRequest[]>;
 
+  updateProfitSharePercentage(userId: number, percentage: number): Promise<User>;
+
   createBroadcast(data: { senderId: number; senderRole: string; targetRole: string; message: string }): Promise<Broadcast>;
   getBroadcastsForUser(userId: number, userRole: string, createdBy?: number | null): Promise<Broadcast[]>;
   dismissBroadcast(broadcastId: number, userId: number): Promise<void>;
@@ -264,6 +266,11 @@ export class DatabaseStorage implements IStorage {
 
   async getUserWithdrawalRequests(userId: number): Promise<WithdrawalRequest[]> {
     return await db.select().from(withdrawalRequests).where(eq(withdrawalRequests.userId, userId)).orderBy(desc(withdrawalRequests.createdAt));
+  }
+
+  async updateProfitSharePercentage(userId: number, percentage: number): Promise<User> {
+    const [updated] = await db.update(users).set({ profitSharePercentage: percentage }).where(eq(users.id, userId)).returning();
+    return updated;
   }
 
   async createBroadcast(data: { senderId: number; senderRole: string; targetRole: string; message: string }): Promise<Broadcast> {

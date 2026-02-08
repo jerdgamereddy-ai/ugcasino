@@ -1229,5 +1229,101 @@ export async function registerRoutes(
     }
   });
 
+  // === PROFIT SHARING ROUTES ===
+
+  app.post("/api/profit-share/set", async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    const { userId, percentage } = req.body;
+    if (typeof percentage !== 'number' || percentage < 0 || percentage > 100) {
+      return res.status(400).json({ message: "Percentage must be between 0 and 100" });
+    }
+
+    const targetUser = await storage.getUser(userId);
+    if (!targetUser) return res.status(404).json({ message: "User not found" });
+
+    const role = req.user.role;
+    if (role === 'admin') {
+      if (targetUser.role !== 'super_manager') {
+        return res.status(403).json({ message: "Admin can only set profit share for super managers" });
+      }
+    } else if (role === 'super_manager') {
+      if (targetUser.role !== 'manager' || targetUser.createdBy !== req.user.id) {
+        return res.status(403).json({ message: "You can only set profit share for your managers" });
+      }
+    } else {
+      return res.status(403).json({ message: "Forbidden" });
+    }
+
+    const updated = await storage.updateProfitSharePercentage(userId, percentage);
+    res.json({ message: "Profit share percentage updated", user: updated });
+  });
+
+  app.get("/api/profit-share/calculate", async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    const role = req.user.role;
+    if (role !== 'admin' && role !== 'super_manager') {
+      return res.status(403).json({ message: "Forbidden" });
+    }
+
+    const from = req.query.from ? new Date(req.query.from as string) : undefined;
+    const to = req.query.to ? new Date(req.query.to as string) : undefined;
+
+    try {
+      let subordinates: User[] = [];
+      if (role === 'admin') {
+        const allUsers = await storage.getAllUsers();
+        subordinates = allUsers.filter(u => u.role === 'super_manager');
+      } else if (role === 'super_manager') {
+        subordinates = await storage.getUsersByCreator(req.user.id);
+        subordinates = subordinates.filter(u => u.role === 'manager');
+      }
+
+      const results = [];
+      for (const sub of subordinates) {
+        let playerIds: number[] = [];
+        if (sub.role === 'super_manager') {
+          const managers = await storage.getUsersByCreator(sub.id);
+          for (const mgr of managers) {
+            const players = await storage.getUsersByCreator(mgr.id);
+            playerIds = playerIds.concat(players.map(p => p.id));
+          }
+        } else if (sub.role === 'manager') {
+          const players = await storage.getUsersByCreator(sub.id);
+          playerIds = players.map(p => p.id);
+        }
+
+        let totalBets = 0;
+        let totalWins = 0;
+        if (playerIds.length > 0) {
+          const txns = await storage.getTransactionsByUserIdsAndDateRange(playerIds, from, to);
+          for (const tx of txns) {
+            if (tx.type === 'bet') totalBets += Math.abs(tx.amount);
+            if (tx.type === 'win') totalWins += tx.amount;
+          }
+        }
+
+        const profit = totalBets - totalWins;
+        const sharePercentage = sub.profitSharePercentage || 0;
+        const amountOwed = profit > 0 ? Math.round(profit * sharePercentage / 100) : 0;
+
+        results.push({
+          id: sub.id,
+          username: sub.username,
+          role: sub.role,
+          profitSharePercentage: sharePercentage,
+          totalBets,
+          totalWins,
+          profit,
+          amountOwed,
+        });
+      }
+
+      res.json(results);
+    } catch (err) {
+      console.error("Profit share calc error:", err);
+      res.status(500).json({ message: "Failed to calculate profit shares" });
+    }
+  });
+
   return httpServer;
 }
