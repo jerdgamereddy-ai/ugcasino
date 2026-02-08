@@ -66,7 +66,7 @@ function GameSettingCard({ setting }: { setting: GameSetting }) {
                   <FormControl>
                     <div className="flex gap-2 items-center">
                       <div className="relative flex-1">
-                        <Input type="number" step="1" min={0} max={100} {...field} onChange={e => field.onChange(Number(e.target.value))} className="pr-8 bg-white/5 border-white/10" data-testid={`input-winchance-${setting.gameType}`} />
+                        <Input type="number" step="1" min={0} max={100} value={field.value ?? ""} onChange={e => { const v = e.target.value; field.onChange(v === "" ? "" : Number(v)); }} onBlur={() => { if (field.value === "" || isNaN(Number(field.value))) field.onChange(0); }} className="pr-8 bg-white/5 border-white/10" data-testid={`input-winchance-${setting.gameType}`} />
                         <span className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground font-mono text-sm">%</span>
                       </div>
                       <Button type="submit" size="sm" disabled={mutation.isPending} data-testid={`button-save-${setting.gameType}`}>
