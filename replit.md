@@ -36,7 +36,7 @@ Preferred communication style: Simple, everyday language.
 - **Migrations**: Drizzle Kit for database migrations (`drizzle-kit push` for development)
 
 ### Key Data Models
-- **Users**: id, username, password, role (admin/manager/user), balance (UGX integer)
+- **Users**: id, username, password, role (admin/manager/user), balance (UGX integer), profitSharePercentage (double)
 - **Vouchers**: code-based deposit system, tracks creator and redeemer
 - **Transactions**: audit log of all balance changes (deposits, withdrawals, bets, wins)
 - **Game Settings**: per-game win probability configuration (0.0-1.0)
@@ -58,6 +58,13 @@ Preferred communication style: Simple, everyday language.
 - **Metrics**: Profit/Loss, Amount in User Accounts, Total Deposited, Total Withdrawn, Amount Won, Amount Bet
 - **Hierarchical Access**: Admin sees all; Super Manager sees their network only; Manager sees their players only
 - **Manager Filter**: Admin can filter by any super_manager or manager; Super Manager can filter by their managers
+
+### Profit Sharing System
+- **Profit Calculator**: Available in Admin and Super Manager dashboards as a tab
+- **Admin → Super Managers**: Admin sets profit share percentage for each super manager; super manager owes that % of their network's profit (bets - wins)
+- **Super Manager → Managers**: Super Manager sets profit share percentage for each manager; manager owes that % of their players' profit
+- **Time Filtering**: Supports time presets (today, 7 days, 30 days, etc.) for calculating profit within specific periods
+- **API**: `POST /api/profit-share/set` (set percentage), `GET /api/profit-share/calculate` (calculate owed amounts with time filtering)
 
 ## External Dependencies
 
