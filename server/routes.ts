@@ -658,14 +658,63 @@ export async function registerRoutes(
       
       await storage.updateUserBalance(req.user.id, -bet);
       await storage.createTransaction({ userId: req.user.id, amount: -bet, type: "bet", description: "Wheel spin" });
-      
-      const won = Math.random() < winChance;
-      const segmentIndex = won ? (Math.floor(Math.random() * 4) * 2) : (Math.floor(Math.random() * 4) * 2 + 1);
-      const multiplier = won ? 2 : 0;
+
+      const SEGMENTS = [
+        { multiplier: 0 },    // 0
+        { multiplier: 0.5 },  // 1
+        { multiplier: 0 },    // 2
+        { multiplier: 1 },    // 3
+        { multiplier: 0 },    // 4
+        { multiplier: 1.5 },  // 5
+        { multiplier: 0 },    // 6
+        { multiplier: 2 },    // 7
+        { multiplier: 0 },    // 8
+        { multiplier: 0.5 },  // 9
+        { multiplier: 0 },    // 10
+        { multiplier: 3 },    // 11
+        { multiplier: 0 },    // 12
+        { multiplier: 1 },    // 13
+        { multiplier: 5 },    // 14
+        { multiplier: 10 },   // 15
+      ];
+
+      const houseRoll = Math.random();
+      const isWinSpin = houseRoll < winChance;
+
+      let segmentIndex: number;
+      if (isWinSpin) {
+        const winIndices = SEGMENTS.map((s, i) => s.multiplier > 0 ? i : -1).filter(i => i >= 0);
+        const weights = winIndices.map(i => {
+          const m = SEGMENTS[i].multiplier;
+          if (m <= 0.5) return 5;
+          if (m <= 1) return 4;
+          if (m <= 1.5) return 3;
+          if (m <= 2) return 2.5;
+          if (m <= 3) return 1.5;
+          if (m <= 5) return 0.8;
+          return 0.3;
+        });
+        const totalWeight = weights.reduce((a, b) => a + b, 0);
+        let r = Math.random() * totalWeight;
+        segmentIndex = winIndices[0];
+        for (let i = 0; i < winIndices.length; i++) {
+          r -= weights[i];
+          if (r <= 0) { segmentIndex = winIndices[i]; break; }
+        }
+      } else {
+        const lossIndices = SEGMENTS.map((s, i) => s.multiplier === 0 ? i : -1).filter(i => i >= 0);
+        segmentIndex = lossIndices[Math.floor(Math.random() * lossIndices.length)];
+      }
+
+      const multiplier = SEGMENTS[segmentIndex].multiplier;
       const payout = Math.floor(bet * multiplier);
+      const won = multiplier > 0;
       
-      const user = won ? await storage.updateUserBalance(req.user.id, payout) : await storage.getUser(req.user.id);
-      if (won) await storage.createTransaction({ userId: req.user.id, amount: payout, type: "win", description: "Wheel win" });
+      if (payout > 0) {
+        await storage.updateUserBalance(req.user.id, payout);
+        await storage.createTransaction({ userId: req.user.id, amount: payout, type: "win", description: `Wheel win x${multiplier}` });
+      }
+      const user = await storage.getUser(req.user.id);
       
       res.json({ won, payout, balance: user?.balance ?? 0, segmentIndex, multiplier });
     } catch (err) {
