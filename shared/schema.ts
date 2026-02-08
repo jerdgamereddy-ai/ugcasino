@@ -17,6 +17,7 @@ export const users = pgTable("users", {
   profitSharePercentage: doublePrecision("profit_share_percentage").default(0).notNull(),
   phoneNumber: text("phone_number"),
   withdrawCode: text("withdraw_code"),
+  lastActive: timestamp("last_active"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
