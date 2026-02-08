@@ -81,6 +81,15 @@ export const broadcastDismissals = pgTable("broadcast_dismissals", {
   userId: integer("user_id").notNull(),
 });
 
+export const messages = pgTable("messages", {
+  id: serial("id").primaryKey(),
+  senderId: integer("sender_id").notNull(),
+  receiverId: integer("receiver_id").notNull(),
+  content: text("content").notNull(),
+  isRead: boolean("is_read").default(false).notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 // === RELATIONS ===
 
 export const usersRelations = relations(users, ({ one, many }) => ({
@@ -127,6 +136,19 @@ export const withdrawalRequestsRelations = relations(withdrawalRequests, ({ one 
   processor: one(users, {
     fields: [withdrawalRequests.processedBy],
     references: [users.id],
+  }),
+}));
+
+export const messagesRelations = relations(messages, ({ one }) => ({
+  sender: one(users, {
+    fields: [messages.senderId],
+    references: [users.id],
+    relationName: "message_sender",
+  }),
+  receiver: one(users, {
+    fields: [messages.receiverId],
+    references: [users.id],
+    relationName: "message_receiver",
   }),
 }));
 
@@ -194,6 +216,7 @@ export type InsertWithdrawalRequest = z.infer<typeof insertWithdrawalRequestSche
 
 export type Broadcast = typeof broadcasts.$inferSelect;
 export type BroadcastDismissal = typeof broadcastDismissals.$inferSelect;
+export type Message = typeof messages.$inferSelect;
 
 export const insertBroadcastSchema = createInsertSchema(broadcasts).pick({
   targetRole: true,

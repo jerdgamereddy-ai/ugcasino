@@ -1364,5 +1364,117 @@ export async function registerRoutes(
     }
   });
 
+  app.get("/api/user/:id", async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    const userId = parseInt(req.params.id);
+    if (isNaN(userId)) return res.status(400).json({ message: "Invalid user ID" });
+
+    const requester = req.user;
+    if (requester.role === 'admin') {
+      // admin can view anyone
+    } else if (requester.role === 'super_manager') {
+      const targetUser = await storage.getUser(userId);
+      if (!targetUser || (targetUser.createdBy !== requester.id && targetUser.id !== requester.id)) {
+        return res.status(403).json({ message: "Not authorized" });
+      }
+    } else if (requester.role === 'manager') {
+      if (userId !== requester.createdBy && userId !== requester.id) {
+        return res.status(403).json({ message: "Not authorized" });
+      }
+    } else {
+      return res.status(403).json({ message: "Not authorized" });
+    }
+
+    const targetUser = await storage.getUser(userId);
+    if (!targetUser) return res.status(404).json({ message: "User not found" });
+    const { password, ...safeUser } = targetUser;
+    res.json(safeUser);
+  });
+
+  // === CHAT SYSTEM ===
+  app.post("/api/messages", async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+
+    try {
+      const { receiverId, content } = z.object({
+        receiverId: z.number(),
+        content: z.string().min(1).max(1000),
+      }).parse(req.body);
+
+      const sender = req.user;
+      const receiver = await storage.getUser(receiverId);
+      if (!receiver) return res.status(404).json({ message: "User not found" });
+
+      if (sender.role === 'admin') {
+        // admin can message anyone
+      } else if (sender.role === 'super_manager') {
+        if (receiver.role !== 'manager' || receiver.createdBy !== sender.id) {
+          return res.status(403).json({ message: "You can only message managers you created" });
+        }
+      } else if (sender.role === 'manager') {
+        if (receiver.id !== sender.createdBy) {
+          return res.status(403).json({ message: "You can only message your super manager" });
+        }
+      } else if (sender.role === 'user') {
+        return res.status(403).json({ message: "Players cannot send messages in chat" });
+      }
+
+      const message = await storage.createMessage({
+        senderId: sender.id,
+        receiverId,
+        content,
+      });
+
+      res.status(201).json(message);
+    } catch (err) {
+      res.status(400).json({ message: "Invalid message input" });
+    }
+  });
+
+  app.get("/api/messages/unread/count", async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+
+    const count = await storage.getUnreadCount(req.user.id);
+    res.json({ count });
+  });
+
+  app.get("/api/messages/contacts", async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+
+    if (req.user.role === 'user') return res.status(403).json({ message: "Not authorized" });
+
+    const contacts = await storage.getChatContacts(req.user.id);
+    res.json(contacts);
+  });
+
+  app.get("/api/messages/:userId", async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+
+    const otherUserId = parseInt(req.params.userId);
+    if (isNaN(otherUserId)) return res.status(400).json({ message: "Invalid user ID" });
+
+    const sender = req.user;
+    if (sender.role === 'user') return res.status(403).json({ message: "Not authorized" });
+
+    const otherUser = await storage.getUser(otherUserId);
+    if (!otherUser) return res.status(404).json({ message: "User not found" });
+
+    if (sender.role === 'super_manager') {
+      if (otherUser.role !== 'manager' || otherUser.createdBy !== sender.id) {
+        return res.status(403).json({ message: "Not authorized to view this conversation" });
+      }
+    } else if (sender.role === 'manager') {
+      if (otherUser.id !== sender.createdBy) {
+        return res.status(403).json({ message: "Not authorized to view this conversation" });
+      }
+    }
+
+    const conversation = await storage.getConversation(sender.id, otherUserId);
+
+    await storage.markMessagesAsRead(otherUserId, sender.id);
+
+    res.json(conversation);
+  });
+
   return httpServer;
 }

@@ -1,4 +1,4 @@
-import { users, vouchers, transactions, gameSettings, withdrawalRequests, adminSecurityAnswers, broadcasts, broadcastDismissals, type User, type InsertUser, type Voucher, type InsertVoucher, type Transaction, type GameSetting, type WithdrawalRequest, type InsertWithdrawalRequest, type AdminSecurityAnswer, type Broadcast, type BroadcastDismissal } from "@shared/schema";
+import { users, vouchers, transactions, gameSettings, withdrawalRequests, adminSecurityAnswers, broadcasts, broadcastDismissals, messages, type User, type InsertUser, type Voucher, type InsertVoucher, type Transaction, type GameSetting, type WithdrawalRequest, type InsertWithdrawalRequest, type AdminSecurityAnswer, type Broadcast, type BroadcastDismissal, type Message } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, sql, and, inArray, gte, lte, between } from "drizzle-orm";
 import session from "express-session";
@@ -62,6 +62,12 @@ export interface IStorage {
   dismissBroadcast(broadcastId: number, userId: number): Promise<void>;
   getDismissedBroadcastIds(userId: number): Promise<number[]>;
   getSentBroadcasts(senderId: number): Promise<Broadcast[]>;
+
+  createMessage(data: { senderId: number; receiverId: number; content: string }): Promise<Message>;
+  getConversation(userId1: number, userId2: number): Promise<Message[]>;
+  getUnreadCount(userId: number): Promise<number>;
+  markMessagesAsRead(senderId: number, receiverId: number): Promise<void>;
+  getChatContacts(userId: number): Promise<{ userId: number; lastMessage: string; lastMessageAt: Date | null; unreadCount: number }[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -337,6 +343,52 @@ export class DatabaseStorage implements IStorage {
 
   async getSentBroadcasts(senderId: number): Promise<Broadcast[]> {
     return await db.select().from(broadcasts).where(eq(broadcasts.senderId, senderId)).orderBy(desc(broadcasts.createdAt));
+  }
+
+  async createMessage(data: { senderId: number; receiverId: number; content: string }): Promise<Message> {
+    const [message] = await db.insert(messages).values({
+      senderId: data.senderId,
+      receiverId: data.receiverId,
+      content: data.content,
+    }).returning();
+    return message;
+  }
+
+  async getConversation(userId1: number, userId2: number): Promise<Message[]> {
+    const result = await db.select().from(messages).where(
+      sql`(${messages.senderId} = ${userId1} AND ${messages.receiverId} = ${userId2}) OR (${messages.senderId} = ${userId2} AND ${messages.receiverId} = ${userId1})`
+    ).orderBy(messages.createdAt);
+    return result;
+  }
+
+  async getUnreadCount(userId: number): Promise<number> {
+    const result = await db.select({ count: sql<number>`count(*)` }).from(messages)
+      .where(and(eq(messages.receiverId, userId), eq(messages.isRead, false)));
+    return Number(result[0]?.count || 0);
+  }
+
+  async markMessagesAsRead(senderId: number, receiverId: number): Promise<void> {
+    await db.update(messages).set({ isRead: true })
+      .where(and(eq(messages.senderId, senderId), eq(messages.receiverId, receiverId), eq(messages.isRead, false)));
+  }
+
+  async getChatContacts(userId: number): Promise<{ userId: number; lastMessage: string; lastMessageAt: Date | null; unreadCount: number }[]> {
+    const allMessages = await db.select().from(messages).where(
+      sql`${messages.senderId} = ${userId} OR ${messages.receiverId} = ${userId}`
+    ).orderBy(desc(messages.createdAt));
+
+    const contactMap = new Map<number, { lastMessage: string; lastMessageAt: Date | null; unreadCount: number }>();
+    for (const msg of allMessages) {
+      const contactId = msg.senderId === userId ? msg.receiverId : msg.senderId;
+      if (!contactMap.has(contactId)) {
+        contactMap.set(contactId, { lastMessage: msg.content, lastMessageAt: msg.createdAt, unreadCount: 0 });
+      }
+      if (msg.receiverId === userId && !msg.isRead) {
+        const entry = contactMap.get(contactId)!;
+        entry.unreadCount++;
+      }
+    }
+    return Array.from(contactMap.entries()).map(([uid, data]) => ({ userId: uid, ...data }));
   }
 }
 

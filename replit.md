@@ -75,6 +75,15 @@ Preferred communication style: Simple, everyday language.
 - **Time Filtering**: Supports time presets (today, 7 days, 30 days, etc.) for calculating profit within specific periods
 - **API**: `POST /api/profit-share/set` (set percentage), `GET /api/profit-share/calculate` (calculate owed amounts with time filtering)
 
+### Chat System
+- **Admin Chat**: Admin can message any non-admin user directly from the Chat tab
+- **Super Manager Chat**: Super managers can message their managers from the Chat tab
+- **Manager Chat**: Managers can reply to their super manager (creator) from the Chat tab
+- **Role-Based Access**: Strict server-side enforcement - users can only chat with permitted contacts
+- **Auto-Refresh**: Conversations refresh every 3 seconds, contact list every 5 seconds
+- **Unread Badges**: Unread message counts shown on contact list
+- **API**: `POST /api/messages`, `GET /api/messages/:userId`, `GET /api/messages/contacts`, `GET /api/messages/unread/count`
+
 ## External Dependencies
 
 ### Database

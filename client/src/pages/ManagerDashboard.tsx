@@ -13,6 +13,8 @@ import { queryClient } from "@/lib/queryClient";
 import { User } from "@shared/schema";
 import { BroadcastBanner } from "@/components/BroadcastBanner";
 import { BroadcastSender } from "@/components/BroadcastSender";
+import { ChatPanel } from "@/components/ChatPanel";
+import { MessageCircle } from "lucide-react";
 
 export default function ManagerDashboard() {
   const { data: user } = useUser();
@@ -24,6 +26,16 @@ export default function ManagerDashboard() {
   const { data: myUsers, isLoading: usersLoading } = useQuery<User[]>({
     queryKey: ["/api/admin/users"],
     enabled: user?.role === 'manager',
+  });
+
+  const { data: creatorUser } = useQuery<User>({
+    queryKey: ["/api/user", user?.createdBy],
+    queryFn: async () => {
+      const res = await fetch(`/api/user/${user?.createdBy}`);
+      if (!res.ok) throw new Error("Failed");
+      return res.json();
+    },
+    enabled: !!user?.createdBy,
   });
 
   const createUserMutation = useMutation({
@@ -125,6 +137,7 @@ export default function ManagerDashboard() {
             <TabsTrigger value="create" data-testid="tab-create-user">Create Player</TabsTrigger>
             <TabsTrigger value="withdrawals" data-testid="tab-withdrawals"><Banknote className="w-3 h-3 mr-1" /> Withdrawals ({withdrawRequests?.length || 0})</TabsTrigger>
             <TabsTrigger value="broadcast" data-testid="tab-broadcast"><Megaphone className="w-3 h-3 mr-1" /> Broadcast</TabsTrigger>
+            <TabsTrigger value="chat" data-testid="tab-chat"><MessageCircle className="w-3 h-3 mr-1" /> Chat</TabsTrigger>
           </TabsList>
 
           <TabsContent value="users" className="mt-6">
@@ -288,6 +301,23 @@ export default function ManagerDashboard() {
 
           <TabsContent value="broadcast" className="mt-6">
             <BroadcastSender senderRole="manager" />
+          </TabsContent>
+
+          <TabsContent value="chat" className="mt-6">
+            {user && creatorUser && (
+              <ChatPanel
+                currentUserId={user.id}
+                chatTargets={[creatorUser as User]}
+                title="Chat with Super Manager"
+              />
+            )}
+            {user && !user.createdBy && (
+              <Card className="glass-card">
+                <CardContent className="py-8 text-center text-muted-foreground">
+                  No super manager assigned to chat with.
+                </CardContent>
+              </Card>
+            )}
           </TabsContent>
         </Tabs>
       </div>

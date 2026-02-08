@@ -23,6 +23,8 @@ import { Badge } from "@/components/ui/badge";
 import { BroadcastBanner } from "@/components/BroadcastBanner";
 import { BroadcastSender } from "@/components/BroadcastSender";
 import { ProfitCalculator } from "@/components/ProfitCalculator";
+import { ChatPanel } from "@/components/ChatPanel";
+import { MessageCircle } from "lucide-react";
 
 type GameFormData = z.infer<typeof updateGameSettingsSchema>;
 
@@ -345,6 +347,7 @@ export default function AdminDashboard() {
             <TabsTrigger value="reports" data-testid="tab-reports">Reports</TabsTrigger>
             <TabsTrigger value="profit" data-testid="tab-profit"><Calculator className="w-3 h-3 mr-1" /> Profit Calculator</TabsTrigger>
             <TabsTrigger value="broadcast" data-testid="tab-broadcast"><Megaphone className="w-3 h-3 mr-1" /> Broadcast</TabsTrigger>
+            <TabsTrigger value="chat" data-testid="tab-chat"><MessageCircle className="w-3 h-3 mr-1" /> Chat</TabsTrigger>
             <TabsTrigger value="security" data-testid="tab-security">Security</TabsTrigger>
             <TabsTrigger value="settings" data-testid="tab-settings">Account</TabsTrigger>
           </TabsList>
@@ -718,6 +721,16 @@ export default function AdminDashboard() {
                 </Button>
               </CardContent>
             </Card>
+          </TabsContent>
+
+          <TabsContent value="chat" className="mt-6">
+            {user && users && (
+              <ChatPanel
+                currentUserId={user.id}
+                chatTargets={users.filter(u => u.role !== 'admin')}
+                title="Admin Chat"
+              />
+            )}
           </TabsContent>
 
           <TabsContent value="settings" className="mt-6">

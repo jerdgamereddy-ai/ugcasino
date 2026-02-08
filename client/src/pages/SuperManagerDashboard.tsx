@@ -14,6 +14,8 @@ import { User } from "@shared/schema";
 import { BroadcastBanner } from "@/components/BroadcastBanner";
 import { BroadcastSender } from "@/components/BroadcastSender";
 import { ProfitCalculator } from "@/components/ProfitCalculator";
+import { ChatPanel } from "@/components/ChatPanel";
+import { MessageCircle } from "lucide-react";
 
 export default function SuperManagerDashboard() {
   const { data: user } = useUser();
@@ -134,6 +136,7 @@ export default function SuperManagerDashboard() {
             <TabsTrigger value="create" data-testid="tab-create">Create Manager</TabsTrigger>
             <TabsTrigger value="profit" data-testid="tab-profit"><Calculator className="w-3 h-3 mr-1" /> Profit Calculator</TabsTrigger>
             <TabsTrigger value="broadcast" data-testid="tab-broadcast"><Megaphone className="w-3 h-3 mr-1" /> Broadcast</TabsTrigger>
+            <TabsTrigger value="chat" data-testid="tab-chat"><MessageCircle className="w-3 h-3 mr-1" /> Chat</TabsTrigger>
           </TabsList>
 
           <TabsContent value="managers" className="mt-6">
@@ -336,6 +339,16 @@ export default function SuperManagerDashboard() {
 
           <TabsContent value="broadcast" className="mt-6">
             <BroadcastSender senderRole="super_manager" />
+          </TabsContent>
+
+          <TabsContent value="chat" className="mt-6">
+            {user && (
+              <ChatPanel
+                currentUserId={user.id}
+                chatTargets={managers}
+                title="Chat with Managers"
+              />
+            )}
           </TabsContent>
         </Tabs>
       </div>
