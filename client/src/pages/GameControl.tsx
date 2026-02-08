@@ -1,17 +1,16 @@
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { useRef } from "react";
+import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { type GameSetting } from "@shared/schema";
 import { api } from "@shared/routes";
 import { queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Settings2 } from "lucide-react";
+import { Loader2, Settings2, ChevronUp, ChevronDown } from "lucide-react";
 
 function GameSettingForm({ setting }: { setting: GameSetting }) {
   const { toast } = useToast();
-  const inputRef = useRef<HTMLInputElement>(null);
+  const [pct, setPct] = useState(Math.round(setting.winChance * 100));
 
   const mutation = useMutation({
     mutationFn: async (val: number) => {
@@ -29,15 +28,8 @@ function GameSettingForm({ setting }: { setting: GameSetting }) {
     },
   });
 
-  const handleSave = () => {
-    const val = inputRef.current?.value ?? "";
-    const num = Number(val);
-    if (isNaN(num) || num < 0 || num > 100) {
-      toast({ title: "Invalid value", description: "Enter a number between 0 and 100", variant: "destructive" });
-      return;
-    }
-    mutation.mutate(num);
-  };
+  const increment = () => setPct(p => Math.min(100, p + 1));
+  const decrement = () => setPct(p => Math.max(0, p - 1));
 
   return (
     <Card>
@@ -47,23 +39,20 @@ function GameSettingForm({ setting }: { setting: GameSetting }) {
       </CardHeader>
       <CardContent>
         <label className="text-sm font-medium">Win Probability</label>
-        <div className="flex gap-2 items-center mt-1">
-          <div className="relative flex-1">
-            <Input
-              ref={inputRef}
-              type="text"
-              inputMode="numeric"
-              pattern="[0-9]*"
-              defaultValue={Math.round(setting.winChance * 100)}
-              className="pr-8"
-              data-testid={`input-winchance-${setting.gameType}`}
-            />
-            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground font-mono text-sm">%</span>
+        <div className="flex items-center gap-2 mt-2">
+          <Button size="icon" variant="outline" onClick={decrement} disabled={pct <= 0 || mutation.isPending} data-testid={`button-decrease-${setting.gameType}`}>
+            <ChevronDown className="h-4 w-4" />
+          </Button>
+          <div className="flex-1 text-center py-2 rounded-md border font-mono text-lg font-bold" data-testid={`display-winchance-${setting.gameType}`}>
+            {pct}%
           </div>
-          <Button onClick={handleSave} disabled={mutation.isPending}>
-            {mutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save"}
+          <Button size="icon" variant="outline" onClick={increment} disabled={pct >= 100 || mutation.isPending} data-testid={`button-increase-${setting.gameType}`}>
+            <ChevronUp className="h-4 w-4" />
           </Button>
         </div>
+        <Button className="w-full mt-3" size="sm" onClick={() => mutation.mutate(pct)} disabled={mutation.isPending} data-testid={`button-save-${setting.gameType}`}>
+          {mutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save"}
+        </Button>
       </CardContent>
     </Card>
   );
