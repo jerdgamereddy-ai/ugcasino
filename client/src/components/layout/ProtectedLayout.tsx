@@ -54,8 +54,14 @@ export function ProtectedLayout({ children }: { children: React.ReactNode }) {
     { label: "Lobby", href: "/", icon: Gamepad2 },
   ];
 
-  if (user?.role === "admin" || user?.role === "manager") {
+  if (user?.role === "admin") {
     navItems.push({ label: "Admin Panel", href: "/admin", icon: ShieldCheck });
+  }
+  if (user?.role === "super_manager") {
+    navItems.push({ label: "Management Panel", href: "/super-manager", icon: ShieldCheck });
+  }
+  if (user?.role === "manager") {
+    navItems.push({ label: "Manager Panel", href: "/manager", icon: ShieldCheck });
   }
 
   return (
