@@ -824,6 +824,7 @@ export async function registerRoutes(
         role: "user",
         isApproved: true,
         isSuspended: false,
+        createdBy: voucher.createdBy,
       });
 
       req.login(guestUser, async (err) => {
