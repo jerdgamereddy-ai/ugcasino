@@ -5,10 +5,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { useState } from "react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useState, useMemo } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { Shield, Plus, Users, UserCog, Loader2, Ban, CheckCircle, Megaphone, Calculator, Phone, KeyRound } from "lucide-react";
+import { Shield, Plus, Users, UserCog, Loader2, Ban, CheckCircle, Megaphone, Calculator, Phone, KeyRound, BarChart3, TrendingUp, TrendingDown, Wallet, Trophy, ArrowDownCircle, ArrowUpCircle, DollarSign, RefreshCw, Filter } from "lucide-react";
 import { queryClient } from "@/lib/queryClient";
 import { User } from "@shared/schema";
 import { BroadcastBanner } from "@/components/BroadcastBanner";
@@ -16,6 +17,51 @@ import { BroadcastSender } from "@/components/BroadcastSender";
 import { ProfitCalculator } from "@/components/ProfitCalculator";
 import { ChatPanel } from "@/components/ChatPanel";
 import { MessageCircle } from "lucide-react";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, Legend } from 'recharts';
+
+type PeriodPreset = "15min" | "30min" | "1hour" | "6hours" | "today" | "yesterday" | "7days" | "30days" | "3months" | "6months" | "1year" | "custom";
+
+function getDateRange(preset: PeriodPreset, customFrom?: string, customTo?: string): { from?: string; to?: string } {
+  const now = new Date();
+  if (preset === "custom") {
+    return {
+      from: customFrom ? new Date(customFrom).toISOString() : undefined,
+      to: customTo ? new Date(customTo + "T23:59:59").toISOString() : undefined,
+    };
+  }
+  let from = new Date(now);
+  switch (preset) {
+    case "15min": from.setMinutes(now.getMinutes() - 15); break;
+    case "30min": from.setMinutes(now.getMinutes() - 30); break;
+    case "1hour": from.setHours(now.getHours() - 1); break;
+    case "6hours": from.setHours(now.getHours() - 6); break;
+    case "today": from.setHours(0, 0, 0, 0); break;
+    case "yesterday":
+      from.setDate(now.getDate() - 1);
+      from.setHours(0, 0, 0, 0);
+      const yesterdayEnd = new Date(now);
+      yesterdayEnd.setDate(now.getDate() - 1);
+      yesterdayEnd.setHours(23, 59, 59, 999);
+      return { from: from.toISOString(), to: yesterdayEnd.toISOString() };
+    case "7days": from.setDate(now.getDate() - 7); break;
+    case "30days": from.setDate(now.getDate() - 30); break;
+    case "3months": from.setMonth(now.getMonth() - 3); break;
+    case "6months": from.setMonth(now.getMonth() - 6); break;
+    case "1year": from.setFullYear(now.getFullYear() - 1); break;
+  }
+  return { from: from.toISOString(), to: now.toISOString() };
+}
+
+interface ReportData {
+  totalDeposits: number;
+  totalWithdrawals: number;
+  totalBets: number;
+  totalWins: number;
+  totalAccountBalances: number;
+  profit: number;
+  playersCount: number;
+  dailyStats: { date: string; bets: number; wins: number; deposits: number; withdrawals: number }[];
+}
 
 export default function SuperManagerDashboard() {
   const { data: user } = useUser();
@@ -23,6 +69,10 @@ export default function SuperManagerDashboard() {
   const [newManagerUsername, setNewManagerUsername] = useState("");
   const [newManagerPassword, setNewManagerPassword] = useState("");
   const [newManagerPhone, setNewManagerPhone] = useState("");
+  const [period, setPeriod] = useState<PeriodPreset>("today");
+  const [customFrom, setCustomFrom] = useState("");
+  const [customTo, setCustomTo] = useState("");
+  const [selectedManager, setSelectedManager] = useState<string>("all");
 
   const { data: subordinates, isLoading: usersLoading } = useQuery<User[]>({
     queryKey: ["/api/admin/users"],
@@ -114,6 +164,34 @@ export default function SuperManagerDashboard() {
   const managers = subordinates?.filter(u => u.role === 'manager') || [];
   const players = subordinates?.filter(u => u.role === 'user') || [];
 
+  const queryParams = useMemo(() => {
+    const range = getDateRange(period, customFrom, customTo);
+    const params = new URLSearchParams();
+    if (range.from) params.set("from", range.from);
+    if (range.to) params.set("to", range.to);
+    if (selectedManager !== "all") params.set("managerId", selectedManager);
+    return params.toString();
+  }, [period, customFrom, customTo, selectedManager]);
+
+  const { data: reports, isLoading: reportsLoading, refetch: refetchReports } = useQuery<ReportData>({
+    queryKey: ["/api/reports", queryParams],
+    queryFn: async () => {
+      const res = await fetch(`/api/reports?${queryParams}`);
+      if (!res.ok) throw new Error("Failed to fetch reports");
+      return res.json();
+    },
+    enabled: user?.role === 'super_manager',
+  });
+
+  const statCards = reports ? [
+    { title: "Profit / Loss", value: reports.profit, icon: reports.profit >= 0 ? TrendingUp : TrendingDown, color: reports.profit >= 0 ? "text-green-500" : "text-red-500" },
+    { title: "Amount in Accounts", value: reports.totalAccountBalances, icon: Wallet, color: "text-blue-500" },
+    { title: "Total Deposited", value: reports.totalDeposits, icon: ArrowDownCircle, color: "text-green-500" },
+    { title: "Total Withdrawn", value: reports.totalWithdrawals, icon: ArrowUpCircle, color: "text-orange-500" },
+    { title: "Amount Won", value: reports.totalWins, icon: Trophy, color: "text-yellow-500" },
+    { title: "Amount Bet", value: reports.totalBets, icon: DollarSign, color: "text-purple-500" },
+  ] : [];
+
   return (
     <ProtectedLayout>
       <div className="space-y-6">
@@ -134,6 +212,7 @@ export default function SuperManagerDashboard() {
             <TabsTrigger value="managers" data-testid="tab-managers">Managers ({managers.length})</TabsTrigger>
             <TabsTrigger value="players" data-testid="tab-players">Players ({players.length})</TabsTrigger>
             <TabsTrigger value="create" data-testid="tab-create">Create Manager</TabsTrigger>
+            <TabsTrigger value="reports" data-testid="tab-reports"><BarChart3 className="w-3 h-3 mr-1" /> Reports</TabsTrigger>
             <TabsTrigger value="profit" data-testid="tab-profit"><Calculator className="w-3 h-3 mr-1" /> Profit Calculator</TabsTrigger>
             <TabsTrigger value="broadcast" data-testid="tab-broadcast"><Megaphone className="w-3 h-3 mr-1" /> Broadcast</TabsTrigger>
             <TabsTrigger value="chat" data-testid="tab-chat"><MessageCircle className="w-3 h-3 mr-1" /> Chat</TabsTrigger>
@@ -331,6 +410,128 @@ export default function SuperManagerDashboard() {
                 </form>
               </CardContent>
             </Card>
+          </TabsContent>
+
+          <TabsContent value="reports" className="mt-6">
+            <div className="space-y-6">
+              <Card className="glass-card">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2"><Filter className="w-4 h-4" /> Report Filters</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="flex flex-wrap gap-4 items-end">
+                    <div className="space-y-1.5">
+                      <label className="text-xs uppercase text-muted-foreground font-semibold">Time Period</label>
+                      <Select value={period} onValueChange={(v: PeriodPreset) => setPeriod(v)}>
+                        <SelectTrigger className="w-[180px]" data-testid="select-report-period">
+                          <SelectValue placeholder="Select period" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="15min">Last 15 Minutes</SelectItem>
+                          <SelectItem value="30min">Last 30 Minutes</SelectItem>
+                          <SelectItem value="1hour">Last 1 Hour</SelectItem>
+                          <SelectItem value="6hours">Last 6 Hours</SelectItem>
+                          <SelectItem value="today">Today</SelectItem>
+                          <SelectItem value="yesterday">Yesterday</SelectItem>
+                          <SelectItem value="7days">Last 7 Days</SelectItem>
+                          <SelectItem value="30days">Last 30 Days</SelectItem>
+                          <SelectItem value="3months">Last 3 Months</SelectItem>
+                          <SelectItem value="6months">Last 6 Months</SelectItem>
+                          <SelectItem value="1year">Last Year</SelectItem>
+                          <SelectItem value="custom">Custom Range</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <label className="text-xs uppercase text-muted-foreground font-semibold">Filter by Manager</label>
+                      <Select value={selectedManager} onValueChange={setSelectedManager}>
+                        <SelectTrigger className="w-[200px]" data-testid="select-report-manager">
+                          <SelectValue placeholder="All Managers" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">All Managers</SelectItem>
+                          {managers.map((mgr) => (
+                            <SelectItem key={mgr.id} value={String(mgr.id)}>{mgr.username}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    {period === "custom" && (
+                      <>
+                        <div className="space-y-1.5">
+                          <label className="text-xs uppercase text-muted-foreground font-semibold">From</label>
+                          <Input type="date" value={customFrom} onChange={(e) => setCustomFrom(e.target.value)} className="w-[160px]" data-testid="input-report-from" />
+                        </div>
+                        <div className="space-y-1.5">
+                          <label className="text-xs uppercase text-muted-foreground font-semibold">To</label>
+                          <Input type="date" value={customTo} onChange={(e) => setCustomTo(e.target.value)} className="w-[160px]" data-testid="input-report-to" />
+                        </div>
+                      </>
+                    )}
+
+                    <Button variant="outline" size="sm" onClick={() => refetchReports()} data-testid="button-refresh-reports">
+                      <RefreshCw className="w-4 h-4 mr-1" /> Refresh
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {reportsLoading ? (
+                <div className="flex justify-center p-12"><Loader2 className="w-8 h-8 animate-spin" /></div>
+              ) : reports ? (
+                <>
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                    {statCards.map((stat) => {
+                      const Icon = stat.icon;
+                      return (
+                        <Card key={stat.title} className="glass-card">
+                          <CardContent className="p-4">
+                            <div className="flex items-center gap-2 mb-2">
+                              <Icon className={`w-4 h-4 ${stat.color}`} />
+                              <span className="text-xs text-muted-foreground">{stat.title}</span>
+                            </div>
+                            <div className={`text-lg font-bold ${stat.color}`} data-testid={`text-stat-${stat.title.toLowerCase().replace(/\s+/g, '-')}`}>
+                              UGX {Math.abs(stat.value).toLocaleString()}
+                            </div>
+                          </CardContent>
+                        </Card>
+                      );
+                    })}
+                  </div>
+
+                  {reports.dailyStats && reports.dailyStats.length > 0 && (
+                    <Card className="glass-card">
+                      <CardHeader>
+                        <CardTitle className="text-base flex items-center gap-2"><BarChart3 className="w-4 h-4" /> Daily Activity</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <ResponsiveContainer width="100%" height={300}>
+                          <BarChart data={reports.dailyStats}>
+                            <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
+                            <XAxis dataKey="date" tick={{ fontSize: 10, fill: '#999' }} />
+                            <YAxis tick={{ fontSize: 10, fill: '#999' }} tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`} />
+                            <RechartsTooltip
+                              contentStyle={{ backgroundColor: '#1a1a2e', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px' }}
+                              labelStyle={{ color: '#FFD700' }}
+                              formatter={(value: number) => [`UGX ${value.toLocaleString()}`, undefined]}
+                            />
+                            <Legend />
+                            <Bar dataKey="deposits" name="Deposits" fill="#22c55e" radius={[4, 4, 0, 0]} />
+                            <Bar dataKey="bets" name="Bets" fill="#a855f7" radius={[4, 4, 0, 0]} />
+                            <Bar dataKey="wins" name="Wins" fill="#eab308" radius={[4, 4, 0, 0]} />
+                            <Bar dataKey="withdrawals" name="Withdrawals" fill="#f97316" radius={[4, 4, 0, 0]} />
+                          </BarChart>
+                        </ResponsiveContainer>
+                      </CardContent>
+                    </Card>
+                  )}
+                </>
+              ) : (
+                <p className="text-center text-muted-foreground py-8">No report data available.</p>
+              )}
+            </div>
           </TabsContent>
 
           <TabsContent value="profit" className="mt-6">
