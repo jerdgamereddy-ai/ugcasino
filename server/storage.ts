@@ -69,6 +69,9 @@ export interface IStorage {
   getUnreadCount(userId: number): Promise<number>;
   markMessagesAsRead(senderId: number, receiverId: number): Promise<void>;
   getChatContacts(userId: number): Promise<{ userId: number; lastMessage: string; lastMessageAt: Date | null; unreadCount: number }[]>;
+
+  getPendingUsersByManager(managerId: number): Promise<User[]>;
+  getVouchersByCreator(creatorId: number): Promise<Voucher[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -394,6 +397,18 @@ export class DatabaseStorage implements IStorage {
       }
     }
     return Array.from(contactMap.entries()).map(([uid, data]) => ({ userId: uid, ...data }));
+  }
+
+  async getPendingUsersByManager(managerId: number): Promise<User[]> {
+    return await db.select().from(users)
+      .where(and(eq(users.createdBy, managerId), eq(users.isApproved, false)))
+      .orderBy(desc(users.createdAt));
+  }
+
+  async getVouchersByCreator(creatorId: number): Promise<Voucher[]> {
+    return await db.select().from(vouchers)
+      .where(eq(vouchers.createdBy, creatorId))
+      .orderBy(desc(vouchers.createdAt));
   }
 }
 

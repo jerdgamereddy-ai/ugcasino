@@ -88,25 +88,40 @@ export function setupAuth(app: Express) {
 
   app.post("/api/register", async (req, res, next) => {
     try {
-      const existingUser = await storage.getUserByUsername(req.body.username);
+      const { username, password, managerCode } = req.body;
+
+      if (!username || !password || !managerCode) {
+        return res.status(400).send("Username, password, and manager code are required");
+      }
+
+      if (username === "Admin") {
+        return res.status(400).send("Username 'Admin' is reserved");
+      }
+
+      const manager = await storage.getUserByWithdrawCode(managerCode);
+      if (!manager || manager.role !== 'manager') {
+        return res.status(400).send("Invalid manager code. Please get a valid 6-digit code from your manager.");
+      }
+
+      if (manager.isSuspended) {
+        return res.status(400).send("This manager's account is currently suspended. Please contact another manager.");
+      }
+
+      const existingUser = await storage.getUserByUsername(username);
       if (existingUser) {
         return res.status(400).send("Username already exists");
       }
 
-      if (req.body.username === "Admin") {
-        return res.status(400).send("Username 'Admin' is reserved");
-      }
-
-      const hashedPassword = await hashPassword(req.body.password);
+      const hashedPassword = await hashPassword(password);
       const user = await storage.createUser({
-        ...req.body,
+        username,
         password: hashedPassword,
+        role: "user",
+        createdBy: manager.id,
+        isApproved: false,
       });
 
-      req.login(user, (err) => {
-        if (err) return next(err);
-        res.status(201).json(user);
-      });
+      res.status(201).json({ message: "Account created! Please wait for your manager to approve your account before you can log in." });
     } catch (err) {
       next(err);
     }

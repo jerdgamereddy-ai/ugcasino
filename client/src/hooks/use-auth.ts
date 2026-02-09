@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { api, type InsertUser } from "@shared/routes";
+import { api } from "@shared/routes";
 import { z } from "zod";
 
 export function useUser() {
@@ -42,9 +42,8 @@ export function useLogin() {
 }
 
 export function useRegister() {
-  const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (data: InsertUser) => {
+    mutationFn: async (data: { username: string; password: string; managerCode: string }) => {
       const res = await fetch(api.auth.register.path, {
         method: api.auth.register.method,
         headers: { "Content-Type": "application/json" },
@@ -53,16 +52,10 @@ export function useRegister() {
       });
 
       if (!res.ok) {
-        if (res.status === 400) {
-          const error = api.auth.register.responses[400].parse(await res.json());
-          throw new Error(error.message);
-        }
-        throw new Error("Registration failed");
+        const text = await res.text();
+        throw new Error(text || "Registration failed");
       }
-      return api.auth.register.responses[201].parse(await res.json());
-    },
-    onSuccess: () => {
-      // Typically auto-login or redirect to login
+      return await res.json();
     },
   });
 }

@@ -76,6 +76,26 @@ Preferred communication style: Simple, everyday language.
 - **Time Filtering**: Supports time presets (today, 7 days, 30 days, etc.) for calculating profit within specific periods
 - **API**: `POST /api/profit-share/set` (set percentage), `GET /api/profit-share/calculate` (calculate owed amounts with time filtering)
 
+### Manager Financial Reports
+- **Reports Tab**: Available in Manager Dashboard with time-based filtering
+- **Metrics**: Profit/Loss, Amount in Accounts, Total Deposited, Total Withdrawn, Amount Won, Amount Bet
+- **Bar Charts**: Daily activity trends using Recharts (deposits, bets, wins, withdrawals)
+- **Time Presets**: Same as admin reports (15min to 1year + custom range)
+- **API**: Uses existing `GET /api/reports` which supports manager role
+
+### Player Signup Approval System
+- **Registration Flow**: New players must enter a manager's 6-digit withdraw code during registration
+- **Pending State**: New signups are created with `isApproved: false` and `createdBy` = manager ID
+- **Login Blocked**: Unapproved users see "Account pending approval" and cannot log in
+- **Manager Approval**: Managers see "Pending Signups" tab with approve/decline buttons (auto-refreshes every 10s)
+- **Suspended Check**: Cannot register under a suspended manager
+- **API**: `GET /api/manager/pending-signups`, `POST /api/admin/users/:id/approve`, `POST /api/admin/users/:id/reject`
+
+### Manager Voucher Creation
+- **Create Vouchers**: Managers can generate deposit vouchers from "Vouchers" tab
+- **View Vouchers**: Managers see list of their created vouchers with code, amount, status, and copy button
+- **API**: `GET /api/manager/vouchers`, `POST /api/vouchers` (existing, already allows manager role)
+
 ### Chat System
 - **Admin Chat**: Admin can message any non-admin user directly from the Chat tab
 - **Super Manager Chat**: Super managers can message their managers from the Chat tab

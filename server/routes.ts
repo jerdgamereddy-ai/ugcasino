@@ -1166,8 +1166,43 @@ export async function registerRoutes(
   app.post("/api/admin/users/:id/approve", async (req, res) => {
     if (!req.isAuthenticated() || (req.user.role !== 'admin' && req.user.role !== 'super_manager' && req.user.role !== 'manager')) return res.status(403).send("Forbidden");
     const userId = parseInt(req.params.id);
+    const targetUser = await storage.getUser(userId);
+    if (!targetUser) return res.status(404).json({ message: "User not found" });
+
+    if (req.user.role === 'manager' && targetUser.createdBy !== req.user.id) {
+      return res.status(403).json({ message: "You can only approve users you manage" });
+    }
+
     const updatedUser = await storage.approveUser(userId);
     res.json(updatedUser);
+  });
+
+  app.post("/api/admin/users/:id/reject", async (req, res) => {
+    if (!req.isAuthenticated() || (req.user.role !== 'admin' && req.user.role !== 'super_manager' && req.user.role !== 'manager')) return res.status(403).send("Forbidden");
+    const userId = parseInt(req.params.id);
+    const targetUser = await storage.getUser(userId);
+    if (!targetUser) return res.status(404).json({ message: "User not found" });
+
+    if (req.user.role === 'manager' && targetUser.createdBy !== req.user.id) {
+      return res.status(403).json({ message: "You can only reject users you manage" });
+    }
+
+    if (targetUser.isApproved) return res.status(400).json({ message: "Cannot reject an already approved user" });
+
+    await storage.deleteUser(userId);
+    res.json({ message: "Signup rejected and user removed" });
+  });
+
+  app.get("/api/manager/pending-signups", async (req, res) => {
+    if (!req.isAuthenticated() || req.user.role !== 'manager') return res.status(403).send("Forbidden");
+    const pending = await storage.getPendingUsersByManager(req.user.id);
+    res.json(pending);
+  });
+
+  app.get("/api/manager/vouchers", async (req, res) => {
+    if (!req.isAuthenticated() || req.user.role !== 'manager') return res.status(403).send("Forbidden");
+    const managerVouchers = await storage.getVouchersByCreator(req.user.id);
+    res.json(managerVouchers);
   });
 
   app.post("/api/admin/users/:id/password", async (req, res) => {

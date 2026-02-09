@@ -18,7 +18,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { useLocation } from "wouter";
 import { Coins, Loader2, Ticket, Trophy, Star, Gem, Crown, Sparkles } from "lucide-react";
-import { insertUserSchema } from "@shared/schema";
 import { motion, AnimatePresence } from "framer-motion";
 
 interface Particle {
@@ -323,8 +322,7 @@ export default function Login() {
   });
 
   const registerForm = useForm({
-    resolver: zodResolver(insertUserSchema),
-    defaultValues: { username: "", password: "", role: "user" as const },
+    defaultValues: { username: "", password: "", managerCode: "" },
   });
 
   const onLogin = (data: any) => {
@@ -341,8 +339,9 @@ export default function Login() {
 
   const onRegister = (data: any) => {
     register(data, {
-      onSuccess: () => {
-        toast({ title: "Account created!", description: "Please log in.", className: "bg-green-600 text-white" });
+      onSuccess: (result: any) => {
+        toast({ title: "Account created!", description: result.message || "Please wait for your manager to approve your account.", className: "bg-green-600 text-white" });
+        registerForm.reset();
       },
       onError: (err) => {
         toast({ title: "Registration Failed", description: err.message, variant: "destructive" });
@@ -442,6 +441,20 @@ export default function Login() {
                   <form onSubmit={registerForm.handleSubmit(onRegister)} className="space-y-4">
                     <FormField
                       control={registerForm.control}
+                      name="managerCode"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Manager Code</FormLabel>
+                          <FormControl>
+                            <Input placeholder="Enter 6-digit manager code" maxLength={6} {...field} onChange={(e) => field.onChange(e.target.value.replace(/\D/g, '').slice(0, 6))} data-testid="input-register-manager-code" className="bg-white/5 border-white/10 font-mono text-center tracking-widest" />
+                          </FormControl>
+                          <FormMessage />
+                          <p className="text-[10px] text-muted-foreground">Get this code from your manager to register</p>
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={registerForm.control}
                       name="username"
                       render={({ field }) => (
                         <FormItem>
@@ -469,6 +482,7 @@ export default function Login() {
                     <Button type="submit" className="w-full" variant="outline" disabled={isRegisterPending} data-testid="button-register-submit">
                       {isRegisterPending ? <Loader2 className="animate-spin" /> : "Create Account"}
                     </Button>
+                    <p className="text-[10px] text-center text-muted-foreground">Your account will need manager approval before you can play</p>
                   </form>
                 </Form>
               </TabsContent>
