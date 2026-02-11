@@ -9,6 +9,8 @@ import { queryClient } from "@/lib/queryClient";
 import { motion, AnimatePresence } from "framer-motion";
 import { Coins, RotateCw } from "lucide-react";
 import { playSound } from "@/lib/sounds";
+import coinHeads from "@assets/image_1_1770641777738_1770793509893.jpg";
+import coinTails from "@assets/image_1_1770793462386_1770793521045.jpg";
 
 export default function CoinFlip() {
   const { data: user } = useUser();
@@ -76,11 +78,21 @@ export default function CoinFlip() {
                 transition={isFlipping ? { duration: 2, ease: "easeInOut" } : { type: "spring", damping: 15 }}
                 className="relative w-56 h-56"
               >
-                <div className={`w-full h-full rounded-full border-[10px] border-primary bg-gradient-to-tr from-primary via-yellow-200 to-primary flex items-center justify-center shadow-[0_0_80px_rgba(212,175,55,0.6)] relative overflow-hidden`}>
-                  <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_30%,_rgba(255,255,255,0.4)_0%,_transparent_50%)]" />
-                  <div className="text-8xl font-display font-black text-black select-none drop-shadow-md relative z-10">
-                    {isFlipping ? "?" : (result ? (result === "heads" ? "H" : "T") : "$")}
-                  </div>
+                <div className={`w-full h-full rounded-full border-[6px] border-primary shadow-[0_0_80px_rgba(212,175,55,0.6)] relative overflow-hidden`}>
+                  {isFlipping ? (
+                    <div className="w-full h-full bg-gradient-to-tr from-primary via-yellow-200 to-primary flex items-center justify-center">
+                      <div className="text-8xl font-display font-black text-black select-none drop-shadow-md">?</div>
+                    </div>
+                  ) : result ? (
+                    <img
+                      src={result === "heads" ? coinHeads : coinTails}
+                      alt={result === "heads" ? "Heads" : "Tails"}
+                      className="w-full h-full object-cover"
+                      data-testid={`img-coin-${result}`}
+                    />
+                  ) : (
+                    <img src={coinHeads} alt="Coin" className="w-full h-full object-cover" />
+                  )}
                 </div>
               </motion.div>
             </AnimatePresence>

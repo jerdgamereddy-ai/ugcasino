@@ -1,5 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import coinHeads from "@assets/image_1_1770641777738_1770793509893.jpg";
+import coinTails from "@assets/image_1_1770793462386_1770793521045.jpg";
 
 const SLOT_SYMBOLS = ["7", "\u2666", "\u2605", "\u265B", "\u2663", "\u2665"];
 const SLOT_COLORS = ["#FFD700", "#FF6347", "#00CED1", "#FFD700", "#98FB98", "#FF69B4"];
@@ -518,21 +520,18 @@ function MiniCoinFlip() {
     <div className="flex flex-col items-center gap-2">
       <div className="text-[10px] uppercase tracking-widest text-primary/70 font-bold">Coin Flip</div>
       <motion.div
-        className="w-14 h-14 rounded-full flex items-center justify-center text-xl font-black border-2"
-        style={{
-          background: side === "H"
-            ? "linear-gradient(135deg, #FFD700 0%, #FFA500 100%)"
-            : "linear-gradient(135deg, #C0C0C0 0%, #808080 100%)",
-          borderColor: side === "H" ? "#FFD700" : "#A0A0A0",
-          color: side === "H" ? "#000" : "#333",
-        }}
+        className="w-16 h-16 rounded-full overflow-hidden border-2 border-primary/50"
         animate={flipping ? {
           rotateX: [0, 360, 720, 1080],
           scale: [1, 0.8, 1.1, 1],
         } : {}}
         transition={{ duration: 1.2, ease: "easeOut" }}
       >
-        {side}
+        <img
+          src={side === "H" ? coinHeads : coinTails}
+          alt={side === "H" ? "Heads" : "Tails"}
+          className="w-full h-full object-cover"
+        />
       </motion.div>
     </div>
   );
