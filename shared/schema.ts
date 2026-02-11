@@ -75,6 +75,8 @@ export const broadcasts = pgTable("broadcasts", {
   message: text("message").notNull(),
   fontFamily: text("font_family").default("sans-serif"),
   color: text("color").default("#FFD700"),
+  scrollSpeed: integer("scroll_speed").default(15),
+  expiresAt: timestamp("expires_at"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
