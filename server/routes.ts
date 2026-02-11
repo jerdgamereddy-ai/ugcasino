@@ -1388,12 +1388,15 @@ export async function registerRoutes(
 
     try {
       const { targetRole, message, fontFamily, color } = z.object({
-        targetRole: z.enum(["super_manager", "manager", "user", "all"]),
+        targetRole: z.enum(["super_manager", "manager", "user", "all", "public"]),
         message: z.string().min(1).max(500),
         fontFamily: z.string().optional().default("sans-serif"),
         color: z.string().optional().default("#FFD700"),
       }).parse(req.body);
 
+      if (targetRole === 'public' && role !== 'admin') {
+        return res.status(403).json({ message: "Only admins can send public broadcasts" });
+      }
       if (role === 'super_manager' && targetRole !== 'manager') {
         return res.status(403).json({ message: "Super managers can only broadcast to their managers" });
       }
@@ -1428,6 +1431,15 @@ export async function registerRoutes(
       res.json(myBroadcasts);
     } catch (err) {
       res.status(500).json({ message: "Failed to fetch broadcasts" });
+    }
+  });
+
+  app.get("/api/broadcasts/public", async (_req, res) => {
+    try {
+      const publicBroadcasts = await storage.getPublicBroadcasts();
+      res.json(publicBroadcasts);
+    } catch (err) {
+      res.status(500).json({ message: "Failed to fetch public broadcasts" });
     }
   });
 

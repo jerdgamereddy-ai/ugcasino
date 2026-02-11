@@ -83,10 +83,11 @@ export function BroadcastSender({ senderRole }: BroadcastSenderProps) {
 
   const targetOptions = senderRole === "admin"
     ? [
+        { value: "public", label: "Public (All Visitors)" },
         { value: "super_manager", label: "Super Managers" },
         { value: "manager", label: "Managers" },
         { value: "user", label: "Players" },
-        { value: "all", label: "Everyone" },
+        { value: "all", label: "Everyone (Logged In)" },
       ]
     : senderRole === "super_manager"
     ? [{ value: "manager", label: "My Managers" }]
@@ -94,6 +95,7 @@ export function BroadcastSender({ senderRole }: BroadcastSenderProps) {
 
   const getTargetLabel = (role: string) => {
     switch (role) {
+      case "public": return "Public";
       case "super_manager": return "Super Managers";
       case "manager": return "Managers";
       case "user": return "Players";

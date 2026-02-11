@@ -17,9 +17,11 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { useLocation } from "wouter";
-import { Coins, Loader2, Ticket, Trophy, Star, Gem, Crown, Sparkles } from "lucide-react";
+import { Coins, Loader2, Ticket, Trophy, Star, Gem, Crown, Sparkles, Megaphone } from "lucide-react";
 import { DemoGamesLeft, DemoGamesRight } from "@/components/DemoGames";
 import { motion, AnimatePresence } from "framer-motion";
+import { useQuery } from "@tanstack/react-query";
+import { type Broadcast } from "@shared/schema";
 
 interface Particle {
   id: number;
@@ -288,6 +290,56 @@ function GlowingOrb({ color, size, x, y, delay }: { color: string; size: number;
   );
 }
 
+function PublicBroadcastBanner() {
+  const { data: broadcasts } = useQuery<Broadcast[]>({
+    queryKey: ["/api/broadcasts/public"],
+    refetchInterval: 30000,
+  });
+
+  if (!broadcasts || broadcasts.length === 0) return null;
+
+  return (
+    <div className="fixed top-0 left-0 right-0 z-50 space-y-0" data-testid="public-broadcast-container">
+      {broadcasts.map((b) => {
+        const font = b.fontFamily || "sans-serif";
+        const textColor = b.color || "#FFD700";
+
+        return (
+          <div
+            key={b.id}
+            className="relative flex items-center overflow-hidden"
+            style={{
+              background: "linear-gradient(90deg, rgba(0,0,0,0.95) 0%, rgba(20,10,0,0.97) 50%, rgba(0,0,0,0.95) 100%)",
+              borderBottom: `1px solid ${textColor}22`,
+            }}
+            data-testid={`public-broadcast-${b.id}`}
+          >
+            <div className="flex-shrink-0 px-3 py-1.5 flex items-center gap-1.5 z-10 bg-black/90" style={{ borderRight: `1px solid ${textColor}33` }}>
+              <Megaphone className="h-3.5 w-3.5" style={{ color: textColor }} />
+            </div>
+            <div className="flex-1 overflow-hidden py-1.5">
+              <div
+                className="marquee-scroll whitespace-nowrap"
+                style={{
+                  fontFamily: font,
+                  color: textColor,
+                  fontSize: "0.875rem",
+                  fontWeight: "bold",
+                  textShadow: `0 0 8px ${textColor}66, 0 0 16px ${textColor}33`,
+                }}
+              >
+                <span className="marquee-text">
+                  {b.message}&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;{b.message}&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;{b.message}&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+                </span>
+              </div>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 export default function Login() {
   const [_, setLocation] = useLocation();
   const { mutate: login, isPending: isLoginPending } = useLogin();
@@ -352,6 +404,7 @@ export default function Login() {
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center p-4 relative overflow-hidden bg-black overflow-y-auto">
+      <PublicBroadcastBanner />
       <div className="absolute inset-0 bg-gradient-to-b from-black via-zinc-950 to-black" />
 
       <GlowingOrb color="rgba(255,215,0,0.15)" size={400} x="-5%" y="10%" delay={0} />

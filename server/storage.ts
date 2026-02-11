@@ -63,6 +63,7 @@ export interface IStorage {
   dismissBroadcast(broadcastId: number, userId: number): Promise<void>;
   getDismissedBroadcastIds(userId: number): Promise<number[]>;
   getSentBroadcasts(senderId: number): Promise<Broadcast[]>;
+  getPublicBroadcasts(): Promise<Broadcast[]>;
 
   createMessage(data: { senderId: number; receiverId: number; content: string }): Promise<Message>;
   getConversation(userId1: number, userId2: number): Promise<Message[]>;
@@ -310,7 +311,7 @@ export class DatabaseStorage implements IStorage {
     const [broadcast] = await db.insert(broadcasts).values({
       senderId: data.senderId,
       senderRole: data.senderRole as "admin" | "super_manager" | "manager",
-      targetRole: data.targetRole as "super_manager" | "manager" | "user" | "all",
+      targetRole: data.targetRole as "super_manager" | "manager" | "user" | "all" | "public",
       message: data.message,
       fontFamily: data.fontFamily || "sans-serif",
       color: data.color || "#FFD700",
@@ -324,6 +325,7 @@ export class DatabaseStorage implements IStorage {
 
     return allBroadcasts.filter(b => {
       if (dismissedIds.includes(b.id)) return false;
+      if (b.targetRole === 'public') return true;
       if (b.targetRole === 'all') return true;
       if (b.targetRole === userRole) {
         if (userRole === 'super_manager') return b.senderRole === 'admin';
@@ -353,6 +355,13 @@ export class DatabaseStorage implements IStorage {
 
   async getSentBroadcasts(senderId: number): Promise<Broadcast[]> {
     return await db.select().from(broadcasts).where(eq(broadcasts.senderId, senderId)).orderBy(desc(broadcasts.createdAt));
+  }
+
+  async getPublicBroadcasts(): Promise<Broadcast[]> {
+    return await db.select().from(broadcasts)
+      .where(eq(broadcasts.targetRole, "public"))
+      .orderBy(desc(broadcasts.createdAt))
+      .limit(10);
   }
 
   async createMessage(data: { senderId: number; receiverId: number; content: string }): Promise<Message> {
