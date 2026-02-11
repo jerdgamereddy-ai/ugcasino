@@ -402,8 +402,8 @@ export default function Lobby() {
               icon: Coins,
               tag: "Featured",
               tagColor: "bg-primary",
-              title: "Royal Slots",
-              desc: "Spin the reels for ultimate golden treasures.",
+              title: "Fruit Slots",
+              desc: "Match tropical fruits for ultimate golden treasures.",
               id: "slots"
             },
             {

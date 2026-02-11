@@ -3,29 +3,37 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useSpinSlots } from "@/hooks/use-games";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
-import { Coins, Loader2, Sparkles, Diamond, Cherry, Star, Gem, Crown, Zap } from "lucide-react";
+import { Coins, Loader2, Sparkles } from "lucide-react";
 import { playSound } from "@/lib/sounds";
 
+import bananaImg from "@assets/banana_1770797891098.png";
+import berriesImg from "@assets/berries_1770797891098.png";
+import coconutImg from "@assets/coconut_1770797891098.png";
+import mangoImg from "@assets/mango2_1770797891098.png";
+import melonImg from "@assets/melon_1770797891098.png";
+import orangeImg from "@assets/orange_1770797891098.png";
+import pineappleImg from "@assets/pineapple_1770797891098.png";
+
 const SYMBOL_CONFIGS = [
-  { id: "cherry", icon: Cherry, color: "text-red-500", glow: "rgba(239,68,68,0.6)", bg: "from-red-500/20 to-red-900/20", label: "Cherry" },
-  { id: "diamond", icon: Diamond, color: "text-cyan-400", glow: "rgba(34,211,238,0.6)", bg: "from-cyan-400/20 to-cyan-900/20", label: "Diamond" },
-  { id: "seven", icon: Zap, color: "text-yellow-400", glow: "rgba(250,204,21,0.6)", bg: "from-yellow-400/20 to-yellow-900/20", label: "7" },
-  { id: "star", icon: Star, color: "text-amber-400", glow: "rgba(251,191,36,0.6)", bg: "from-amber-400/20 to-amber-900/20", label: "Star" },
-  { id: "crown", icon: Crown, color: "text-purple-400", glow: "rgba(192,132,252,0.6)", bg: "from-purple-400/20 to-purple-900/20", label: "Crown" },
-  { id: "gem", icon: Gem, color: "text-emerald-400", glow: "rgba(52,211,153,0.6)", bg: "from-emerald-400/20 to-emerald-900/20", label: "Gem" },
+  { id: "banana", image: bananaImg, glow: "rgba(255,215,0,0.6)", label: "Banana" },
+  { id: "berries", image: berriesImg, glow: "rgba(220,38,38,0.6)", label: "Berries" },
+  { id: "coconut", image: coconutImg, glow: "rgba(139,90,43,0.6)", label: "Coconut" },
+  { id: "mango", image: mangoImg, glow: "rgba(255,0,100,0.6)", label: "Mango" },
+  { id: "melon", image: melonImg, glow: "rgba(34,197,94,0.6)", label: "Melon" },
+  { id: "orange", image: orangeImg, glow: "rgba(251,146,60,0.6)", label: "Orange" },
+  { id: "pineapple", image: pineappleImg, glow: "rgba(234,179,8,0.6)", label: "Pineapple" },
 ];
 
-const EMOJI_TO_INDEX: Record<string, number> = {
-  "cherry": 0, "diamond": 1, "seven": 2, "star": 3, "crown": 4, "gem": 5,
+const SYMBOL_MAP: Record<string, number> = {
+  "banana": 0, "berries": 1, "coconut": 2, "mango": 3, "melon": 4, "orange": 5, "pineapple": 6,
 };
 
 function Symbol3D({ symbolIndex, isSpinning, delay = 0 }: { symbolIndex: number; isSpinning: boolean; delay?: number }) {
   const config = SYMBOL_CONFIGS[symbolIndex % SYMBOL_CONFIGS.length];
-  const Icon = config.icon;
 
   return (
     <motion.div
-      className={`relative flex items-center justify-center w-full h-full`}
+      className="relative flex items-center justify-center w-full h-full"
       initial={{ rotateX: isSpinning ? -90 : 0, scale: isSpinning ? 0.5 : 1 }}
       animate={{ rotateX: 0, scale: 1 }}
       transition={{
@@ -37,24 +45,26 @@ function Symbol3D({ symbolIndex, isSpinning, delay = 0 }: { symbolIndex: number;
       style={{ perspective: "600px" }}
     >
       <div
-        className={`relative p-2 rounded-2xl bg-gradient-to-b ${config.bg}`}
+        className="relative p-1 rounded-2xl"
         style={{
           filter: `drop-shadow(0 0 12px ${config.glow}) drop-shadow(0 4px 8px rgba(0,0,0,0.5))`,
           transform: "translateZ(20px)",
         }}
       >
-        <Icon
-          className={`w-10 h-10 md:w-16 md:h-16 ${config.color}`}
-          strokeWidth={1.5}
+        <img
+          src={config.image}
+          alt={config.label}
+          className="w-14 h-14 md:w-20 md:h-20 object-contain"
           style={{
             filter: `drop-shadow(0 0 8px ${config.glow})`,
           }}
+          draggable={false}
         />
       </div>
       <div
         className="absolute inset-0 rounded-2xl pointer-events-none"
         style={{
-          background: `radial-gradient(circle at 30% 30%, rgba(255,255,255,0.15) 0%, transparent 60%)`,
+          background: "radial-gradient(circle at 30% 30%, rgba(255,255,255,0.15) 0%, transparent 60%)",
         }}
       />
     </motion.div>
@@ -85,11 +95,8 @@ export function SlotMachine() {
           setTimeout(() => {
             clearInterval(interval);
             setIsSpinning(false);
-            const mappedReels = data.reels.map((emoji: string) => {
-              const emojiMap: Record<string, number> = {
-                "cherry": 0, "diamond": 1, "seven": 2, "star": 3, "crown": 4, "gem": 5,
-              };
-              return emojiMap[emoji] ?? Math.floor(Math.random() * SYMBOL_CONFIGS.length);
+            const mappedReels = data.reels.map((name: string) => {
+              return SYMBOL_MAP[name] ?? Math.floor(Math.random() * SYMBOL_CONFIGS.length);
             });
             setReels(mappedReels);
 
@@ -128,14 +135,11 @@ export function SlotMachine() {
   return (
     <div className="flex flex-col items-center gap-8 w-full max-w-4xl mx-auto p-4 md:p-8">
 
-      {/* Machine Frame */}
       <div className="relative bg-gradient-to-b from-neutral-800 to-neutral-900 p-8 rounded-3xl border-4 border-primary shadow-[0_0_60px_rgba(212,175,55,0.4)] w-full">
-        {/* Decorative Top */}
         <div className="absolute -top-6 left-1/2 -translate-x-1/2 bg-primary px-8 py-3 rounded-t-2xl border-t-2 border-l-2 border-r-2 border-yellow-200 shadow-[0_-5px_20px_rgba(212,175,55,0.5)]">
-             <span className="font-display font-black text-black tracking-[0.2em] text-lg">LUCKY SLOTS</span>
+             <span className="font-display font-black text-black tracking-[0.2em] text-lg">FRUIT SLOTS</span>
         </div>
 
-        {/* Win Effect Overlay */}
         <AnimatePresence>
           {showWinEffect && (
             <motion.div
@@ -165,15 +169,13 @@ export function SlotMachine() {
           )}
         </AnimatePresence>
 
-        {/* Reels Container */}
         <div className="flex gap-2 md:gap-4 justify-center bg-black p-6 rounded-2xl border-4 border-yellow-900/50 shadow-[inset_0_0_40px_rgba(0,0,0,1)] relative overflow-hidden">
-          {/* Light streaks */}
           <div className="absolute inset-0 bg-gradient-to-b from-white/5 via-transparent to-white/5 pointer-events-none" />
 
           {reels.map((symbolIdx, i) => (
             <div
               key={i}
-              className="w-20 h-28 md:w-32 md:h-40 bg-gradient-to-b from-zinc-900 via-zinc-800 to-zinc-900 rounded-xl flex items-center justify-center shadow-[inset_0_0_20px_rgba(0,0,0,0.8),0_0_15px_rgba(212,175,55,0.1)] border-2 border-white/10 relative overflow-hidden"
+              className="w-24 h-28 md:w-36 md:h-44 bg-gradient-to-b from-zinc-900 via-zinc-800 to-zinc-900 rounded-xl flex items-center justify-center shadow-[inset_0_0_20px_rgba(0,0,0,0.8),0_0_15px_rgba(212,175,55,0.1)] border-2 border-white/10 relative overflow-hidden"
               style={{ perspective: "800px" }}
             >
               <div className="absolute inset-0 bg-gradient-to-b from-white/10 via-transparent to-white/10 pointer-events-none" />
@@ -200,7 +202,6 @@ export function SlotMachine() {
           ))}
         </div>
 
-        {/* Controls */}
         <div className="mt-8 flex flex-col md:flex-row items-center justify-between gap-6 bg-neutral-900/50 p-6 rounded-xl border border-white/5">
            <div className="flex flex-col gap-2 w-full md:w-auto">
                <label className="text-xs text-muted-foreground uppercase tracking-widest">Bet Amount</label>
@@ -239,7 +240,7 @@ export function SlotMachine() {
       </div>
 
       <div className="text-center text-muted-foreground text-sm">
-          <p>Min Bet: UGX 500 - 3 Matching Symbols Wins</p>
+          <p>Min Bet: UGX 500 - 3 Matching Fruits Wins</p>
       </div>
     </div>
   );

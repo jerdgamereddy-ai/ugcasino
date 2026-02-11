@@ -2,9 +2,15 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import coinHeads from "@assets/image_1_1770641777738_1770793509893.jpg";
 import coinTails from "@assets/image_1_1770793462386_1770793521045.jpg";
+import bananaImg from "@assets/banana_1770797891098.png";
+import berriesImg from "@assets/berries_1770797891098.png";
+import coconutImg from "@assets/coconut_1770797891098.png";
+import mangoImg from "@assets/mango2_1770797891098.png";
+import melonImg from "@assets/melon_1770797891098.png";
+import orangeImg from "@assets/orange_1770797891098.png";
+import pineappleImg from "@assets/pineapple_1770797891098.png";
 
-const SLOT_SYMBOLS = ["7", "\u2666", "\u2605", "\u265B", "\u2663", "\u2665"];
-const SLOT_COLORS = ["#FFD700", "#FF6347", "#00CED1", "#FFD700", "#98FB98", "#FF69B4"];
+const SLOT_IMAGES = [bananaImg, berriesImg, coconutImg, mangoImg, melonImg, orangeImg, pineappleImg];
 
 function MiniSlots() {
   const [reels, setReels] = useState([0, 1, 2]);
@@ -19,14 +25,14 @@ function MiniSlots() {
       if (innerRef.current) clearInterval(innerRef.current);
       innerRef.current = setInterval(() => {
         setReels([
-          Math.floor(Math.random() * SLOT_SYMBOLS.length),
-          Math.floor(Math.random() * SLOT_SYMBOLS.length),
-          Math.floor(Math.random() * SLOT_SYMBOLS.length),
+          Math.floor(Math.random() * SLOT_IMAGES.length),
+          Math.floor(Math.random() * SLOT_IMAGES.length),
+          Math.floor(Math.random() * SLOT_IMAGES.length),
         ]);
         ticks++;
         if (ticks >= maxTicks) {
           clearInterval(innerRef.current);
-          const final0 = Math.floor(Math.random() * SLOT_SYMBOLS.length);
+          const final0 = Math.floor(Math.random() * SLOT_IMAGES.length);
           setReels(prev => {
             if (Math.random() < 0.3) return [final0, final0, final0];
             return prev;
@@ -45,17 +51,16 @@ function MiniSlots() {
 
   return (
     <div className="flex flex-col items-center gap-2">
-      <div className="text-[10px] uppercase tracking-widest text-primary/70 font-bold">Royal Slots</div>
+      <div className="text-[10px] uppercase tracking-widest text-primary/70 font-bold">Fruit Slots</div>
       <div className="flex gap-1.5">
         {reels.map((r, i) => (
           <motion.div
             key={i}
-            className="w-10 h-12 rounded-md bg-black/80 border border-primary/30 flex items-center justify-center text-xl font-bold"
-            style={{ color: SLOT_COLORS[r] }}
+            className="w-10 h-12 rounded-md bg-black/80 border border-primary/30 flex items-center justify-center"
             animate={spinning ? { y: [0, -4, 4, 0] } : {}}
             transition={{ duration: 0.08, repeat: spinning ? Infinity : 0 }}
           >
-            {SLOT_SYMBOLS[r]}
+            <img src={SLOT_IMAGES[r]} alt="fruit" className="w-8 h-8 object-contain" draggable={false} />
           </motion.div>
         ))}
       </div>

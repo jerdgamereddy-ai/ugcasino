@@ -1049,7 +1049,7 @@ export async function registerRoutes(
       await storage.createTransaction({ userId: req.user.id, amount: -bet, type: "bet", description: "Slots spin" });
 
       const won = Math.random() < winChance;
-      const symbols = ["cherry", "diamond", "seven", "star", "crown", "gem"];
+      const symbols = ["banana", "berries", "coconut", "mango", "melon", "orange", "pineapple"];
       
       let reels: string[];
       let payout = 0;
