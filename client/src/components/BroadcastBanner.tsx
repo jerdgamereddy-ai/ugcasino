@@ -55,6 +55,7 @@ export function BroadcastBanner() {
                   fontSize: "0.875rem",
                   fontWeight: "bold",
                   textShadow: `0 0 8px ${textColor}66, 0 0 16px ${textColor}33`,
+                  animationDuration: `${b.scrollSpeed || 15}s`,
                 }}
               >
                 <span className="marquee-text">

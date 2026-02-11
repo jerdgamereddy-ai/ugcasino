@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
+import { Input } from "@/components/ui/input";
 import { Megaphone, Send, Loader2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -40,13 +41,15 @@ export function BroadcastSender({ senderRole }: BroadcastSenderProps) {
   const [targetRole, setTargetRole] = useState<string>("");
   const [fontFamily, setFontFamily] = useState("sans-serif");
   const [color, setColor] = useState("#FFD700");
+  const [scrollSpeed, setScrollSpeed] = useState(15);
+  const [durationHours, setDurationHours] = useState<string>("");
 
   const { data: sentBroadcasts, isLoading } = useQuery<Broadcast[]>({
     queryKey: ["/api/broadcasts/sent"],
   });
 
   const sendMutation = useMutation({
-    mutationFn: async (data: { targetRole: string; message: string; fontFamily: string; color: string }) => {
+    mutationFn: async (data: { targetRole: string; message: string; fontFamily: string; color: string; scrollSpeed: number; durationHours?: number }) => {
       const res = await fetch("/api/broadcasts", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -78,7 +81,8 @@ export function BroadcastSender({ senderRole }: BroadcastSenderProps) {
       toast({ title: "Empty Message", description: "Please type a message to broadcast.", variant: "destructive" });
       return;
     }
-    sendMutation.mutate({ targetRole, message: message.trim(), fontFamily, color });
+    const parsed = durationHours ? parseFloat(durationHours) : undefined;
+    sendMutation.mutate({ targetRole, message: message.trim(), fontFamily, color, scrollSpeed, durationHours: parsed && parsed > 0 ? parsed : undefined });
   };
 
   const targetOptions = senderRole === "admin"
@@ -164,6 +168,45 @@ export function BroadcastSender({ senderRole }: BroadcastSenderProps) {
             </div>
           </div>
 
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-2">
+              <label className="text-xs uppercase text-muted-foreground font-bold">Duration</label>
+              <Select value={durationHours || "forever"} onValueChange={(v) => setDurationHours(v === "forever" ? "" : v)}>
+                <SelectTrigger data-testid="select-broadcast-duration">
+                  <SelectValue placeholder="How long to run..." />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="forever">Forever (no expiry)</SelectItem>
+                  <SelectItem value="0.25">15 Minutes</SelectItem>
+                  <SelectItem value="0.5">30 Minutes</SelectItem>
+                  <SelectItem value="1">1 Hour</SelectItem>
+                  <SelectItem value="3">3 Hours</SelectItem>
+                  <SelectItem value="6">6 Hours</SelectItem>
+                  <SelectItem value="12">12 Hours</SelectItem>
+                  <SelectItem value="24">1 Day</SelectItem>
+                  <SelectItem value="72">3 Days</SelectItem>
+                  <SelectItem value="168">1 Week</SelectItem>
+                  <SelectItem value="720">30 Days</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <label className="text-xs uppercase text-muted-foreground font-bold">Scroll Speed</label>
+              <Select value={String(scrollSpeed)} onValueChange={(v) => setScrollSpeed(parseInt(v))}>
+                <SelectTrigger data-testid="select-broadcast-speed">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="30">Slow</SelectItem>
+                  <SelectItem value="20">Medium-Slow</SelectItem>
+                  <SelectItem value="15">Normal</SelectItem>
+                  <SelectItem value="10">Fast</SelectItem>
+                  <SelectItem value="6">Very Fast</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
           <div className="space-y-2">
             <label className="text-xs uppercase text-muted-foreground font-bold">Message</label>
             <Textarea
@@ -181,8 +224,10 @@ export function BroadcastSender({ senderRole }: BroadcastSenderProps) {
             <div className="space-y-1">
               <label className="text-xs uppercase text-muted-foreground font-bold">Preview</label>
               <div className="overflow-hidden rounded-md border border-white/10 bg-black/80 py-2">
-                <div className="animate-marquee whitespace-nowrap" style={{ fontFamily, color, fontSize: "1rem", fontWeight: "bold" }}>
-                  {message} &nbsp;&nbsp;&nbsp;&nbsp;&nbsp; {message} &nbsp;&nbsp;&nbsp;&nbsp;&nbsp; {message}
+                <div className="marquee-scroll whitespace-nowrap" style={{ fontFamily, color, fontSize: "1rem", fontWeight: "bold", animationDuration: `${scrollSpeed}s` }}>
+                  <span className="marquee-text">
+                    {message}&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;{message}&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;{message}&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+                  </span>
                 </div>
               </div>
             </div>
@@ -217,6 +262,8 @@ export function BroadcastSender({ senderRole }: BroadcastSenderProps) {
                   <TableHead>Message</TableHead>
                   <TableHead>Target</TableHead>
                   <TableHead>Style</TableHead>
+                  <TableHead>Speed</TableHead>
+                  <TableHead>Expires</TableHead>
                   <TableHead>Date</TableHead>
                 </TableRow>
               </TableHeader>
@@ -229,6 +276,12 @@ export function BroadcastSender({ senderRole }: BroadcastSenderProps) {
                     </TableCell>
                     <TableCell>
                       <span className="w-3 h-3 rounded-full inline-block" style={{ background: b.color || "#FFD700" }} />
+                    </TableCell>
+                    <TableCell className="text-sm text-muted-foreground">
+                      {b.scrollSpeed === 30 ? "Slow" : b.scrollSpeed === 20 ? "Med-Slow" : b.scrollSpeed === 10 ? "Fast" : b.scrollSpeed === 6 ? "V.Fast" : "Normal"}
+                    </TableCell>
+                    <TableCell className="text-sm text-muted-foreground">
+                      {b.expiresAt ? (new Date(b.expiresAt) > new Date() ? new Date(b.expiresAt).toLocaleString() : "Expired") : "Never"}
                     </TableCell>
                     <TableCell className="text-sm text-muted-foreground">
                       {b.createdAt ? new Date(b.createdAt).toLocaleString() : ""}

@@ -1387,12 +1387,19 @@ export async function registerRoutes(
     }
 
     try {
-      const { targetRole, message, fontFamily, color } = z.object({
+      const { targetRole, message, fontFamily, color, scrollSpeed, durationHours } = z.object({
         targetRole: z.enum(["super_manager", "manager", "user", "all", "public"]),
         message: z.string().min(1).max(500),
         fontFamily: z.string().optional().default("sans-serif"),
         color: z.string().optional().default("#FFD700"),
+        scrollSpeed: z.number().min(5).max(60).optional().default(15),
+        durationHours: z.number().min(0).max(8760).optional(),
       }).parse(req.body);
+
+      let expiresAt: Date | null = null;
+      if (durationHours && durationHours > 0) {
+        expiresAt = new Date(Date.now() + durationHours * 60 * 60 * 1000);
+      }
 
       if (targetRole === 'public' && role !== 'admin') {
         return res.status(403).json({ message: "Only admins can send public broadcasts" });
@@ -1411,6 +1418,8 @@ export async function registerRoutes(
         message,
         fontFamily,
         color,
+        scrollSpeed,
+        expiresAt,
       });
 
       res.status(201).json(broadcast);

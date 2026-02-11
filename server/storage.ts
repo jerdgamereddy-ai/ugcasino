@@ -58,7 +58,7 @@ export interface IStorage {
   updateLastActive(userId: number): Promise<void>;
   updateProfitSharePercentage(userId: number, percentage: number): Promise<User>;
 
-  createBroadcast(data: { senderId: number; senderRole: string; targetRole: string; message: string; fontFamily?: string; color?: string }): Promise<Broadcast>;
+  createBroadcast(data: { senderId: number; senderRole: string; targetRole: string; message: string; fontFamily?: string; color?: string; scrollSpeed?: number; expiresAt?: Date | null }): Promise<Broadcast>;
   getBroadcastsForUser(userId: number, userRole: string, createdBy?: number | null): Promise<Broadcast[]>;
   dismissBroadcast(broadcastId: number, userId: number): Promise<void>;
   getDismissedBroadcastIds(userId: number): Promise<number[]>;
@@ -307,7 +307,7 @@ export class DatabaseStorage implements IStorage {
     return updated;
   }
 
-  async createBroadcast(data: { senderId: number; senderRole: string; targetRole: string; message: string; fontFamily?: string; color?: string }): Promise<Broadcast> {
+  async createBroadcast(data: { senderId: number; senderRole: string; targetRole: string; message: string; fontFamily?: string; color?: string; scrollSpeed?: number; expiresAt?: Date | null }): Promise<Broadcast> {
     const [broadcast] = await db.insert(broadcasts).values({
       senderId: data.senderId,
       senderRole: data.senderRole as "admin" | "super_manager" | "manager",
@@ -315,6 +315,8 @@ export class DatabaseStorage implements IStorage {
       message: data.message,
       fontFamily: data.fontFamily || "sans-serif",
       color: data.color || "#FFD700",
+      scrollSpeed: data.scrollSpeed || 15,
+      expiresAt: data.expiresAt || null,
     }).returning();
     return broadcast;
   }
@@ -323,8 +325,10 @@ export class DatabaseStorage implements IStorage {
     const allBroadcasts = await db.select().from(broadcasts).orderBy(desc(broadcasts.createdAt));
     const dismissedIds = await this.getDismissedBroadcastIds(userId);
 
+    const now = new Date();
     return allBroadcasts.filter(b => {
       if (dismissedIds.includes(b.id)) return false;
+      if (b.expiresAt && new Date(b.expiresAt) < now) return false;
       if (b.targetRole === 'public') return true;
       if (b.targetRole === 'all') return true;
       if (b.targetRole === userRole) {
@@ -358,10 +362,12 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getPublicBroadcasts(): Promise<Broadcast[]> {
-    return await db.select().from(broadcasts)
+    const all = await db.select().from(broadcasts)
       .where(eq(broadcasts.targetRole, "public"))
       .orderBy(desc(broadcasts.createdAt))
       .limit(10);
+    const now = new Date();
+    return all.filter(b => !b.expiresAt || new Date(b.expiresAt) >= now);
   }
 
   async createMessage(data: { senderId: number; receiverId: number; content: string }): Promise<Message> {
