@@ -117,4 +117,12 @@
     display: inline-block;
     animation: marquee-scroll 12s linear infinite;
   }
+
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
 }

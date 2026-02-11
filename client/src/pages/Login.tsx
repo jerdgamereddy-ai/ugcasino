@@ -18,7 +18,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { useLocation } from "wouter";
 import { Coins, Loader2, Ticket, Trophy, Star, Gem, Crown, Sparkles, Megaphone } from "lucide-react";
-import { DemoGamesLeft, DemoGamesRight } from "@/components/DemoGames";
+import { DemoGamesLeft, DemoGamesRight, DemoGamesMobile } from "@/components/DemoGames";
 import { motion, AnimatePresence } from "framer-motion";
 import { useQuery } from "@tanstack/react-query";
 import { type Broadcast } from "@shared/schema";
@@ -426,7 +426,7 @@ export default function Login() {
       <motion.img
         src={casinoManImg}
         alt=""
-        className="hidden lg:block absolute bottom-0 left-0 w-64 xl:w-80 pointer-events-none z-[2] rounded-tr-3xl"
+        className="absolute bottom-0 left-0 w-24 sm:w-36 md:w-44 lg:w-64 xl:w-80 pointer-events-none z-[1] rounded-tr-3xl opacity-60 lg:opacity-100"
         initial={{ x: -200, opacity: 0 }}
         animate={{ 
           x: 0, 
@@ -447,7 +447,7 @@ export default function Login() {
       <motion.img
         src={rioDancerImg}
         alt=""
-        className="hidden lg:block absolute bottom-0 right-0 w-56 xl:w-72 pointer-events-none z-[2] rounded-tl-3xl"
+        className="absolute bottom-0 right-0 w-20 sm:w-32 md:w-40 lg:w-56 xl:w-72 pointer-events-none z-[1] rounded-tl-3xl opacity-60 lg:opacity-100"
         initial={{ x: 200, opacity: 0 }}
         animate={{ 
           x: 0, 
@@ -623,6 +623,10 @@ export default function Login() {
         >
           Play responsibly. 18+ only.
         </motion.p>
+
+        <div className="lg:hidden mt-4 w-full" data-testid="demo-games-mobile">
+          <DemoGamesMobile />
+        </div>
         </div>
 
         <div className="hidden lg:block flex-shrink-0" data-testid="demo-games-right">

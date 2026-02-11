@@ -692,3 +692,33 @@ export function DemoGamesRight() {
   ];
   return <DemoColumn demos={demos} delay={1.0} />;
 }
+
+export function DemoGamesMobile() {
+  const demos = [
+    { id: "slots", component: MiniSlots },
+    { id: "roulette", component: MiniRoulette },
+    { id: "coin", component: MiniCoinFlip },
+    { id: "dice", component: MiniDice },
+    { id: "wheel", component: MiniWheel },
+    { id: "cards", component: MiniCards },
+  ];
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: 1, duration: 0.8 }}
+      className="w-full overflow-x-auto scrollbar-hide"
+    >
+      <div className="flex gap-3 px-2 pb-2 w-max">
+        {demos.map((demo) => (
+          <div
+            key={demo.id}
+            className="bg-black/40 backdrop-blur-sm border border-white/5 rounded-xl p-3 flex items-center justify-center flex-shrink-0"
+          >
+            <demo.component />
+          </div>
+        ))}
+      </div>
+    </motion.div>
+  );
+}
