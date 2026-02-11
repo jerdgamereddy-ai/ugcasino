@@ -96,6 +96,15 @@ Preferred communication style: Simple, everyday language.
 - **View Vouchers**: Managers see list of their created vouchers with code, amount, status, and copy button
 - **API**: `GET /api/manager/vouchers`, `POST /api/vouchers` (existing, already allows manager role)
 
+### Broadcast System
+- **Hierarchical Broadcasts**: Admin broadcasts to all roles + public; Super Managers to their managers; Managers to their players
+- **Public Broadcasts**: Admin-only public broadcasts visible on login screen to all visitors (including non-logged-in users)
+- **Customization**: Font family (sans-serif, serif, monospace, cursive, fantasy), text color (8 options), scroll speed (Slow/Medium-Slow/Normal/Fast/Very Fast)
+- **Duration/Expiry**: Broadcasts can run forever or auto-expire after 15min to 30 days; expired broadcasts are filtered server-side
+- **Scroll Speed**: Configurable per broadcast (5-60 seconds animation duration), applied via inline `animationDuration` style
+- **Dismissable**: Logged-in users can dismiss broadcasts; dismissals tracked in `broadcast_dismissals` table
+- **API**: `POST /api/broadcasts`, `GET /api/broadcasts`, `GET /api/broadcasts/public`, `GET /api/broadcasts/sent`, `POST /api/broadcasts/:id/dismiss`
+
 ### Chat System
 - **Admin Chat**: Admin can message any non-admin user directly from the Chat tab
 - **Super Manager Chat**: Super managers can message their managers from the Chat tab
