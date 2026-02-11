@@ -426,21 +426,21 @@ export default function Login() {
       <motion.img
         src={casinoManImg}
         alt=""
-        className="hidden xl:block absolute bottom-0 left-0 w-72 opacity-40 pointer-events-none z-[1] rounded-tr-3xl"
+        className="hidden 2xl:block absolute bottom-0 left-0 w-56 opacity-30 pointer-events-none z-[1] rounded-tr-3xl"
         initial={{ x: -100, opacity: 0 }}
-        animate={{ x: 0, opacity: 0.4 }}
+        animate={{ x: 0, opacity: 0.3 }}
         transition={{ duration: 1.2, delay: 0.5 }}
-        style={{ maskImage: "linear-gradient(to top, black 40%, transparent 100%)" }}
+        style={{ maskImage: "linear-gradient(to top, black 30%, transparent 90%)" }}
         draggable={false}
       />
       <motion.img
         src={rioDancerImg}
         alt=""
-        className="hidden xl:block absolute bottom-0 right-0 w-60 opacity-40 pointer-events-none z-[1] rounded-tl-3xl"
+        className="hidden 2xl:block absolute bottom-0 right-0 w-48 opacity-30 pointer-events-none z-[1] rounded-tl-3xl"
         initial={{ x: 100, opacity: 0 }}
-        animate={{ x: 0, opacity: 0.4 }}
+        animate={{ x: 0, opacity: 0.3 }}
         transition={{ duration: 1.2, delay: 0.8 }}
-        style={{ maskImage: "linear-gradient(to top, black 40%, transparent 100%)" }}
+        style={{ maskImage: "linear-gradient(to top, black 30%, transparent 90%)" }}
         draggable={false}
       />
 
