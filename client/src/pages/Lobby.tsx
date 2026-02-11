@@ -17,6 +17,7 @@ import moneyManImg from "@assets/money_man_casino.jpeg";
 import treesOfFortuneImg from "@assets/trees_of_fortune.jpeg";
 import rioDancerImg from "@assets/Rio_Fantasia_1770798304010.jpeg";
 import casinoManImg from "@assets/casino_roulette_man.jpeg";
+import diceImg from "@assets/dice_1770799379923.png";
 
 function AnimatedCounter({ target, duration = 2000, prefix = "", suffix = "" }: { target: number; duration?: number; prefix?: string; suffix?: string }) {
   const [count, setCount] = useState(0);
@@ -450,7 +451,7 @@ export default function Lobby() {
             },
             {
               href: "/dice",
-              img: "https://images.unsplash.com/photo-1595131838585-34435997c65b?q=80&w=2070",
+              img: diceImg,
               icon: Dices,
               tag: "Trending",
               tagColor: "bg-purple-600",
