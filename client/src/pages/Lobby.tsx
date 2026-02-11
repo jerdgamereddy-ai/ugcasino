@@ -13,6 +13,10 @@ import { motion, AnimatePresence } from "framer-motion";
 
 import { playSound } from "@/lib/sounds";
 import { BroadcastBanner } from "@/components/BroadcastBanner";
+import moneyManImg from "@assets/money_man_casino.jpeg";
+import treesOfFortuneImg from "@assets/trees_of_fortune.jpeg";
+import rioDancerImg from "@assets/Rio_Fantasia_1770798304010.jpeg";
+import casinoManImg from "@assets/casino_roulette_man.jpeg";
 
 function AnimatedCounter({ target, duration = 2000, prefix = "", suffix = "" }: { target: number; duration?: number; prefix?: string; suffix?: string }) {
   const [count, setCount] = useState(0);
@@ -252,6 +256,13 @@ export default function Lobby() {
           className="relative overflow-hidden rounded-3xl p-8 md:p-12 bg-gradient-to-br from-black via-emerald-900/30 to-black border border-emerald-500/20 shadow-[0_0_50px_rgba(16,185,129,0.15)]"
           variants={itemVariants}
         >
+          <img
+            src={moneyManImg}
+            alt=""
+            className="absolute right-0 bottom-0 h-full w-auto opacity-20 pointer-events-none hidden md:block object-cover object-top"
+            style={{ maskImage: "linear-gradient(to left, black 20%, transparent 80%)" }}
+            draggable={false}
+          />
           <div className="absolute top-0 right-0 p-4 opacity-20 pointer-events-none">
             <Sparkles className="w-64 h-64 text-emerald-500 animate-pulse" />
           </div>
@@ -378,6 +389,27 @@ export default function Lobby() {
             </Card>
           </motion.div>
         </div>
+
+        <motion.div variants={itemVariants} className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="relative overflow-hidden rounded-2xl border border-primary/20 h-40 group cursor-default">
+            <img src={treesOfFortuneImg} alt="" className="absolute inset-0 w-full h-full object-cover opacity-60 group-hover:scale-105 transition-transform duration-700" draggable={false} />
+            <div className="absolute inset-0 bg-gradient-to-r from-black/80 via-black/40 to-transparent" />
+            <div className="relative z-10 flex flex-col justify-center h-full p-6">
+              <p className="text-primary text-xs font-bold uppercase tracking-widest">Trees of Fortune</p>
+              <p className="text-white text-lg font-display font-bold mt-1">Unlock Golden Rewards</p>
+              <p className="text-gray-400 text-xs mt-1">Spin for legendary wins</p>
+            </div>
+          </div>
+          <div className="relative overflow-hidden rounded-2xl border border-purple-500/20 h-40 group cursor-default">
+            <img src={casinoManImg} alt="" className="absolute inset-0 w-full h-full object-cover opacity-60 group-hover:scale-105 transition-transform duration-700" draggable={false} />
+            <div className="absolute inset-0 bg-gradient-to-r from-black/80 via-black/40 to-transparent" />
+            <div className="relative z-10 flex flex-col justify-center h-full p-6">
+              <p className="text-purple-400 text-xs font-bold uppercase tracking-widest">VIP Lounge</p>
+              <p className="text-white text-lg font-display font-bold mt-1">Play Like a High Roller</p>
+              <p className="text-gray-400 text-xs mt-1">Premium casino experience</p>
+            </div>
+          </div>
+        </motion.div>
 
         {/* Games Section Label */}
         <motion.div 

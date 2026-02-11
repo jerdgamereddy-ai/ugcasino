@@ -22,6 +22,8 @@ import { DemoGamesLeft, DemoGamesRight } from "@/components/DemoGames";
 import { motion, AnimatePresence } from "framer-motion";
 import { useQuery } from "@tanstack/react-query";
 import { type Broadcast } from "@shared/schema";
+import casinoManImg from "@assets/casino_roulette_man.jpeg";
+import rioDancerImg from "@assets/Rio_Fantasia_1770798304010.jpeg";
 
 interface Particle {
   id: number;
@@ -420,6 +422,27 @@ export default function Login() {
       <FloatingIcon icon={Sparkles} delay={2} x="80%" y="70%" duration={5.5} />
       <FloatingIcon icon={Trophy} delay={0.8} x="50%" y="8%" duration={7} />
       <FloatingIcon icon={Coins} delay={1.5} x="5%" y="45%" duration={6} />
+
+      <motion.img
+        src={casinoManImg}
+        alt=""
+        className="hidden xl:block absolute bottom-0 left-0 w-72 opacity-40 pointer-events-none z-[1] rounded-tr-3xl"
+        initial={{ x: -100, opacity: 0 }}
+        animate={{ x: 0, opacity: 0.4 }}
+        transition={{ duration: 1.2, delay: 0.5 }}
+        style={{ maskImage: "linear-gradient(to top, black 40%, transparent 100%)" }}
+        draggable={false}
+      />
+      <motion.img
+        src={rioDancerImg}
+        alt=""
+        className="hidden xl:block absolute bottom-0 right-0 w-60 opacity-40 pointer-events-none z-[1] rounded-tl-3xl"
+        initial={{ x: 100, opacity: 0 }}
+        animate={{ x: 0, opacity: 0.4 }}
+        transition={{ duration: 1.2, delay: 0.8 }}
+        style={{ maskImage: "linear-gradient(to top, black 40%, transparent 100%)" }}
+        draggable={false}
+      />
 
       <div className="relative z-10 w-full max-w-6xl flex items-start justify-center gap-4">
         <div className="hidden lg:block flex-shrink-0" data-testid="demo-games-left">
