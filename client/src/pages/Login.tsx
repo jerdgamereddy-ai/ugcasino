@@ -22,8 +22,8 @@ import { DemoGamesLeft, DemoGamesRight } from "@/components/DemoGames";
 import { motion, AnimatePresence } from "framer-motion";
 import { useQuery } from "@tanstack/react-query";
 import { type Broadcast } from "@shared/schema";
-import casinoManImg from "@assets/casino_roulette_man.jpeg";
-import rioDancerImg from "@assets/Rio_Fantasia_1770798304010.jpeg";
+import casinoManImg from "@assets/don_1770799596293.jpeg";
+import rioDancerImg from "@assets/Rio_Fantasia_1770799596293.jpeg";
 
 interface Particle {
   id: number;
@@ -426,21 +426,43 @@ export default function Login() {
       <motion.img
         src={casinoManImg}
         alt=""
-        className="hidden 2xl:block absolute bottom-0 left-0 w-56 opacity-30 pointer-events-none z-[1] rounded-tr-3xl"
-        initial={{ x: -100, opacity: 0 }}
-        animate={{ x: 0, opacity: 0.3 }}
-        transition={{ duration: 1.2, delay: 0.5 }}
-        style={{ maskImage: "linear-gradient(to top, black 30%, transparent 90%)" }}
+        className="hidden lg:block absolute bottom-0 left-0 w-64 xl:w-80 pointer-events-none z-[2] rounded-tr-3xl"
+        initial={{ x: -200, opacity: 0 }}
+        animate={{ 
+          x: 0, 
+          opacity: 0.85,
+          y: [0, -8, 0],
+        }}
+        transition={{ 
+          x: { duration: 1.2, delay: 0.3, ease: "easeOut" },
+          opacity: { duration: 1.5, delay: 0.3 },
+          y: { duration: 4, repeat: Infinity, ease: "easeInOut", delay: 1.5 },
+        }}
+        style={{ 
+          maskImage: "linear-gradient(to top, black 50%, transparent 95%)",
+          filter: "drop-shadow(0 0 30px rgba(100, 50, 255, 0.4))",
+        }}
         draggable={false}
       />
       <motion.img
         src={rioDancerImg}
         alt=""
-        className="hidden 2xl:block absolute bottom-0 right-0 w-48 opacity-30 pointer-events-none z-[1] rounded-tl-3xl"
-        initial={{ x: 100, opacity: 0 }}
-        animate={{ x: 0, opacity: 0.3 }}
-        transition={{ duration: 1.2, delay: 0.8 }}
-        style={{ maskImage: "linear-gradient(to top, black 30%, transparent 90%)" }}
+        className="hidden lg:block absolute bottom-0 right-0 w-56 xl:w-72 pointer-events-none z-[2] rounded-tl-3xl"
+        initial={{ x: 200, opacity: 0 }}
+        animate={{ 
+          x: 0, 
+          opacity: 0.9,
+          y: [0, -10, 0],
+        }}
+        transition={{ 
+          x: { duration: 1.2, delay: 0.6, ease: "easeOut" },
+          opacity: { duration: 1.5, delay: 0.6 },
+          y: { duration: 3.5, repeat: Infinity, ease: "easeInOut", delay: 2 },
+        }}
+        style={{ 
+          maskImage: "linear-gradient(to top, black 60%, transparent 95%)",
+          filter: "drop-shadow(0 0 25px rgba(255, 100, 50, 0.4))",
+        }}
         draggable={false}
       />
 
