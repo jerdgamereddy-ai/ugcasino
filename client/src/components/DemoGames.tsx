@@ -647,41 +647,43 @@ function MiniPlinko() {
   );
 }
 
-export function DemoGames() {
+function DemoColumn({ demos, delay }: { demos: { id: string; component: () => JSX.Element }[]; delay: number }) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, x: delay === 0.8 ? -30 : 30 }}
+      animate={{ opacity: 1, x: 0 }}
+      transition={{ delay, duration: 1 }}
+      className="flex flex-col gap-3"
+    >
+      {demos.map((demo) => (
+        <motion.div
+          key={demo.id}
+          className="bg-black/40 backdrop-blur-sm border border-white/5 rounded-xl p-3 flex items-center justify-center"
+          whileHover={{ borderColor: "rgba(212,175,55,0.3)" }}
+        >
+          <demo.component />
+        </motion.div>
+      ))}
+    </motion.div>
+  );
+}
+
+export function DemoGamesLeft() {
   const demos = [
     { id: "slots", component: MiniSlots },
     { id: "roulette", component: MiniRoulette },
     { id: "dice", component: MiniDice },
+    { id: "coin", component: MiniCoinFlip },
+  ];
+  return <DemoColumn demos={demos} delay={0.8} />;
+}
+
+export function DemoGamesRight() {
+  const demos = [
     { id: "cards", component: MiniCards },
     { id: "wheel", component: MiniWheel },
-    { id: "coin", component: MiniCoinFlip },
     { id: "fish", component: MiniFishHunt },
     { id: "plinko", component: MiniPlinko },
   ];
-
-  return (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      transition={{ delay: 1, duration: 1.5 }}
-      className="w-full max-w-5xl mx-auto mt-6"
-    >
-      <div className="text-center mb-4">
-        <div className="text-[10px] uppercase tracking-[0.4em] text-primary/50 font-bold">
-          Live Demo Games
-        </div>
-      </div>
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 px-2">
-        {demos.map((demo) => (
-          <motion.div
-            key={demo.id}
-            className="bg-black/40 backdrop-blur-sm border border-white/5 rounded-xl p-3 flex items-center justify-center"
-            whileHover={{ borderColor: "rgba(212,175,55,0.3)" }}
-          >
-            <demo.component />
-          </motion.div>
-        ))}
-      </div>
-    </motion.div>
-  );
+  return <DemoColumn demos={demos} delay={1.0} />;
 }

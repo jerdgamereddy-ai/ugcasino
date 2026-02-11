@@ -18,7 +18,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { useLocation } from "wouter";
 import { Coins, Loader2, Ticket, Trophy, Star, Gem, Crown, Sparkles } from "lucide-react";
-import { DemoGames } from "@/components/DemoGames";
+import { DemoGamesLeft, DemoGamesRight } from "@/components/DemoGames";
 import { motion, AnimatePresence } from "framer-motion";
 
 interface Particle {
@@ -351,7 +351,7 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col items-center p-4 pt-8 relative overflow-hidden bg-black overflow-y-auto">
+    <div className="min-h-screen flex flex-col items-center justify-center p-4 relative overflow-hidden bg-black overflow-y-auto">
       <div className="absolute inset-0 bg-gradient-to-b from-black via-zinc-950 to-black" />
 
       <GlowingOrb color="rgba(255,215,0,0.15)" size={400} x="-5%" y="10%" delay={0} />
@@ -367,7 +367,12 @@ export default function Login() {
       <FloatingIcon icon={Trophy} delay={0.8} x="50%" y="8%" duration={7} />
       <FloatingIcon icon={Coins} delay={1.5} x="5%" y="45%" duration={6} />
 
-      <div className="relative z-10 w-full max-w-md flex flex-col items-center">
+      <div className="relative z-10 w-full max-w-6xl flex items-start justify-center gap-4">
+        <div className="hidden lg:block flex-shrink-0" data-testid="demo-games-left">
+          <DemoGamesLeft />
+        </div>
+
+        <div className="w-full max-w-md flex flex-col items-center flex-shrink-0">
         <GrowingJackpot />
         <LiveStatBar />
 
@@ -519,13 +524,12 @@ export default function Login() {
         >
           Play responsibly. 18+ only.
         </motion.p>
-      </div>
+        </div>
 
-      <div className="relative z-10 w-full" data-testid="demo-games-section">
-        <DemoGames />
+        <div className="hidden lg:block flex-shrink-0" data-testid="demo-games-right">
+          <DemoGamesRight />
+        </div>
       </div>
-
-      <div className="h-8" />
     </div>
   );
 }
