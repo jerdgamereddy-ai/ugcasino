@@ -9,8 +9,8 @@ import { queryClient } from "@/lib/queryClient";
 import { motion, AnimatePresence } from "framer-motion";
 import { Coins, RotateCw } from "lucide-react";
 import { playSound } from "@/lib/sounds";
-import coinHeads from "@assets/image_1_1770641777738_1770793509893.jpg";
-import coinTails from "@assets/image_1_1770793462386_1770793521045.jpg";
+import coinHeads from "@assets/coin_heads.jpg";
+import coinTails from "@assets/coin_tails.jpg";
 
 export default function CoinFlip() {
   const { data: user } = useUser();

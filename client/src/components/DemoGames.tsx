@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import coinHeads from "@assets/image_1_1770641777738_1770793509893.jpg";
-import coinTails from "@assets/image_1_1770793462386_1770793521045.jpg";
+import coinHeads from "@assets/coin_heads.jpg";
+import coinTails from "@assets/coin_tails.jpg";
 import bananaImg from "@assets/banana_1770797891098.png";
 import berriesImg from "@assets/berries_1770797891098.png";
 import coconutImg from "@assets/coconut_1770797891098.png";
