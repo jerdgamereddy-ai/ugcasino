@@ -474,7 +474,7 @@ export default function GameFishHunt() {
     const fish: FishData = {
       id: nextIdRef.current++,
       type,
-      x: direction === 1 ? -ft.size : 900,
+      x: direction === 1 ? -ft.size : 1100,
       y,
       speed,
       direction,
@@ -510,7 +510,7 @@ export default function GameFishHunt() {
   useEffect(() => {
     const initialBubbles: Bubble[] = Array.from({ length: 20 }, (_, i) => ({
       id: i,
-      x: Math.random() * 900,
+      x: Math.random() * 1100,
       y: Math.random() * 500,
       size: 3 + Math.random() * 8,
       speed: 0.3 + Math.random() * 0.7,
@@ -525,7 +525,7 @@ export default function GameFishHunt() {
           y: b.y - b.speed,
           x: b.x + Math.sin(b.y * 0.02) * 0.5,
           opacity: b.y < 20 ? b.opacity * 0.95 : b.opacity,
-        })).map(b => b.y < -10 ? { ...b, y: 500, x: Math.random() * 900, opacity: 0.2 + Math.random() * 0.4 } : b)
+        })).map(b => b.y < -10 ? { ...b, y: 500, x: Math.random() * 1100, opacity: 0.2 + Math.random() * 0.4 } : b)
       );
     }, 50);
 
@@ -545,7 +545,7 @@ export default function GameFishHunt() {
             x: f.x + f.speed * f.direction,
             y: f.y + Math.sin(frameCount * f.frequency + f.phase) * f.amplitude * 0.05,
           }))
-          .filter(f => f.direction === 1 ? f.x < 950 : f.x > -f.size - 50)
+          .filter(f => f.direction === 1 ? f.x < 1150 : f.x > -f.size - 50)
       );
 
       setBullets(prev =>
@@ -662,13 +662,13 @@ export default function GameFishHunt() {
           <p className="text-muted-foreground text-xs uppercase tracking-widest">Shoot to catch. Bigger prey = bigger rewards.</p>
         </div>
 
-        <div className="max-w-6xl mx-auto grid lg:grid-cols-[1fr_280px] gap-4 items-start">
+        <div className="max-w-7xl mx-auto grid lg:grid-cols-[1fr_280px] gap-4 items-start">
           <div className="relative" style={{ perspective: "1200px" }}>
             <div style={{ transform: "rotateX(3deg)", transformStyle: "preserve-3d" }}>
               <div
                 ref={gameAreaRef}
                 className="relative border-2 border-cyan-900/50 rounded-xl cursor-crosshair select-none"
-                style={{ width: "100%", height: "480px", maxWidth: "900px" }}
+                style={{ width: "100%", height: "600px", maxWidth: "1100px" }}
                 data-testid="fishhunt-game-area"
               >
                 <UnderwaterScene>

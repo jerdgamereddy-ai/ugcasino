@@ -98,4 +98,23 @@
     background-size: 200% auto;
     animation: gradient 3s ease infinite;
   }
+
+  @keyframes marquee-scroll {
+    0% { transform: translateX(0); }
+    100% { transform: translateX(-33.33%); }
+  }
+
+  .marquee-scroll {
+    display: inline-block;
+    animation: marquee-scroll 15s linear infinite;
+  }
+
+  .marquee-scroll:hover {
+    animation-play-state: paused;
+  }
+
+  .animate-marquee {
+    display: inline-block;
+    animation: marquee-scroll 12s linear infinite;
+  }
 }

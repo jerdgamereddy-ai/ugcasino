@@ -73,7 +73,7 @@ export default function GameMines() {
           <p className="text-white font-black text-xl drop-shadow-[0_2px_10_rgba(0,0,0,1)] uppercase tracking-widest">Find gems, avoid the mines.</p>
         </div>
 
-        <div className="max-w-4xl mx-auto grid md:grid-cols-3 gap-8">
+        <div className="max-w-6xl mx-auto grid md:grid-cols-3 gap-8">
           <Card className="glass-card border-white/10 p-6 bg-black/60">
             <CardContent className="p-0 space-y-6">
               <div className="space-y-2">

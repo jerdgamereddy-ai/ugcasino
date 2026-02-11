@@ -58,7 +58,7 @@ export interface IStorage {
   updateLastActive(userId: number): Promise<void>;
   updateProfitSharePercentage(userId: number, percentage: number): Promise<User>;
 
-  createBroadcast(data: { senderId: number; senderRole: string; targetRole: string; message: string }): Promise<Broadcast>;
+  createBroadcast(data: { senderId: number; senderRole: string; targetRole: string; message: string; fontFamily?: string; color?: string }): Promise<Broadcast>;
   getBroadcastsForUser(userId: number, userRole: string, createdBy?: number | null): Promise<Broadcast[]>;
   dismissBroadcast(broadcastId: number, userId: number): Promise<void>;
   getDismissedBroadcastIds(userId: number): Promise<number[]>;
@@ -306,12 +306,14 @@ export class DatabaseStorage implements IStorage {
     return updated;
   }
 
-  async createBroadcast(data: { senderId: number; senderRole: string; targetRole: string; message: string }): Promise<Broadcast> {
+  async createBroadcast(data: { senderId: number; senderRole: string; targetRole: string; message: string; fontFamily?: string; color?: string }): Promise<Broadcast> {
     const [broadcast] = await db.insert(broadcasts).values({
       senderId: data.senderId,
       senderRole: data.senderRole as "admin" | "super_manager" | "manager",
       targetRole: data.targetRole as "super_manager" | "manager" | "user" | "all",
       message: data.message,
+      fontFamily: data.fontFamily || "sans-serif",
+      color: data.color || "#FFD700",
     }).returning();
     return broadcast;
   }

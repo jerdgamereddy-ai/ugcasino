@@ -73,6 +73,8 @@ export const broadcasts = pgTable("broadcasts", {
   senderRole: text("sender_role", { enum: ["admin", "super_manager", "manager"] }).notNull(),
   targetRole: text("target_role", { enum: ["super_manager", "manager", "user", "all"] }).notNull(),
   message: text("message").notNull(),
+  fontFamily: text("font_family").default("sans-serif"),
+  color: text("color").default("#FFD700"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 

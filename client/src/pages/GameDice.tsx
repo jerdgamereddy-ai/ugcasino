@@ -19,7 +19,7 @@ export default function GameDice() {
             <p className="text-white font-black text-xl drop-shadow-[0_2px_10px_rgba(0,0,0,1)] uppercase tracking-widest">Predict high or low rolls for double payouts.</p>
         </div>
 
-        <div className="max-w-2xl mx-auto">
+        <div className="max-w-4xl mx-auto">
           <DiceGame />
         </div>
       </div>

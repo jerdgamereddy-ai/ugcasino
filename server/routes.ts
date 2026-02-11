@@ -509,7 +509,7 @@ export async function registerRoutes(
     
     try {
       const { gameType, winChance } = z.object({
-        gameType: z.enum(["slots", "roulette", "dice", "hilo", "coinflip", "plinko", "mines", "wheel", "poker", "keno"]),
+        gameType: z.enum(["slots", "roulette", "dice", "hilo", "coinflip", "plinko", "mines", "wheel", "poker", "keno", "fishhunt"]),
         winChance: z.number().min(0).max(100)
       }).parse(req.body);
       
@@ -1387,9 +1387,11 @@ export async function registerRoutes(
     }
 
     try {
-      const { targetRole, message } = z.object({
+      const { targetRole, message, fontFamily, color } = z.object({
         targetRole: z.enum(["super_manager", "manager", "user", "all"]),
         message: z.string().min(1).max(500),
+        fontFamily: z.string().optional().default("sans-serif"),
+        color: z.string().optional().default("#FFD700"),
       }).parse(req.body);
 
       if (role === 'super_manager' && targetRole !== 'manager') {
@@ -1404,6 +1406,8 @@ export async function registerRoutes(
         senderRole: role,
         targetRole,
         message,
+        fontFamily,
+        color,
       });
 
       res.status(201).json(broadcast);

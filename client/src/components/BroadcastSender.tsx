@@ -15,17 +15,38 @@ interface BroadcastSenderProps {
   senderRole: "admin" | "super_manager" | "manager";
 }
 
+const FONT_OPTIONS = [
+  { value: "sans-serif", label: "Sans Serif" },
+  { value: "serif", label: "Serif" },
+  { value: "monospace", label: "Monospace" },
+  { value: "cursive", label: "Cursive" },
+  { value: "fantasy", label: "Fantasy" },
+];
+
+const COLOR_OPTIONS = [
+  { value: "#FFD700", label: "Gold" },
+  { value: "#FF4444", label: "Red" },
+  { value: "#44FF44", label: "Green" },
+  { value: "#4FC3F7", label: "Blue" },
+  { value: "#FF69B4", label: "Pink" },
+  { value: "#FF8C00", label: "Orange" },
+  { value: "#E040FB", label: "Purple" },
+  { value: "#FFFFFF", label: "White" },
+];
+
 export function BroadcastSender({ senderRole }: BroadcastSenderProps) {
   const { toast } = useToast();
   const [message, setMessage] = useState("");
   const [targetRole, setTargetRole] = useState<string>("");
+  const [fontFamily, setFontFamily] = useState("sans-serif");
+  const [color, setColor] = useState("#FFD700");
 
   const { data: sentBroadcasts, isLoading } = useQuery<Broadcast[]>({
     queryKey: ["/api/broadcasts/sent"],
   });
 
   const sendMutation = useMutation({
-    mutationFn: async (data: { targetRole: string; message: string }) => {
+    mutationFn: async (data: { targetRole: string; message: string; fontFamily: string; color: string }) => {
       const res = await fetch("/api/broadcasts", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -57,7 +78,7 @@ export function BroadcastSender({ senderRole }: BroadcastSenderProps) {
       toast({ title: "Empty Message", description: "Please type a message to broadcast.", variant: "destructive" });
       return;
     }
-    sendMutation.mutate({ targetRole, message: message.trim() });
+    sendMutation.mutate({ targetRole, message: message.trim(), fontFamily, color });
   };
 
   const targetOptions = senderRole === "admin"
@@ -86,7 +107,7 @@ export function BroadcastSender({ senderRole }: BroadcastSenderProps) {
       <Card className="glass-card">
         <CardHeader>
           <CardTitle className="flex items-center gap-2"><Megaphone className="w-5 h-5" /> Send Broadcast</CardTitle>
-          <CardDescription>Send an announcement to your team. Recipients will see it as a banner.</CardDescription>
+          <CardDescription>Send an announcement to your team. Recipients will see it as a scrolling banner.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-2">
@@ -104,6 +125,43 @@ export function BroadcastSender({ senderRole }: BroadcastSenderProps) {
               </SelectContent>
             </Select>
           </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-2">
+              <label className="text-xs uppercase text-muted-foreground font-bold">Font Style</label>
+              <Select value={fontFamily} onValueChange={setFontFamily}>
+                <SelectTrigger data-testid="select-broadcast-font">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {FONT_OPTIONS.map((opt) => (
+                    <SelectItem key={opt.value} value={opt.value} data-testid={`option-font-${opt.value}`}>
+                      <span style={{ fontFamily: opt.value }}>{opt.label}</span>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <label className="text-xs uppercase text-muted-foreground font-bold">Text Color</label>
+              <Select value={color} onValueChange={setColor}>
+                <SelectTrigger data-testid="select-broadcast-color">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {COLOR_OPTIONS.map((opt) => (
+                    <SelectItem key={opt.value} value={opt.value} data-testid={`option-color-${opt.value}`}>
+                      <span className="flex items-center gap-2">
+                        <span className="w-3 h-3 rounded-full inline-block flex-shrink-0" style={{ background: opt.value }} />
+                        {opt.label}
+                      </span>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
           <div className="space-y-2">
             <label className="text-xs uppercase text-muted-foreground font-bold">Message</label>
             <Textarea
@@ -116,6 +174,18 @@ export function BroadcastSender({ senderRole }: BroadcastSenderProps) {
             />
             <p className="text-xs text-muted-foreground text-right">{message.length}/500</p>
           </div>
+
+          {message.trim() && (
+            <div className="space-y-1">
+              <label className="text-xs uppercase text-muted-foreground font-bold">Preview</label>
+              <div className="overflow-hidden rounded-md border border-white/10 bg-black/80 py-2">
+                <div className="animate-marquee whitespace-nowrap" style={{ fontFamily, color, fontSize: "1rem", fontWeight: "bold" }}>
+                  {message} &nbsp;&nbsp;&nbsp;&nbsp;&nbsp; {message} &nbsp;&nbsp;&nbsp;&nbsp;&nbsp; {message}
+                </div>
+              </div>
+            </div>
+          )}
+
           <Button
             onClick={handleSend}
             disabled={sendMutation.isPending || !message.trim() || !targetRole}
@@ -144,6 +214,7 @@ export function BroadcastSender({ senderRole }: BroadcastSenderProps) {
                 <TableRow className="border-white/10">
                   <TableHead>Message</TableHead>
                   <TableHead>Target</TableHead>
+                  <TableHead>Style</TableHead>
                   <TableHead>Date</TableHead>
                 </TableRow>
               </TableHeader>
@@ -153,6 +224,9 @@ export function BroadcastSender({ senderRole }: BroadcastSenderProps) {
                     <TableCell className="max-w-xs truncate">{b.message}</TableCell>
                     <TableCell>
                       <Badge variant="secondary">{getTargetLabel(b.targetRole)}</Badge>
+                    </TableCell>
+                    <TableCell>
+                      <span className="w-3 h-3 rounded-full inline-block" style={{ background: b.color || "#FFD700" }} />
                     </TableCell>
                     <TableCell className="text-sm text-muted-foreground">
                       {b.createdAt ? new Date(b.createdAt).toLocaleString() : ""}

@@ -126,7 +126,7 @@ export function SlotMachine() {
   };
 
   return (
-    <div className="flex flex-col items-center gap-8 w-full max-w-2xl mx-auto p-4 md:p-8">
+    <div className="flex flex-col items-center gap-8 w-full max-w-4xl mx-auto p-4 md:p-8">
 
       {/* Machine Frame */}
       <div className="relative bg-gradient-to-b from-neutral-800 to-neutral-900 p-8 rounded-3xl border-4 border-primary shadow-[0_0_60px_rgba(212,175,55,0.4)] w-full">

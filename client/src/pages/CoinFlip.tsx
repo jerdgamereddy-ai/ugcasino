@@ -58,7 +58,7 @@ export default function CoinFlip() {
 
   return (
     <ProtectedLayout>
-      <div className="max-w-4xl mx-auto space-y-8">
+      <div className="max-w-5xl mx-auto space-y-8">
         <div className="text-center space-y-4">
           <h1 className="text-5xl md:text-8xl font-display font-bold text-white tracking-tighter drop-shadow-[0_0_30px_rgba(212,175,55,0.5)]">
             Double or <span className="text-primary">Nothing</span>

@@ -298,7 +298,7 @@ export default function GameWheel() {
           <p className="text-muted-foreground text-sm uppercase tracking-widest">16 segments. 8 multipliers. Dare to win big.</p>
         </div>
 
-        <div className="max-w-5xl mx-auto grid md:grid-cols-[1fr_auto] gap-8 items-start">
+        <div className="max-w-6xl mx-auto grid md:grid-cols-[1fr_auto] gap-8 items-start">
           <div className="flex flex-col items-center gap-6">
             <div style={{ perspective: "900px" }}>
               <div style={{ transform: "rotateX(10deg)", transformStyle: "preserve-3d" }}>
