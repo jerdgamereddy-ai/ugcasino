@@ -3,16 +3,23 @@ import { HiLoGame } from "@/components/games/HiLoGame";
 import { Button } from "@/components/ui/button";
 import { Link } from "wouter";
 import { ArrowLeft } from "lucide-react";
+import { useFullscreen, FullscreenButton } from "@/components/FullscreenToggle";
 
 export default function GameHiLo() {
+  const { isFullscreen, toggle, containerRef } = useFullscreen();
+
   return (
     <ProtectedLayout>
+      <div ref={containerRef} className={isFullscreen ? "bg-background p-4 overflow-auto h-screen" : ""}>
       <div className="space-y-6">
-        <Link href="/">
-          <Button variant="ghost" className="pl-0 hover:pl-2 transition-all">
-            <ArrowLeft className="w-4 h-4 mr-2" /> Back to Lobby
-          </Button>
-        </Link>
+        <div className="flex items-center justify-between">
+          <Link href="/">
+            <Button variant="ghost" className="pl-0 hover:pl-2 transition-all">
+              <ArrowLeft className="w-4 h-4 mr-2" /> Back to Lobby
+            </Button>
+          </Link>
+          <FullscreenButton isFullscreen={isFullscreen} onToggle={toggle} />
+        </div>
         
         <div className="text-center mb-8">
             <h1 className="text-5xl md:text-7xl font-display font-bold text-primary mb-2 drop-shadow-[0_0_30px_rgba(212,175,55,0.8)]">High-Low Cards</h1>
@@ -22,6 +29,7 @@ export default function GameHiLo() {
         <div className="max-w-4xl mx-auto">
           <HiLoGame />
         </div>
+      </div>
       </div>
     </ProtectedLayout>
   );

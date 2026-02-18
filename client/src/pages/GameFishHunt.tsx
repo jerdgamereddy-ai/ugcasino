@@ -8,6 +8,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
 import { playSound } from "@/lib/sounds";
+import { useFullscreen, FullscreenButton } from "@/components/FullscreenToggle";
 
 interface FishData {
   id: number;
@@ -461,6 +462,7 @@ export default function GameFishHunt() {
   const animFrameRef = useRef<number>();
   const fishesRef = useRef<FishData[]>([]);
   const { toast } = useToast();
+  const { isFullscreen, toggle, containerRef: fullscreenRef } = useFullscreen();
 
   fishesRef.current = fishes;
 
@@ -648,12 +650,16 @@ export default function GameFishHunt() {
 
   return (
     <ProtectedLayout>
+      <div ref={fullscreenRef} className={isFullscreen ? "bg-background p-4 overflow-auto h-screen" : ""}>
       <div className="space-y-4">
-        <Link href="/">
-          <Button variant="ghost" className="pl-0 transition-all text-primary" data-testid="button-back-lobby">
-            <ArrowLeft className="w-4 h-4 mr-2" /> Back to Lobby
-          </Button>
-        </Link>
+        <div className="flex items-center justify-between">
+          <Link href="/">
+            <Button variant="ghost" className="pl-0 transition-all text-primary" data-testid="button-back-lobby">
+              <ArrowLeft className="w-4 h-4 mr-2" /> Back to Lobby
+            </Button>
+          </Link>
+          <FullscreenButton isFullscreen={isFullscreen} onToggle={toggle} />
+        </div>
 
         <div className="text-center mb-2">
           <h1 className="text-3xl md:text-5xl font-display font-bold text-primary mb-1" data-testid="text-fishhunt-title">
@@ -826,6 +832,7 @@ export default function GameFishHunt() {
             )}
           </div>
         </div>
+      </div>
       </div>
     </ProtectedLayout>
   );

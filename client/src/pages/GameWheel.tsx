@@ -8,6 +8,7 @@ import { motion } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
 import { playSound } from "@/lib/sounds";
+import { useFullscreen, FullscreenButton } from "@/components/FullscreenToggle";
 
 const SEGMENTS = [
   { multiplier: 0,   label: "MISS",  color: "#1a1a2e", accent: "#2a2a4e" },
@@ -209,6 +210,7 @@ export default function GameWheel() {
   const [recentResults, setRecentResults] = useState<number[]>([]);
   const tickCountRef = useRef(0);
   const { toast } = useToast();
+  const { isFullscreen, toggle, containerRef } = useFullscreen();
 
   const handleSpin = async () => {
     if (isSpinning) return;
@@ -286,12 +288,16 @@ export default function GameWheel() {
 
   return (
     <ProtectedLayout>
+      <div ref={containerRef} className={isFullscreen ? "bg-background p-4 overflow-auto h-screen" : ""}>
       <div className="space-y-6">
-        <Link href="/">
-          <Button variant="ghost" className="pl-0 transition-all text-primary" data-testid="button-back-lobby">
-            <ArrowLeft className="w-4 h-4 mr-2" /> Back to Lobby
-          </Button>
-        </Link>
+        <div className="flex items-center justify-between">
+          <Link href="/">
+            <Button variant="ghost" className="pl-0 transition-all text-primary" data-testid="button-back-lobby">
+              <ArrowLeft className="w-4 h-4 mr-2" /> Back to Lobby
+            </Button>
+          </Link>
+          <FullscreenButton isFullscreen={isFullscreen} onToggle={toggle} />
+        </div>
         
         <div className="text-center mb-4">
           <h1 className="text-4xl md:text-6xl font-display font-bold text-primary mb-2" data-testid="text-wheel-title">Wheel of Fortune</h1>
@@ -438,6 +444,7 @@ export default function GameWheel() {
             )}
           </div>
         </div>
+      </div>
       </div>
     </ProtectedLayout>
   );

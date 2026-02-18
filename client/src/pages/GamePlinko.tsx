@@ -8,6 +8,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
 import { playSound } from "@/lib/sounds";
+import { useFullscreen, FullscreenButton } from "@/components/FullscreenToggle";
 
 export default function GamePlinko() {
   const [bet, setBet] = useState(500);
@@ -15,6 +16,7 @@ export default function GamePlinko() {
   const [ballPath, setBallPath] = useState<number[]>([]);
   const [multiplier, setMultiplier] = useState<number | null>(null);
   const { toast } = useToast();
+  const { isFullscreen, toggle, containerRef } = useFullscreen();
 
   const handlePlay = async () => {
     if (isDropping) return;
@@ -59,12 +61,16 @@ export default function GamePlinko() {
 
   return (
     <ProtectedLayout>
+      <div ref={containerRef} className={isFullscreen ? "bg-background p-4 overflow-auto h-screen" : ""}>
       <div className="space-y-6">
-        <Link href="/">
-          <Button variant="ghost" className="pl-0 hover:pl-2 transition-all text-[#D4AF37]">
-            <ArrowLeft className="w-4 h-4 mr-2" /> Back to Lobby
-          </Button>
-        </Link>
+        <div className="flex items-center justify-between">
+          <Link href="/">
+            <Button variant="ghost" className="pl-0 hover:pl-2 transition-all text-[#D4AF37]">
+              <ArrowLeft className="w-4 h-4 mr-2" /> Back to Lobby
+            </Button>
+          </Link>
+          <FullscreenButton isFullscreen={isFullscreen} onToggle={toggle} />
+        </div>
         
         <div className="text-center mb-8">
           <h1 className="text-5xl md:text-7xl font-display font-bold text-primary mb-2 drop-shadow-[0_0_30px_rgba(212,175,55,0.8)]">Plinko</h1>
@@ -101,7 +107,6 @@ export default function GamePlinko() {
 
           <div className="md:col-span-2 relative aspect-square bg-zinc-900/50 rounded-3xl border border-white/5 overflow-hidden flex flex-col items-center justify-center p-8">
             <div className="grid grid-rows-9 gap-4 w-full h-full relative">
-              {/* Simplified visual representation of peg board */}
               {Array.from({ length: 9 }).map((_, row) => (
                 <div key={row} className="flex justify-center gap-4">
                   {Array.from({ length: row + 3 }).map((_, i) => (
@@ -136,6 +141,7 @@ export default function GamePlinko() {
             </div>
           </div>
         </div>
+      </div>
       </div>
     </ProtectedLayout>
   );

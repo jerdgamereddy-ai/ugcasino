@@ -11,6 +11,7 @@ import { Coins, RotateCw } from "lucide-react";
 import { playSound } from "@/lib/sounds";
 import coinHeads from "@assets/coin_heads.jpg";
 import coinTails from "@assets/coin_tails.jpg";
+import { useFullscreen, FullscreenButton } from "@/components/FullscreenToggle";
 
 export default function CoinFlip() {
   const { data: user } = useUser();
@@ -19,6 +20,7 @@ export default function CoinFlip() {
   const [isFlipping, setIsFlipping] = useState(false);
   const [result, setResult] = useState<string | null>(null);
   const [lastWon, setLastWon] = useState<boolean | null>(null);
+  const { isFullscreen, toggle, containerRef } = useFullscreen();
 
   const play = async (choice: "heads" | "tails") => {
     if (bet < 500) return toast({ title: "Minimum bet is UGX 500", variant: "destructive" });
@@ -60,7 +62,12 @@ export default function CoinFlip() {
 
   return (
     <ProtectedLayout>
+      <div ref={containerRef} className={isFullscreen ? "bg-background p-4 overflow-auto h-screen" : ""}>
       <div className="max-w-5xl mx-auto space-y-8">
+        <div className="flex items-center justify-end">
+          <FullscreenButton isFullscreen={isFullscreen} onToggle={toggle} />
+        </div>
+
         <div className="text-center space-y-4">
           <h1 className="text-5xl md:text-8xl font-display font-bold text-white tracking-tighter drop-shadow-[0_0_30px_rgba(212,175,55,0.5)]">
             Double or <span className="text-primary">Nothing</span>
@@ -151,6 +158,7 @@ export default function CoinFlip() {
             </div>
           </Card>
         </div>
+      </div>
       </div>
     </ProtectedLayout>
   );

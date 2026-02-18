@@ -9,6 +9,7 @@ import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
 import { Input } from "@/components/ui/input";
 import { playSound } from "@/lib/sounds";
+import { useFullscreen, FullscreenButton } from "@/components/FullscreenToggle";
 
 const SUITS = ["♠", "♣", "♥", "♦"];
 const VALUES = ["A", "2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K"];
@@ -19,6 +20,7 @@ export default function GamePoker() {
   const [hand, setHand] = useState<{ value: string; suit: string; held: boolean }[]>([]);
   const [result, setResult] = useState<string>("");
   const { toast } = useToast();
+  const { isFullscreen, toggle, containerRef } = useFullscreen();
 
   const handleDeal = async () => {
     if (gameState === "playing") return;
@@ -83,12 +85,16 @@ export default function GamePoker() {
 
   return (
     <ProtectedLayout>
+      <div ref={containerRef} className={isFullscreen ? "bg-background p-4 overflow-auto h-screen" : ""}>
       <div className="space-y-6">
-        <Link href="/">
-          <Button variant="ghost" className="pl-0 hover:pl-2 transition-all text-[#D4AF37]">
-            <ArrowLeft className="w-4 h-4 mr-2" /> Back to Lobby
-          </Button>
-        </Link>
+        <div className="flex items-center justify-between">
+          <Link href="/">
+            <Button variant="ghost" className="pl-0 hover:pl-2 transition-all text-[#D4AF37]">
+              <ArrowLeft className="w-4 h-4 mr-2" /> Back to Lobby
+            </Button>
+          </Link>
+          <FullscreenButton isFullscreen={isFullscreen} onToggle={toggle} />
+        </div>
         
         <div className="text-center mb-8">
           <h1 className="text-5xl md:text-7xl font-display font-bold text-primary mb-2">Video Poker</h1>
@@ -156,6 +162,7 @@ export default function GamePoker() {
             </div>
           </Card>
         </div>
+      </div>
       </div>
     </ProtectedLayout>
   );

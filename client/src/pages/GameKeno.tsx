@@ -9,6 +9,7 @@ import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
 
 import { playSound } from "@/lib/sounds";
+import { useFullscreen, FullscreenButton } from "@/components/FullscreenToggle";
 
 export default function GameKeno() {
   const [bet, setBet] = useState(500);
@@ -16,6 +17,7 @@ export default function GameKeno() {
   const [isSpinning, setIsSpinning] = useState(false);
   const [results, setResults] = useState<number[]>([]);
   const { toast } = useToast();
+  const { isFullscreen, toggle, containerRef } = useFullscreen();
 
   const toggleNumber = (num: number) => {
     if (isSpinning) return;
@@ -70,12 +72,16 @@ export default function GameKeno() {
 
   return (
     <ProtectedLayout>
+      <div ref={containerRef} className={isFullscreen ? "bg-background p-4 overflow-auto h-screen" : ""}>
       <div className="space-y-6">
-        <Link href="/">
-          <Button variant="ghost" className="pl-0 hover:pl-2 transition-all text-[#D4AF37]">
-            <ArrowLeft className="w-4 h-4 mr-2" /> Back to Lobby
-          </Button>
-        </Link>
+        <div className="flex items-center justify-between">
+          <Link href="/">
+            <Button variant="ghost" className="pl-0 hover:pl-2 transition-all text-[#D4AF37]">
+              <ArrowLeft className="w-4 h-4 mr-2" /> Back to Lobby
+            </Button>
+          </Link>
+          <FullscreenButton isFullscreen={isFullscreen} onToggle={toggle} />
+        </div>
         
         <div className="text-center mb-8">
           <h1 className="text-5xl md:text-7xl font-display font-bold text-primary mb-2 drop-shadow-[0_0_30px_rgba(212,175,55,0.8)]">Luxury Keno</h1>
@@ -139,6 +145,7 @@ export default function GameKeno() {
             })}
           </div>
         </div>
+      </div>
       </div>
     </ProtectedLayout>
   );
