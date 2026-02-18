@@ -51,12 +51,12 @@ function FireworksCanvas() {
 
   const spawnFirework = useCallback((cx: number, cy: number) => {
     const color = FIREWORK_COLORS[Math.floor(Math.random() * FIREWORK_COLORS.length)];
-    const count = 30 + Math.floor(Math.random() * 30);
+    const count = 15 + Math.floor(Math.random() * 15);
     const newParticles: Particle[] = [];
     for (let i = 0; i < count; i++) {
       const angle = (Math.PI * 2 * i) / count + (Math.random() - 0.5) * 0.3;
       const speed = 1.5 + Math.random() * 3;
-      const maxLife = 60 + Math.floor(Math.random() * 40);
+      const maxLife = 50 + Math.floor(Math.random() * 30);
       newParticles.push({
         id: nextIdRef.current++,
         x: cx,
@@ -89,7 +89,7 @@ function FireworksCanvas() {
       const x = Math.random() * canvas.width;
       const y = Math.random() * canvas.height * 0.6;
       spawnFirework(x, y);
-    }, 1800);
+    }, 3000);
 
     const animate = () => {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -112,10 +112,10 @@ function FireworksCanvas() {
         ctx.arc(p.x, p.y, p.size * alpha, 0, Math.PI * 2);
         ctx.fill();
 
-        if (alpha > 0.3 && Math.random() < 0.3) {
-          ctx.globalAlpha = alpha * 0.3;
+        if (alpha > 0.5 && Math.random() < 0.15) {
+          ctx.globalAlpha = alpha * 0.2;
           ctx.beginPath();
-          ctx.arc(p.x - p.vx * 2, p.y - p.vy * 2, p.size * 0.5 * alpha, 0, Math.PI * 2);
+          ctx.arc(p.x - p.vx * 2, p.y - p.vy * 2, p.size * 0.4 * alpha, 0, Math.PI * 2);
           ctx.fill();
         }
 
@@ -152,7 +152,7 @@ function GrowingJackpot() {
   useEffect(() => {
     const interval = setInterval(() => {
       setAmount(prev => prev + Math.floor(Math.random() * 8000) + 2000);
-    }, 120);
+    }, 500);
     return () => clearInterval(interval);
   }, []);
 
@@ -426,6 +426,7 @@ export default function Login() {
       <motion.img
         src={casinoManImg}
         alt=""
+        loading="lazy"
         className="absolute bottom-0 left-0 w-24 sm:w-36 md:w-44 lg:w-64 xl:w-80 pointer-events-none z-[1] rounded-tr-3xl opacity-60 lg:opacity-100"
         initial={{ x: -200, opacity: 0 }}
         animate={{ 
@@ -447,6 +448,7 @@ export default function Login() {
       <motion.img
         src={rioDancerImg}
         alt=""
+        loading="lazy"
         className="absolute bottom-0 right-0 w-20 sm:w-32 md:w-40 lg:w-56 xl:w-72 pointer-events-none z-[1] rounded-tl-3xl opacity-60 lg:opacity-100"
         initial={{ x: 200, opacity: 0 }}
         animate={{ 
