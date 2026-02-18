@@ -668,7 +668,7 @@ export default function GameFishHunt() {
           <p className="text-muted-foreground text-xs uppercase tracking-widest">Shoot to catch. Bigger prey = bigger rewards.</p>
         </div>
 
-        <div className="max-w-7xl mx-auto grid lg:grid-cols-[1fr_280px] gap-4 items-start">
+        <div className="max-w-[1600px] mx-auto grid lg:grid-cols-[1fr_280px] gap-4 items-start">
           <div className="relative" style={{ perspective: "1200px" }}>
             <div style={{ transform: "rotateX(3deg)", transformStyle: "preserve-3d" }}>
               <div

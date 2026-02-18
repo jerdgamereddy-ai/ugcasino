@@ -101,7 +101,7 @@ export default function GamePoker() {
           <p className="text-white font-black text-xl uppercase tracking-widest">Jacks or Better.</p>
         </div>
 
-        <div className="max-w-6xl mx-auto space-y-8">
+        <div className="max-w-[1400px] mx-auto space-y-8">
           <div className="grid grid-cols-5 gap-4">
             <AnimatePresence mode="wait">
               {hand.length > 0 ? hand.map((card, i) => (

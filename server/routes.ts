@@ -558,6 +558,46 @@ export async function registerRoutes(
     }
   });
 
+  // === CLASSIC SLOTS GAME ===
+  app.post("/api/games/classic-slots/bet", async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    try {
+      const { totBet } = z.object({
+        bet: z.number().min(500),
+        totBet: z.number().min(500)
+      }).parse(req.body);
+
+      if (req.user.balance < totBet) return res.status(400).json({ message: "Insufficient balance" });
+
+      await storage.updateUserBalance(req.user.id, -totBet);
+      await storage.createTransaction({ userId: req.user.id, amount: -totBet, type: "bet", description: "Classic Slots spin" });
+
+      const user = await storage.getUser(req.user.id);
+      res.json({ balance: user?.balance ?? 0 });
+    } catch (err) {
+      res.status(500).json({ message: "Internal Server Error" });
+    }
+  });
+
+  app.post("/api/games/classic-slots/win", async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    try {
+      const { winAmount } = z.object({
+        winAmount: z.number().min(0).max(5000000)
+      }).parse(req.body);
+
+      if (winAmount > 0) {
+        await storage.updateUserBalance(req.user.id, winAmount);
+        await storage.createTransaction({ userId: req.user.id, amount: winAmount, type: "win", description: "Classic Slots win" });
+      }
+
+      const updatedUser = await storage.getUser(req.user.id);
+      res.json({ balance: updatedUser?.balance ?? 0 });
+    } catch (err) {
+      res.status(500).json({ message: "Internal Server Error" });
+    }
+  });
+
   // === DICE GAME ===
   app.post("/api/games/dice/roll", async (req, res) => {
     if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");

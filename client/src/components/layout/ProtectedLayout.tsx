@@ -164,8 +164,8 @@ export function ProtectedLayout({ children }: { children: React.ReactNode }) {
         </Sidebar>
         <main className="flex-1 overflow-auto bg-[#0a0a0a] relative">
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,rgba(212,175,55,0.05),transparent_50%)]" />
-          <div className="p-8 relative z-10">
-            <div className="max-w-7xl mx-auto">
+          <div className="p-3 md:p-5 lg:p-6 relative z-10">
+            <div className="max-w-[1800px] mx-auto">
               <div className="md:hidden mb-6">
                 <SidebarTrigger className="text-[#D4AF37]" />
               </div>

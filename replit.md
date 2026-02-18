@@ -45,6 +45,7 @@ Preferred communication style: Simple, everyday language.
 - **Slots**: 3-reel slot machine with emoji symbols, configurable win chance
 - **Roulette**: European-style with number, color, and parity betting options
 - **Fish Hunt**: Underwater arcade shooter with 10 sea creature types (small fish to Scorpion King), click-to-shoot mechanics, multipliers from x2 to x50, animated SVG fish with health bars, cannon aiming, bubble effects, and 3D perspective scene
+- **Classic Slots**: Imported HTML5 canvas 5-reel 3-row 20-payline slot machine embedded via iframe, uses jQuery/CreateJS/Howler, UGX currency with bet steps 500-5000, postMessage handshake for balance sync with parent React page, backend bet/win API endpoints
 - **House Edge**: Administrators can adjust win probabilities per game type through the Game Control panel
 
 ### Role-Based Access Control (4-tier hierarchy)

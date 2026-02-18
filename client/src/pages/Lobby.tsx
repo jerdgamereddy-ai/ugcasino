@@ -538,6 +538,16 @@ export default function Lobby() {
               title: "Fish Hunt",
               desc: "Hunt legendary sea creatures for massive multipliers!",
               id: "fishhunt"
+            },
+            {
+              href: "/classic-slots",
+              img: "https://images.unsplash.com/photo-1596838132731-3301c3fd4317?q=80&w=2070",
+              icon: Crown as LucideIcon,
+              tag: "NEW",
+              tagColor: "bg-amber-600",
+              title: "Classic Slots",
+              desc: "5-reel 20-payline classic slot machine with big multipliers!",
+              id: "classic-slots"
             }
           ].map((game, idx) => (
             <motion.div 

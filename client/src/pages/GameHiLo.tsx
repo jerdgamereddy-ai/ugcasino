@@ -26,7 +26,7 @@ export default function GameHiLo() {
             <p className="text-white font-black text-xl drop-shadow-[0_2px_10px_rgba(0,0,0,1)] uppercase tracking-widest">Predict if the next card will be higher or lower.</p>
         </div>
 
-        <div className="max-w-4xl mx-auto">
+        <div className="max-w-6xl mx-auto">
           <HiLoGame />
         </div>
       </div>

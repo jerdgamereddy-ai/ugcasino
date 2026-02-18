@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <title>Classic Slots - UG Casino</title>
+        <link rel="stylesheet" href="css/reset.css" type="text/css">
+        <link rel="stylesheet" href="css/main.css" type="text/css">
+        <link rel="stylesheet" href="css/orientation_utils.css" type="text/css">
+        <link rel="stylesheet" href="css/ios_fullscreen.css" type="text/css">
+        <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+
+        <meta name="viewport" content="width=device-width, user-scalable=no, initial-scale=1.0, minimum-scale=1.0, maximum-scale=1.0, minimal-ui" />
+        <meta name="msapplication-tap-highlight" content="no"/>
+
+        <script type="text/javascript" src="js/jquery-3.2.1.min.js"></script>
+        <script type="text/javascript" src="js/createjs-2015.11.26.min.js"></script>
+        <script type="text/javascript" src="js/howler.min.js"></script>
+        <script type="text/javascript" src="js/screenfull.js"></script>
+        <script type="text/javascript" src="js/platform.js"></script>
+        <script type="text/javascript" src="js/ios_fullscreen.js"></script>
+        <script type="text/javascript" src="js/ctl_utils.js"></script>
+        <script type="text/javascript" src="js/sprite_lib.js"></script>
+        <script type="text/javascript" src="js/settings.js"></script>
+        <script type="text/javascript" src="js/CSlotSettings.js"></script>
+        <script type="text/javascript" src="js/CLang.js"></script>
+        <script type="text/javascript" src="js/CPreloader.js"></script>
+        <script type="text/javascript" src="js/CMain.js"></script>
+        <script type="text/javascript" src="js/CTextButton.js"></script>
+        <script type="text/javascript" src="js/CGfxButton.js"></script>
+        <script type="text/javascript" src="js/CToggle.js"></script>
+        <script type="text/javascript" src="js/CBetBut.js"></script>
+        <script type="text/javascript" src="js/CMenu.js"></script>
+        <script type="text/javascript" src="js/CGame.js"></script>
+        <script type="text/javascript" src="js/CReelColumn.js"></script>
+        <script type="text/javascript" src="js/CInterface.js"></script>
+        <script type="text/javascript" src="js/CPayTablePanel.js"></script>
+        <script type="text/javascript" src="js/CStaticSymbolCell.js"></script>
+        <script type="text/javascript" src="js/CTweenController.js"></script>
+        <script type="text/javascript" src="js/CCreditsPanel.js"></script>
+        
+    </head>
+    <body ondragstart="return false;" ondrop="return false;" >
+        <div style="position: fixed; background-color: transparent; top: 0px; left: 0px; width: 100%; height: 100%"></div>
+          <script>
+            var _parentBalance = null;
+            var _gameInitialized = false;
+            
+            window.addEventListener('message', function(event) {
+                if (event.data && event.data.type === 'init_balance' && !_gameInitialized) {
+                    _parentBalance = event.data.balance;
+                    if (document.readyState === 'complete' || document.readyState === 'interactive') {
+                        initGame();
+                    }
+                }
+            });
+
+            function sendToParent(type, data) {
+                if (window.parent !== window) {
+                    window.parent.postMessage({ type: type, ...data }, '*');
+                }
+            }
+
+            function initGame() {
+                if (_gameInitialized || _parentBalance === null) return;
+                _gameInitialized = true;
+                     
+                     var oMain = new CMain({
+                                    win_occurrence:30,
+                                    slot_cash: 500000,
+                                    min_reel_loop:2,
+                                    reel_delay: 6,
+                                    time_show_win:2000,
+                                    time_show_all_wins: 2000,
+                                    money: _parentBalance,
+                                    paytable_symbol_1: [0,0,100,150,200],
+                                    paytable_symbol_2: [0,0,50,100,150],
+                                    paytable_symbol_3: [0,10,25,50,100],
+                                    paytable_symbol_4: [0,10,25,50,100],
+                                    paytable_symbol_5: [0,5,15,25,50],
+                                    paytable_symbol_6: [0,2,10,20,35],
+                                    paytable_symbol_7: [0,1,5,10,15],
+                                    fullscreen:true,
+                                    check_orientation:true,
+                                    show_credits:false,
+                                    ad_show_counter:999
+                                });
+
+                    $(oMain).on("start_session", function (evt) {
+                    });
+
+                    $(oMain).on("end_session", function (evt) {
+                        sendToParent('game_exit', {});
+                    });
+                    
+                    $(oMain).on("bet_placed", function (evt, oBetInfo) {
+                        sendToParent('bet_placed', {
+                            bet: oBetInfo.bet,
+                            tot_bet: oBetInfo.tot_bet
+                        });
+                    });
+                
+                    $(oMain).on("save_score", function (evt, iMoney) {
+                        sendToParent('save_score', { money: iMoney });
+                    });
+                    
+                    $(oMain).on("show_preroll_ad", function (evt) {
+                    });
+                    
+                    $(oMain).on("show_interlevel_ad", function (evt) {
+                    });
+
+                    $(oMain).on("share_event", function(evt, iScore) {
+                    });
+                     
+                    if(isIOS()){
+                        setTimeout(function(){sizeHandler();},200);
+                    }else{
+                        sizeHandler();
+                    }
+            }
+
+            $(document).ready(function(){
+                sendToParent('game_ready', {});
+                if (_parentBalance !== null && !_gameInitialized) {
+                    initGame();
+                }
+           });
+
+        </script>
+        <div class="check-fonts">
+            <p class="check-font-1">test 1</p>
+        </div> 
+        
+        <canvas id="canvas" class='ani_hack' width="1500" height="640"> </canvas>
+        <div data-orientation="landscape" class="orientation-msg-container"><p class="orientation-msg-text">Please rotate your device</p></div>
+        <div id="block_game" style="position: fixed; background-color: transparent; top: 0px; left: 0px; width: 100%; height: 100%; display:none"></div>
+    </body>
+</html>
