@@ -490,7 +490,7 @@ export async function registerRoutes(
     if (!req.isAuthenticated() || req.user.role === 'user') return res.status(403).send("Forbidden");
     
     let settings = await storage.getAllGameSettings();
-    const gameTypes = ["slots", "roulette", "dice", "hilo", "coinflip", "plinko", "mines", "wheel", "poker", "keno", "fishhunt"] as const;
+    const gameTypes = ["slots", "roulette", "dice", "hilo", "coinflip", "plinko", "mines", "wheel", "poker", "keno", "fishhunt", "classic-slots"] as const;
     const existingTypes = settings.map(s => s.gameType);
     
     for (const type of gameTypes) {
@@ -509,7 +509,7 @@ export async function registerRoutes(
     
     try {
       const { gameType, winChance } = z.object({
-        gameType: z.enum(["slots", "roulette", "dice", "hilo", "coinflip", "plinko", "mines", "wheel", "poker", "keno", "fishhunt"]),
+        gameType: z.enum(["slots", "roulette", "dice", "hilo", "coinflip", "plinko", "mines", "wheel", "poker", "keno", "fishhunt", "classic-slots"]),
         winChance: z.number().min(0).max(100)
       }).parse(req.body);
       
@@ -559,6 +559,17 @@ export async function registerRoutes(
   });
 
   // === CLASSIC SLOTS GAME ===
+  app.get("/api/games/classic-slots/settings", async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    try {
+      const settings = await storage.getGameSettings("classic-slots");
+      const winChance = settings?.winChance ?? 0.3;
+      res.json({ winOccurrence: Math.round(winChance * 100) });
+    } catch (err) {
+      res.status(500).json({ message: "Internal Server Error" });
+    }
+  });
+
   app.post("/api/games/classic-slots/bet", async (req, res) => {
     if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
     try {

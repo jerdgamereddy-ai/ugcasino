@@ -18,6 +18,10 @@ export default function GameClassicSlots() {
     queryKey: ["/api/user"],
   });
 
+  const { data: gameSettings } = useQuery<{ winOccurrence: number }>({
+    queryKey: ["/api/games/classic-slots/settings"],
+  });
+
   const betMutation = useMutation({
     mutationFn: async (data: { bet: number; totBet: number }) => {
       const res = await apiRequest("POST", "/api/games/classic-slots/bet", data);
@@ -39,14 +43,14 @@ export default function GameClassicSlots() {
   });
 
   const sendBalanceToIframe = useCallback(() => {
-    if (user && iframeRef.current?.contentWindow && gameReady && !balanceSentRef.current) {
+    if (user && gameSettings && iframeRef.current?.contentWindow && gameReady && !balanceSentRef.current) {
       iframeRef.current.contentWindow.postMessage(
-        { type: "init_balance", balance: user.balance },
+        { type: "init_balance", balance: user.balance, winOccurrence: gameSettings.winOccurrence },
         "*"
       );
       balanceSentRef.current = true;
     }
-  }, [user, gameReady]);
+  }, [user, gameReady, gameSettings]);
 
   const lastBetRef = useRef(0);
 

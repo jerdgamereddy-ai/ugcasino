@@ -44,9 +44,14 @@
             var _parentBalance = null;
             var _gameInitialized = false;
             
+            var _winOccurrence = 30;
+            
             window.addEventListener('message', function(event) {
                 if (event.data && event.data.type === 'init_balance' && !_gameInitialized) {
                     _parentBalance = event.data.balance;
+                    if (typeof event.data.winOccurrence === 'number') {
+                        _winOccurrence = event.data.winOccurrence;
+                    }
                     if (document.readyState === 'complete' || document.readyState === 'interactive') {
                         initGame();
                     }
@@ -64,7 +69,7 @@
                 _gameInitialized = true;
                      
                      var oMain = new CMain({
-                                    win_occurrence:30,
+                                    win_occurrence:_winOccurrence,
                                     slot_cash: 500000,
                                     min_reel_loop:2,
                                     reel_delay: 6,
