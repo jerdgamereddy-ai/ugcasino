@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
+import { useQuery } from "@tanstack/react-query";
 import { motion, AnimatePresence } from "framer-motion";
 import { Coins, RotateCw } from "lucide-react";
 import { playSound } from "@/lib/sounds";
@@ -16,6 +17,10 @@ import { useFullscreen, FullscreenButton } from "@/components/FullscreenToggle";
 export default function CoinFlip() {
   const { data: user } = useUser();
   const { toast } = useToast();
+  const { data: coinSettings } = useQuery<{ payoutMultiplier: number }>({
+    queryKey: ["/api/games/coinflip/settings"],
+  });
+  const payoutMultiplier = coinSettings?.payoutMultiplier ?? 1.95;
   const [bet, setBet] = useState(500);
   const [isFlipping, setIsFlipping] = useState(false);
   const [result, setResult] = useState<string | null>(null);
@@ -154,7 +159,7 @@ export default function CoinFlip() {
             </div>
 
             <div className="pt-4 text-center">
-              <p className="text-xs text-muted-foreground uppercase tracking-widest">Payout: 1.95x</p>
+              <p className="text-xs text-muted-foreground uppercase tracking-widest">Payout: {payoutMultiplier}x</p>
             </div>
           </Card>
         </div>

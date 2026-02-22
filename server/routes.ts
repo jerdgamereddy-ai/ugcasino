@@ -520,16 +520,16 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/games/settings/min-bet", async (req, res) => {
+  app.post("/api/games/settings/payout-multiplier", async (req, res) => {
     if (!req.isAuthenticated() || req.user.role !== 'admin') return res.status(403).send("Forbidden");
     
     try {
-      const { gameType, minBet } = z.object({
-        gameType: z.enum(["fishhunt", "classic-slots"]),
-        minBet: z.number().min(100).max(100000)
+      const { gameType, payoutMultiplier } = z.object({
+        gameType: z.enum(["coinflip"]),
+        payoutMultiplier: z.number().min(1.01).max(10)
       }).parse(req.body);
       
-      const settings = await storage.updateGameMinBet(gameType as any, minBet, req.user.id);
+      const settings = await storage.updateGamePayoutMultiplier(gameType as any, payoutMultiplier, req.user.id);
       res.json(settings);
     } catch (err) {
       res.status(400).json({ message: "Invalid input" });
@@ -580,8 +580,7 @@ export async function registerRoutes(
     try {
       const settings = await storage.getGameSettings("classic-slots");
       const winChance = settings?.winChance ?? 0.3;
-      const minBet = settings?.minBet ?? 500;
-      res.json({ winOccurrence: Math.round(winChance * 100), minBet });
+      res.json({ winOccurrence: Math.round(winChance * 100) });
     } catch (err) {
       res.status(500).json({ message: "Internal Server Error" });
     }
@@ -590,15 +589,11 @@ export async function registerRoutes(
   app.post("/api/games/classic-slots/bet", async (req, res) => {
     if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
     try {
-      const settings = await storage.getGameSettings("classic-slots");
-      const minBet = settings?.minBet ?? 500;
-
       const { totBet } = z.object({
         bet: z.number().min(1),
         totBet: z.number().min(1)
       }).parse(req.body);
 
-      if (totBet < minBet) return res.status(400).json({ message: `Minimum bet is ${minBet.toLocaleString()} UGX` });
       if (req.user.balance < totBet) return res.status(400).json({ message: "Insufficient balance" });
 
       await storage.updateUserBalance(req.user.id, -totBet);
@@ -663,6 +658,17 @@ export async function registerRoutes(
   });
 
   // === COIN FLIP GAME ===
+  app.get("/api/games/coinflip/settings", async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    try {
+      const settings = await storage.getGameSettings("coinflip");
+      const payoutMultiplier = settings?.payoutMultiplier ?? 1.95;
+      res.json({ payoutMultiplier });
+    } catch (err) {
+      res.status(500).json({ message: "Internal Server Error" });
+    }
+  });
+
   app.post("/api/games/coinflip/play", async (req, res) => {
     if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
     try {
@@ -682,7 +688,8 @@ export async function registerRoutes(
       const won = Math.random() < winChance;
       const result = won ? choice : (choice === "heads" ? "tails" : "heads");
       
-      const payout = won ? bet * 1.95 : 0;
+      const multiplier = settings?.payoutMultiplier ?? 1.95;
+      const payout = won ? bet * multiplier : 0;
       const user = won ? await storage.updateUserBalance(req.user.id, Math.floor(payout)) : await storage.getUser(req.user.id);
       if (won) await storage.createTransaction({ userId: req.user.id, amount: Math.floor(payout), type: "win", description: "Coin Flip win" });
 
@@ -892,33 +899,17 @@ export async function registerRoutes(
   });
 
   // === FISH HUNT GAME ===
-  app.get("/api/games/fishhunt/settings", async (req, res) => {
-    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
-    try {
-      const settings = await storage.getGameSettings("fishhunt");
-      const minBet = settings?.minBet ?? 500;
-      res.json({ minBet });
-    } catch (err) {
-      res.status(500).json({ message: "Internal Server Error" });
-    }
-  });
-
   app.post("/api/games/fishhunt/shoot", async (req, res) => {
     if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
 
     try {
       const settings = await storage.getGameSettings("fishhunt");
       const winChance = settings?.winChance ?? 0.45;
-      const minBet = settings?.minBet ?? 500;
 
       const { bet, fishType } = z.object({
         bet: z.number().min(1),
         fishType: z.string()
       }).parse(req.body);
-
-      if (bet < minBet) {
-        return res.status(400).json({ message: `Minimum bet is ${minBet.toLocaleString()} UGX` });
-      }
 
       if (req.user.balance < bet) {
         return res.status(400).json({ message: "Insufficient balance" });

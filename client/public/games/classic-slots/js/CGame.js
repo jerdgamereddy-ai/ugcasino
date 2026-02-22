@@ -373,7 +373,7 @@ function CGame(oData){
     };
     
     this.changeCoinBet = function(){
-        var aBetSteps = [500, 1000, 2000, 3000, 5000];
+        var aBetSteps = [100, 200, 500, 1000, 2000, 3000, 5000];
         var iCurIndex = aBetSteps.indexOf(_iCurBet);
         var iNextIndex = (iCurIndex + 1) % aBetSteps.length;
         var iNewBet = aBetSteps[iNextIndex];
@@ -566,9 +566,6 @@ function CGame(oData){
     TOTAL_MONEY = oData.money;
     SLOT_CASH = oData.slot_cash;
     _iAdsShowingCont = oData.ad_show_counter;
-    if (typeof oData.min_bet === 'number') {
-        MIN_BET = oData.min_bet;
-    }
     
     this._init();
 }

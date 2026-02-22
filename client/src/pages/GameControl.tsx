@@ -9,13 +9,13 @@ import { queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, Settings2, ChevronUp, ChevronDown } from "lucide-react";
 
-const MIN_BET_GAMES = ["fishhunt", "classic-slots"];
+const ACTIVE_GAMES = ["slots", "roulette", "dice", "hilo", "coinflip", "plinko", "wheel", "fishhunt", "classic-slots"];
 
 function GameSettingForm({ setting }: { setting: GameSetting }) {
   const { toast } = useToast();
   const [pct, setPct] = useState(Math.round(setting.winChance * 100));
-  const [minBetVal, setMinBetVal] = useState(setting.minBet ?? 500);
-  const showMinBet = MIN_BET_GAMES.includes(setting.gameType);
+  const [multiplierVal, setMultiplierVal] = useState(setting.payoutMultiplier ?? 1.95);
+  const showMultiplier = setting.gameType === "coinflip";
 
   const mutation = useMutation({
     mutationFn: async (val: number) => {
@@ -33,19 +33,19 @@ function GameSettingForm({ setting }: { setting: GameSetting }) {
     },
   });
 
-  const minBetMutation = useMutation({
+  const multiplierMutation = useMutation({
     mutationFn: async (val: number) => {
-      const res = await fetch("/api/games/settings/min-bet", {
+      const res = await fetch("/api/games/settings/payout-multiplier", {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ gameType: setting.gameType, minBet: val }),
+        body: JSON.stringify({ gameType: setting.gameType, payoutMultiplier: val }),
       });
       if (!res.ok) throw new Error("Failed to update");
       return res.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [api.games.settings.get.path] });
-      toast({ title: "Min Bet Updated", description: `Minimum bet for ${setting.gameType} set to ${minBetVal.toLocaleString()} UGX.` });
+      toast({ title: "Payout Updated", description: `Coinflip payout multiplier set to ${multiplierVal}x.` });
     },
   });
 
@@ -77,30 +77,31 @@ function GameSettingForm({ setting }: { setting: GameSetting }) {
           </Button>
         </div>
 
-        {showMinBet && (
+        {showMultiplier && (
           <div>
-            <label className="text-sm font-medium">Minimum Bet (UGX)</label>
+            <label className="text-sm font-medium">Payout Multiplier</label>
             <div className="flex items-center gap-2 mt-2">
               <Input
                 type="number"
-                min={100}
-                max={100000}
-                step={100}
-                value={minBetVal}
-                onChange={(e) => setMinBetVal(Math.max(100, parseInt(e.target.value) || 100))}
+                min={1.01}
+                max={10}
+                step={0.05}
+                value={multiplierVal}
+                onChange={(e) => setMultiplierVal(Math.max(1.01, parseFloat(e.target.value) || 1.01))}
                 className="font-mono text-lg font-bold text-center"
-                data-testid={`input-minbet-${setting.gameType}`}
+                data-testid={`input-multiplier-${setting.gameType}`}
               />
+              <span className="text-sm font-bold text-muted-foreground">x</span>
             </div>
             <Button
               className="w-full mt-3"
               size="sm"
               variant="secondary"
-              onClick={() => minBetMutation.mutate(minBetVal)}
-              disabled={minBetMutation.isPending}
-              data-testid={`button-save-minbet-${setting.gameType}`}
+              onClick={() => multiplierMutation.mutate(multiplierVal)}
+              disabled={multiplierMutation.isPending}
+              data-testid={`button-save-multiplier-${setting.gameType}`}
             >
-              {minBetMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save Min Bet"}
+              {multiplierMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save Payout Multiplier"}
             </Button>
           </div>
         )}
@@ -122,6 +123,8 @@ export default function GameControl() {
     );
   }
 
+  const activeSettings = settings?.filter(s => ACTIVE_GAMES.includes(s.gameType));
+
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-2">
@@ -130,7 +133,7 @@ export default function GameControl() {
       </div>
       
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {settings?.map((s) => (
+        {activeSettings?.map((s) => (
           <GameSettingForm key={s.id} setting={s} />
         ))}
       </div>

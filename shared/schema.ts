@@ -52,6 +52,7 @@ export const gameSettings = pgTable("game_settings", {
   gameType: text("game_type", { enum: ["slots", "roulette", "dice", "hilo", "coinflip", "plinko", "wheel", "fishhunt", "classic-slots"] }).notNull().unique(),
   winChance: doublePrecision("win_chance").default(0.3).notNull(),
   minBet: integer("min_bet").default(500).notNull(),
+  payoutMultiplier: doublePrecision("payout_multiplier").default(1.95).notNull(),
   updatedBy: integer("updated_by").notNull(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });

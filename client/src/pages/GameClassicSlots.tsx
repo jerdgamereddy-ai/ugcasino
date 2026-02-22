@@ -18,7 +18,7 @@ export default function GameClassicSlots() {
     queryKey: ["/api/user"],
   });
 
-  const { data: gameSettings } = useQuery<{ winOccurrence: number; minBet: number }>({
+  const { data: gameSettings } = useQuery<{ winOccurrence: number }>({
     queryKey: ["/api/games/classic-slots/settings"],
   });
 
@@ -53,7 +53,7 @@ export default function GameClassicSlots() {
   const sendBalanceToIframe = useCallback(() => {
     if (user && gameSettings && iframeRef.current?.contentWindow && gameReady && !balanceSentRef.current) {
       iframeRef.current.contentWindow.postMessage(
-        { type: "init_balance", balance: user.balance, winOccurrence: gameSettings.winOccurrence, minBet: gameSettings.minBet },
+        { type: "init_balance", balance: user.balance, winOccurrence: gameSettings.winOccurrence },
         "*"
       );
       balanceSentRef.current = true;
