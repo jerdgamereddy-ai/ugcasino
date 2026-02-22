@@ -18,10 +18,7 @@ import GameDice from "@/pages/GameDice";
 import GameHiLo from "@/pages/GameHiLo";
 import CoinFlip from "@/pages/CoinFlip";
 import GamePlinko from "@/pages/GamePlinko";
-import GameMines from "@/pages/GameMines";
 import GameWheel from "@/pages/GameWheel";
-import GamePoker from "@/pages/GamePoker";
-import GameKeno from "@/pages/GameKeno";
 import GameFishHunt from "@/pages/GameFishHunt";
 import GameClassicSlots from "@/pages/GameClassicSlots";
 import Reports from "@/pages/Reports";
@@ -45,10 +42,7 @@ function Router() {
       <Route path="/hilo" component={GameHiLo} />
       <Route path="/coinflip" component={CoinFlip} />
       <Route path="/plinko" component={GamePlinko} />
-      <Route path="/mines" component={GameMines} />
       <Route path="/wheel" component={GameWheel} />
-      <Route path="/poker" component={GamePoker} />
-      <Route path="/keno" component={GameKeno} />
       <Route path="/fishhunt" component={GameFishHunt} />
       <Route path="/classic-slots" component={GameClassicSlots} />
       <Route path="/reports" component={Reports} />

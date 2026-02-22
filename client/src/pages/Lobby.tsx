@@ -3,7 +3,7 @@ import { useUser } from "@/hooks/use-auth";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Link } from "wouter";
-import { Coins, Trophy, CreditCard, ChevronRight, Club, Dice5, Dices, Banknote, Sparkles, Zap, Star, Gem, RotateCcw, LucideIcon, Club as Cards, Target, Crown, Diamond, Fish } from "lucide-react";
+import { Coins, Trophy, CreditCard, ChevronRight, Club, Dice5, Dices, Banknote, Sparkles, Zap, Star, RotateCcw, LucideIcon, Crown, Diamond, Fish } from "lucide-react";
 import { useRedeemVoucher } from "@/hooks/use-vouchers";
 import { useState, useEffect, useRef } from "react";
 import { Input } from "@/components/ui/input";
@@ -490,16 +490,6 @@ export default function Lobby() {
               id: "plinko"
             },
             {
-              href: "/mines",
-              img: "https://images.unsplash.com/photo-1596838132731-3301c3fd4317?q=80&w=2070",
-              icon: Gem,
-              tag: "Strategy",
-              tagColor: "bg-red-600",
-              title: "Diamond Mines",
-              desc: "Avoid the mines and find the hidden gems.",
-              id: "mines"
-            },
-            {
               href: "/wheel",
               img: "https://images.unsplash.com/photo-1605870445919-838d190e8e1b?q=80&w=2072",
               icon: RotateCcw as LucideIcon,
@@ -508,26 +498,6 @@ export default function Lobby() {
               title: "Wheel of Fortune",
               desc: "Spin the luxury wheel for instant wins.",
               id: "wheel"
-            },
-            {
-              href: "/poker",
-              img: "https://images.unsplash.com/photo-1511193311914-0346f16efe90?q=80&w=2073",
-              icon: Cards as LucideIcon,
-              tag: "Hot",
-              tagColor: "bg-red-500",
-              title: "Video Poker",
-              desc: "Jacks or better for big payouts.",
-              id: "poker"
-            },
-            {
-              href: "/keno",
-              img: "https://images.unsplash.com/photo-1596838132731-3301c3fd4317?q=80&w=2070",
-              icon: Target as LucideIcon,
-              tag: "Classic",
-              tagColor: "bg-blue-600",
-              title: "Luxury Keno",
-              desc: "Select your numbers and win the luxury jackpot.",
-              id: "keno"
             },
             {
               href: "/fishhunt",

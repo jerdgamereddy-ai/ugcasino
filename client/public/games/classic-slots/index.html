@@ -45,12 +45,16 @@
             var _gameInitialized = false;
             
             var _winOccurrence = 30;
+            var _minBet = 500;
             
             window.addEventListener('message', function(event) {
                 if (event.data && event.data.type === 'init_balance' && !_gameInitialized) {
                     _parentBalance = event.data.balance;
                     if (typeof event.data.winOccurrence === 'number') {
                         _winOccurrence = event.data.winOccurrence;
+                    }
+                    if (typeof event.data.minBet === 'number') {
+                        _minBet = event.data.minBet;
                     }
                     if (document.readyState === 'complete' || document.readyState === 'interactive') {
                         initGame();
@@ -76,6 +80,7 @@
                                     time_show_win:2000,
                                     time_show_all_wins: 2000,
                                     money: _parentBalance,
+                                    min_bet: _minBet,
                                     paytable_symbol_1: [0,0,100,150,200],
                                     paytable_symbol_2: [0,0,50,100,150],
                                     paytable_symbol_3: [0,10,25,50,100],

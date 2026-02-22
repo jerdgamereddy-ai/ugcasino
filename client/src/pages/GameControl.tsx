@@ -2,15 +2,20 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { type GameSetting } from "@shared/schema";
 import { api } from "@shared/routes";
 import { queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, Settings2, ChevronUp, ChevronDown } from "lucide-react";
 
+const MIN_BET_GAMES = ["fishhunt", "classic-slots"];
+
 function GameSettingForm({ setting }: { setting: GameSetting }) {
   const { toast } = useToast();
   const [pct, setPct] = useState(Math.round(setting.winChance * 100));
+  const [minBetVal, setMinBetVal] = useState(setting.minBet ?? 500);
+  const showMinBet = MIN_BET_GAMES.includes(setting.gameType);
 
   const mutation = useMutation({
     mutationFn: async (val: number) => {
@@ -28,6 +33,22 @@ function GameSettingForm({ setting }: { setting: GameSetting }) {
     },
   });
 
+  const minBetMutation = useMutation({
+    mutationFn: async (val: number) => {
+      const res = await fetch("/api/games/settings/min-bet", {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ gameType: setting.gameType, minBet: val }),
+      });
+      if (!res.ok) throw new Error("Failed to update");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [api.games.settings.get.path] });
+      toast({ title: "Min Bet Updated", description: `Minimum bet for ${setting.gameType} set to ${minBetVal.toLocaleString()} UGX.` });
+    },
+  });
+
   const increment = () => setPct(p => Math.min(100, p + 1));
   const decrement = () => setPct(p => Math.max(0, p - 1));
 
@@ -37,22 +58,52 @@ function GameSettingForm({ setting }: { setting: GameSetting }) {
         <CardTitle className="capitalize">{setting.gameType} Settings</CardTitle>
         <CardDescription>Adjust the house edge by setting player win probability.</CardDescription>
       </CardHeader>
-      <CardContent>
-        <label className="text-sm font-medium">Win Probability</label>
-        <div className="flex items-center gap-2 mt-2">
-          <Button size="icon" variant="outline" onClick={decrement} disabled={pct <= 0 || mutation.isPending} data-testid={`button-decrease-${setting.gameType}`}>
-            <ChevronDown className="h-4 w-4" />
-          </Button>
-          <div className="flex-1 text-center py-2 rounded-md border font-mono text-lg font-bold" data-testid={`display-winchance-${setting.gameType}`}>
-            {pct}%
+      <CardContent className="space-y-4">
+        <div>
+          <label className="text-sm font-medium">Win Probability</label>
+          <div className="flex items-center gap-2 mt-2">
+            <Button size="icon" variant="outline" onClick={decrement} disabled={pct <= 0 || mutation.isPending} data-testid={`button-decrease-${setting.gameType}`}>
+              <ChevronDown className="h-4 w-4" />
+            </Button>
+            <div className="flex-1 text-center py-2 rounded-md border font-mono text-lg font-bold" data-testid={`display-winchance-${setting.gameType}`}>
+              {pct}%
+            </div>
+            <Button size="icon" variant="outline" onClick={increment} disabled={pct >= 100 || mutation.isPending} data-testid={`button-increase-${setting.gameType}`}>
+              <ChevronUp className="h-4 w-4" />
+            </Button>
           </div>
-          <Button size="icon" variant="outline" onClick={increment} disabled={pct >= 100 || mutation.isPending} data-testid={`button-increase-${setting.gameType}`}>
-            <ChevronUp className="h-4 w-4" />
+          <Button className="w-full mt-3" size="sm" onClick={() => mutation.mutate(pct)} disabled={mutation.isPending} data-testid={`button-save-${setting.gameType}`}>
+            {mutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save Win Chance"}
           </Button>
         </div>
-        <Button className="w-full mt-3" size="sm" onClick={() => mutation.mutate(pct)} disabled={mutation.isPending} data-testid={`button-save-${setting.gameType}`}>
-          {mutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save"}
-        </Button>
+
+        {showMinBet && (
+          <div>
+            <label className="text-sm font-medium">Minimum Bet (UGX)</label>
+            <div className="flex items-center gap-2 mt-2">
+              <Input
+                type="number"
+                min={100}
+                max={100000}
+                step={100}
+                value={minBetVal}
+                onChange={(e) => setMinBetVal(Math.max(100, parseInt(e.target.value) || 100))}
+                className="font-mono text-lg font-bold text-center"
+                data-testid={`input-minbet-${setting.gameType}`}
+              />
+            </div>
+            <Button
+              className="w-full mt-3"
+              size="sm"
+              variant="secondary"
+              onClick={() => minBetMutation.mutate(minBetVal)}
+              disabled={minBetMutation.isPending}
+              data-testid={`button-save-minbet-${setting.gameType}`}
+            >
+              {minBetMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save Min Bet"}
+            </Button>
+          </div>
+        )}
       </CardContent>
     </Card>
   );

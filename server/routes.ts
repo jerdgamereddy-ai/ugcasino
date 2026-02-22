@@ -490,12 +490,12 @@ export async function registerRoutes(
     if (!req.isAuthenticated() || req.user.role === 'user') return res.status(403).send("Forbidden");
     
     let settings = await storage.getAllGameSettings();
-    const gameTypes = ["slots", "roulette", "dice", "hilo", "coinflip", "plinko", "mines", "wheel", "poker", "keno", "fishhunt", "classic-slots"] as const;
+    const gameTypes = ["slots", "roulette", "dice", "hilo", "coinflip", "plinko", "wheel", "fishhunt", "classic-slots"] as const;
     const existingTypes = settings.map(s => s.gameType);
     
     for (const type of gameTypes) {
       if (!existingTypes.includes(type)) {
-        const defaultChance = (type === "dice" || type === "hilo" || type === "coinflip" || type === "plinko" || type === "mines" || type === "wheel" || type === "poker" || type === "keno") ? 0.48 : 0.3;
+        const defaultChance = (type === "dice" || type === "hilo" || type === "coinflip" || type === "plinko" || type === "wheel") ? 0.48 : 0.3;
         const newSetting = await storage.updateGameSettings(type as any, defaultChance, req.user.id);
         settings.push(newSetting);
       }
@@ -509,11 +509,27 @@ export async function registerRoutes(
     
     try {
       const { gameType, winChance } = z.object({
-        gameType: z.enum(["slots", "roulette", "dice", "hilo", "coinflip", "plinko", "mines", "wheel", "poker", "keno", "fishhunt", "classic-slots"]),
+        gameType: z.enum(["slots", "roulette", "dice", "hilo", "coinflip", "plinko", "wheel", "fishhunt", "classic-slots"]),
         winChance: z.number().min(0).max(100)
       }).parse(req.body);
       
       const settings = await storage.updateGameSettings(gameType as any, winChance / 100, req.user.id);
+      res.json(settings);
+    } catch (err) {
+      res.status(400).json({ message: "Invalid input" });
+    }
+  });
+
+  app.post("/api/games/settings/min-bet", async (req, res) => {
+    if (!req.isAuthenticated() || req.user.role !== 'admin') return res.status(403).send("Forbidden");
+    
+    try {
+      const { gameType, minBet } = z.object({
+        gameType: z.enum(["fishhunt", "classic-slots"]),
+        minBet: z.number().min(100).max(100000)
+      }).parse(req.body);
+      
+      const settings = await storage.updateGameMinBet(gameType as any, minBet, req.user.id);
       res.json(settings);
     } catch (err) {
       res.status(400).json({ message: "Invalid input" });
@@ -564,7 +580,8 @@ export async function registerRoutes(
     try {
       const settings = await storage.getGameSettings("classic-slots");
       const winChance = settings?.winChance ?? 0.3;
-      res.json({ winOccurrence: Math.round(winChance * 100) });
+      const minBet = settings?.minBet ?? 500;
+      res.json({ winOccurrence: Math.round(winChance * 100), minBet });
     } catch (err) {
       res.status(500).json({ message: "Internal Server Error" });
     }
@@ -573,11 +590,15 @@ export async function registerRoutes(
   app.post("/api/games/classic-slots/bet", async (req, res) => {
     if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
     try {
+      const settings = await storage.getGameSettings("classic-slots");
+      const minBet = settings?.minBet ?? 500;
+
       const { totBet } = z.object({
-        bet: z.number().min(500),
-        totBet: z.number().min(500)
+        bet: z.number().min(1),
+        totBet: z.number().min(1)
       }).parse(req.body);
 
+      if (totBet < minBet) return res.status(400).json({ message: `Minimum bet is ${minBet.toLocaleString()} UGX` });
       if (req.user.balance < totBet) return res.status(400).json({ message: "Insufficient balance" });
 
       await storage.updateUserBalance(req.user.id, -totBet);
@@ -703,34 +724,6 @@ export async function registerRoutes(
     }
   });
 
-  // === MINES GAME ===
-  app.post("/api/games/mines/play", async (req, res) => {
-    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
-    try {
-      const { bet, minesCount, selectedCells } = z.object({ 
-        bet: z.number().min(500),
-        minesCount: z.number().min(1).max(24),
-        selectedCells: z.array(z.number())
-      }).parse(req.body);
-      
-      if (req.user.balance < bet) return res.status(400).json({ message: "Insufficient balance" });
-      const settings = await storage.getGameSettings("mines");
-      const winChance = settings?.winChance ?? 0.48;
-      
-      await storage.updateUserBalance(req.user.id, -bet);
-      await storage.createTransaction({ userId: req.user.id, amount: -bet, type: "bet", description: "Mines play" });
-      
-      const won = Math.random() < winChance;
-      const payout = won ? Math.floor(bet * (1 + (minesCount * selectedCells.length * 0.2))) : 0;
-      const user = won ? await storage.updateUserBalance(req.user.id, payout) : await storage.getUser(req.user.id);
-      if (won) await storage.createTransaction({ userId: req.user.id, amount: payout, type: "win", description: "Mines win" });
-      
-      res.json({ won, payout, balance: user?.balance ?? 0 });
-    } catch (err) {
-      res.status(500).json({ message: "Internal Server Error" });
-    }
-  });
-
   // === WHEEL GAME ===
   app.post("/api/games/wheel/play", async (req, res) => {
     if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
@@ -805,58 +798,6 @@ export async function registerRoutes(
     } catch (err) {
       res.status(500).json({ message: "Internal Server Error" });
     }
-  });
-
-  // === POKER GAME ===
-  app.post("/api/games/poker/deal", async (req, res) => {
-    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
-    try {
-      const { bet } = z.object({ bet: z.number().min(500) }).parse(req.body);
-      if (req.user.balance < bet) return res.status(400).json({ message: "Insufficient balance" });
-      await storage.updateUserBalance(req.user.id, -bet);
-      await storage.createTransaction({ userId: req.user.id, amount: -bet, type: "bet", description: "Poker deal" });
-      const suits = ["spades", "clubs", "hearts", "diamonds"];
-      const values = ["A", "2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K"];
-      const hand = Array.from({ length: 5 }).map(() => ({
-        value: values[Math.floor(Math.random() * values.length)],
-        suit: suits[Math.floor(Math.random() * suits.length)]
-      }));
-      res.json({ hand });
-    } catch (err) { res.status(500).send("Error"); }
-  });
-
-  app.post("/api/games/poker/draw", async (req, res) => {
-    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
-    try {
-      const { bet, holds, hand } = z.object({ 
-        bet: z.number(), 
-        holds: z.array(z.boolean()),
-        hand: z.array(z.object({ value: z.string(), suit: z.string() }))
-      }).parse(req.body);
-      
-      const settings = await storage.getGameSettings("poker");
-      const winChance = settings?.winChance ?? 0.3;
-      
-      const suits = ["spades", "clubs", "hearts", "diamonds"];
-      const values = ["A", "2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K"];
-      
-      const newHand = hand.map((card, i) => holds[i] ? card : {
-        value: values[Math.floor(Math.random() * values.length)],
-        suit: suits[Math.floor(Math.random() * suits.length)]
-      });
-
-      const won = Math.random() < winChance;
-      const payout = won ? bet * 2 : 0;
-      const result = won ? "JACKS OR BETTER" : "NO PAIR";
-      
-      if (won) {
-        await storage.updateUserBalance(req.user.id, payout);
-        await storage.createTransaction({ userId: req.user.id, amount: payout, type: "win", description: "Poker win" });
-      }
-      
-      const user = await storage.getUser(req.user.id);
-      res.json({ won, payout, balance: user?.balance, hand: newHand, result });
-    } catch (err) { res.status(500).send("Error"); }
   });
 
   app.post("/api/login/voucher", async (req, res) => {
@@ -950,91 +891,38 @@ export async function registerRoutes(
     res.json(vouchers);
   });
 
-  // === KENO GAME ===
-  app.post("/api/games/keno/play", async (req, res) => {
+  // === FISH HUNT GAME ===
+  app.get("/api/games/fishhunt/settings", async (req, res) => {
     if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
-    
     try {
-      const { bet, selectedNumbers } = z.object({
-        bet: z.number().min(500),
-        selectedNumbers: z.array(z.number()).min(1).max(10)
-      }).parse(req.body);
-
-      if (req.user.balance < bet) {
-        return res.status(400).json({ message: "Insufficient balance" });
-      }
-
-      const settings = await storage.getGameSettings("keno");
-      const winChance = settings?.winChance ?? 0.48;
-
-      const allNumbers = Array.from({ length: 80 }, (_, i) => i + 1);
-      const drawnNumbers: number[] = [];
-      
-      const availableNumbers = [...allNumbers];
-      for (let i = 0; i < 20; i++) {
-        const randomIndex = Math.floor(Math.random() * availableNumbers.length);
-        drawnNumbers.push(availableNumbers.splice(randomIndex, 1)[0]);
-      }
-
-      const hits = selectedNumbers.filter(num => drawnNumbers.includes(num)).length;
-      
-      const hitRatios: Record<number, Record<number, number>> = {
-        1: { 1: 3 },
-        2: { 1: 1, 2: 9 },
-        3: { 2: 2, 3: 16 },
-        4: { 2: 1, 3: 5, 4: 40 },
-        5: { 3: 3, 4: 15, 5: 100 },
-        10: { 5: 2, 6: 15, 7: 100, 8: 500, 9: 1000, 10: 5000 }
-      };
-
-      const count = selectedNumbers.length;
-      let multiplier = 0;
-      
-      const selectionKey = Object.keys(hitRatios)
-        .map(Number)
-        .sort((a, b) => b - a)
-        .find(k => k <= count) || 1;
-
-      multiplier = hitRatios[selectionKey][hits] || 0;
-
-      const isRiggedWin = Math.random() < winChance;
-      if (!isRiggedWin && multiplier > 1) {
-        multiplier = 0;
-      }
-
-      const won = multiplier > 0;
-      const payout = won ? Math.floor(bet * multiplier) : 0;
-
-      const user = await storage.updateUserBalance(req.user.id, payout - bet);
-      await storage.createTransaction({
-        userId: req.user.id,
-        amount: payout - bet,
-        type: won ? "win" : "bet",
-        description: `Keno: ${hits} hits on ${count} numbers`
-      });
-
-      res.json({ won, payout, drawnNumbers, hits, balance: user.balance });
+      const settings = await storage.getGameSettings("fishhunt");
+      const minBet = settings?.minBet ?? 500;
+      res.json({ minBet });
     } catch (err) {
       res.status(500).json({ message: "Internal Server Error" });
     }
   });
 
-  // === FISH HUNT GAME ===
   app.post("/api/games/fishhunt/shoot", async (req, res) => {
     if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
 
     try {
+      const settings = await storage.getGameSettings("fishhunt");
+      const winChance = settings?.winChance ?? 0.45;
+      const minBet = settings?.minBet ?? 500;
+
       const { bet, fishType } = z.object({
-        bet: z.number().min(500),
+        bet: z.number().min(1),
         fishType: z.string()
       }).parse(req.body);
+
+      if (bet < minBet) {
+        return res.status(400).json({ message: `Minimum bet is ${minBet.toLocaleString()} UGX` });
+      }
 
       if (req.user.balance < bet) {
         return res.status(400).json({ message: "Insufficient balance" });
       }
-
-      const settings = await storage.getGameSettings("fishhunt");
-      const winChance = settings?.winChance ?? 0.45;
 
       const FISH_MULTIPLIERS: Record<string, number> = {
         small_fish: 2,

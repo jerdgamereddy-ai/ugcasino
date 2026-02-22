@@ -18,17 +18,25 @@ export default function GameClassicSlots() {
     queryKey: ["/api/user"],
   });
 
-  const { data: gameSettings } = useQuery<{ winOccurrence: number }>({
+  const { data: gameSettings } = useQuery<{ winOccurrence: number; minBet: number }>({
     queryKey: ["/api/games/classic-slots/settings"],
   });
+
+  const postBetBalanceRef = useRef<number | null>(null);
+  const lastBetRef = useRef(0);
 
   const betMutation = useMutation({
     mutationFn: async (data: { bet: number; totBet: number }) => {
       const res = await apiRequest("POST", "/api/games/classic-slots/bet", data);
       return res.json();
     },
-    onSuccess: () => {
+    onSuccess: (data: { balance: number }) => {
+      postBetBalanceRef.current = data.balance;
       queryClient.invalidateQueries({ queryKey: ["/api/user"] });
+    },
+    onError: () => {
+      lastBetRef.current = 0;
+      postBetBalanceRef.current = null;
     },
   });
 
@@ -45,14 +53,12 @@ export default function GameClassicSlots() {
   const sendBalanceToIframe = useCallback(() => {
     if (user && gameSettings && iframeRef.current?.contentWindow && gameReady && !balanceSentRef.current) {
       iframeRef.current.contentWindow.postMessage(
-        { type: "init_balance", balance: user.balance, winOccurrence: gameSettings.winOccurrence },
+        { type: "init_balance", balance: user.balance, winOccurrence: gameSettings.winOccurrence, minBet: gameSettings.minBet },
         "*"
       );
       balanceSentRef.current = true;
     }
   }, [user, gameReady, gameSettings]);
-
-  const lastBetRef = useRef(0);
 
   const handleMessage = useCallback((event: MessageEvent) => {
     if (!event.data || !event.data.type) return;
@@ -63,24 +69,39 @@ export default function GameClassicSlots() {
         break;
       case "bet_placed":
         lastBetRef.current = event.data.tot_bet;
+        postBetBalanceRef.current = null;
         betMutation.mutate({ bet: event.data.bet, totBet: event.data.tot_bet });
         break;
       case "save_score":
         if (lastBetRef.current > 0) {
-          const serverBalance = user?.balance ?? 0;
-          const expectedAfterBet = serverBalance - lastBetRef.current;
-          const winAmount = Math.max(0, event.data.money - expectedAfterBet);
-          if (winAmount > 0) {
-            winMutation.mutate({ winAmount });
-          }
-          lastBetRef.current = 0;
+          const iframeMoney = event.data.money;
+          let retries = 0;
+          const maxRetries = 50;
+
+          const tryCredit = () => {
+            if (postBetBalanceRef.current !== null) {
+              const winAmount = Math.max(0, iframeMoney - postBetBalanceRef.current);
+              if (winAmount > 0) {
+                winMutation.mutate({ winAmount });
+              }
+              lastBetRef.current = 0;
+              postBetBalanceRef.current = null;
+            } else if (retries < maxRetries) {
+              retries++;
+              setTimeout(tryCredit, 100);
+            } else {
+              lastBetRef.current = 0;
+              postBetBalanceRef.current = null;
+            }
+          };
+          tryCredit();
         }
         break;
       case "game_exit":
         navigate("/");
         break;
     }
-  }, [betMutation, winMutation, navigate, user]);
+  }, [betMutation, winMutation, navigate]);
 
   useEffect(() => {
     window.addEventListener("message", handleMessage);

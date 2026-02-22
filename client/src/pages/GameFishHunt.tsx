@@ -6,6 +6,7 @@ import { Link } from "wouter";
 import { useState, useRef, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
+import { useQuery } from "@tanstack/react-query";
 import { queryClient } from "@/lib/queryClient";
 import { playSound } from "@/lib/sounds";
 import { useFullscreen, FullscreenButton } from "@/components/FullscreenToggle";
@@ -447,7 +448,21 @@ function pickRandomFishType(): string {
 }
 
 export default function GameFishHunt() {
+  const { data: fishSettings } = useQuery<{ minBet: number }>({
+    queryKey: ["/api/games/fishhunt/settings"],
+  });
+  const minBet = fishSettings?.minBet ?? 500;
   const [bet, setBet] = useState(1000);
+  const betInitRef = useRef(false);
+  useEffect(() => {
+    if (fishSettings && !betInitRef.current) {
+      betInitRef.current = true;
+      const validAmounts = [500, 1000, 2000, 5000, 10000].filter(a => a >= fishSettings.minBet);
+      if (validAmounts.length > 0 && bet < fishSettings.minBet) {
+        setBet(validAmounts[0]);
+      }
+    }
+  }, [fishSettings]);
   const [fishes, setFishes] = useState<FishData[]>([]);
   const [bullets, setBullets] = useState<Bullet[]>([]);
   const [catchEffects, setCatchEffects] = useState<CatchEffect[]>([]);
@@ -768,7 +783,7 @@ export default function GameFishHunt() {
               <div className="space-y-2">
                 <label className="text-xs uppercase font-bold text-primary tracking-wider">Shot Cost (UGX)</label>
                 <div className="flex flex-wrap gap-1.5">
-                  {[500, 1000, 2000, 5000, 10000].map(amt => (
+                  {[500, 1000, 2000, 5000, 10000].filter(amt => amt >= minBet).map(amt => (
                     <Button
                       key={amt}
                       size="sm"

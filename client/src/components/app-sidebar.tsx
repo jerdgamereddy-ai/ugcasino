@@ -1,5 +1,5 @@
 import { Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarGroupLabel, SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarFooter } from "@/components/ui/sidebar"
-import { Home, Dice5, Target, Dices, Settings, FileText, Users, LogOut, Club, Shield, LayoutDashboard, Coins, Zap, RotateCcw, Gem, Wallet, BarChart3, UserCog } from "lucide-react"
+import { Home, Dice5, Target, Dices, Settings, FileText, Users, LogOut, Club, Shield, LayoutDashboard, Coins, Zap, RotateCcw, Wallet, BarChart3, UserCog } from "lucide-react"
 import { Link, useLocation } from "wouter"
 import { useQuery, useMutation } from "@tanstack/react-query"
 import { User } from "@shared/schema"
@@ -30,10 +30,7 @@ export function AppSidebar() {
     { title: "Hi-Lo", url: "/hilo", icon: Club },
     { title: "Coin Flip", url: "/coinflip", icon: Coins },
     { title: "Plinko", url: "/plinko", icon: Zap },
-    { title: "Mines", url: "/mines", icon: Gem },
     { title: "Wheel", url: "/wheel", icon: RotateCcw },
-    { title: "Poker", url: "/poker", icon: Club },
-    { title: "Keno", url: "/keno", icon: Target },
   ];
 
   const getRoleLabel = (role: string) => {
