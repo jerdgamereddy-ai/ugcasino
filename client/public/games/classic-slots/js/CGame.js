@@ -460,25 +460,35 @@ function CGame(oData){
         
         $(s_oMain).trigger("bet_placed",{bet:_iCurBet,tot_bet:_iTotBet});
         //CHECK IF THERE IS MINIMUM AMOUNT FOR AT LEAST WORST WINNING
+        var _safetyLimit = 500;
+        var _safetyCount = 0;
         if(SLOT_CASH < MIN_WIN){
             //PLAYER MUST LOSE
              do{
                 var bRet = this.generateFinalSymbols();
-            }while(bRet === true);
+                _safetyCount++;
+            }while(bRet === true && _safetyCount < _safetyLimit);
         }else{
             //RANDOM TO ASSIGN A WIN OR NOT
             var iRandSpin = Math.floor(Math.random() * 101);
 
             if(iRandSpin > WIN_OCCURRENCE){
                 //PLAYER LOSES
+                _safetyCount = 0;
                 do{
                     var bRet = this.generateFinalSymbols();
-                }while(bRet === true);
+                    _safetyCount++;
+                }while(bRet === true && _safetyCount < _safetyLimit);
 
             }else{
                 //PLAYER WINS
+                _safetyCount = 0;
                 do{
                     var bRet = this.generateFinalSymbols();
+                    _safetyCount++;
+                    if(_safetyCount >= _safetyLimit){
+                        break;
+                    }
                 }while(bRet === false || (_iTotWin*_iCurBet) > SLOT_CASH);
             }
         }
