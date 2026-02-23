@@ -28,9 +28,13 @@ import { MessageCircle } from "lucide-react";
 
 type GameFormData = z.infer<typeof updateGameSettingsSchema>;
 
+const ACTIVE_GAME_TYPES = ["slots", "roulette", "dice", "hilo", "coinflip", "plinko", "wheel", "fishhunt", "classic-slots"];
+
 function GameSettingCard({ setting }: { setting: GameSetting }) {
   const { toast } = useToast();
   const [pct, setPct] = useState(Math.round(setting.winChance * 100));
+  const [multiplierVal, setMultiplierVal] = useState(setting.payoutMultiplier ?? 1.95);
+  const isCoinflip = setting.gameType === "coinflip";
 
   const mutation = useMutation({
     mutationFn: async (val: number) => {
@@ -48,6 +52,22 @@ function GameSettingCard({ setting }: { setting: GameSetting }) {
     },
   });
 
+  const multiplierMutation = useMutation({
+    mutationFn: async (val: number) => {
+      const res = await fetch("/api/games/settings/payout-multiplier", {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ gameType: "coinflip", payoutMultiplier: val }),
+      });
+      if (!res.ok) throw new Error("Failed to update");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [api.games.settings.get.path] });
+      toast({ title: "Payout Updated", description: `Coin flip payout set to ${multiplierVal}x.` });
+    },
+  });
+
   const increment = () => setPct(p => Math.min(100, p + 1));
   const decrement = () => setPct(p => Math.max(0, p - 1));
 
@@ -56,22 +76,52 @@ function GameSettingCard({ setting }: { setting: GameSetting }) {
       <CardHeader className="pb-2">
         <CardTitle className="capitalize text-base">{setting.gameType}</CardTitle>
       </CardHeader>
-      <CardContent>
-        <label className="text-xs text-muted-foreground">Win Probability</label>
-        <div className="flex items-center gap-2 mt-2">
-          <Button size="icon" variant="outline" onClick={decrement} disabled={pct <= 0 || mutation.isPending} data-testid={`button-decrease-${setting.gameType}`}>
-            <ChevronDown className="h-4 w-4" />
-          </Button>
-          <div className="flex-1 text-center py-2 rounded-md border border-white/10 bg-white/5 font-mono text-lg font-bold" data-testid={`display-winchance-${setting.gameType}`}>
-            {pct}%
+      <CardContent className="space-y-4">
+        <div>
+          <label className="text-xs text-muted-foreground">Win Probability</label>
+          <div className="flex items-center gap-2 mt-2">
+            <Button size="icon" variant="outline" onClick={decrement} disabled={pct <= 0 || mutation.isPending} data-testid={`button-decrease-${setting.gameType}`}>
+              <ChevronDown className="h-4 w-4" />
+            </Button>
+            <div className="flex-1 text-center py-2 rounded-md border border-white/10 bg-white/5 font-mono text-lg font-bold" data-testid={`display-winchance-${setting.gameType}`}>
+              {pct}%
+            </div>
+            <Button size="icon" variant="outline" onClick={increment} disabled={pct >= 100 || mutation.isPending} data-testid={`button-increase-${setting.gameType}`}>
+              <ChevronUp className="h-4 w-4" />
+            </Button>
           </div>
-          <Button size="icon" variant="outline" onClick={increment} disabled={pct >= 100 || mutation.isPending} data-testid={`button-increase-${setting.gameType}`}>
-            <ChevronUp className="h-4 w-4" />
+          <Button className="w-full mt-3" size="sm" onClick={() => mutation.mutate(pct)} disabled={mutation.isPending} data-testid={`button-save-${setting.gameType}`}>
+            {mutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save"}
           </Button>
         </div>
-        <Button className="w-full mt-3" size="sm" onClick={() => mutation.mutate(pct)} disabled={mutation.isPending} data-testid={`button-save-${setting.gameType}`}>
-          {mutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save"}
-        </Button>
+        {isCoinflip && (
+          <div className="border-t border-white/10 pt-4">
+            <label className="text-xs text-muted-foreground">Payout Odds (Multiplier)</label>
+            <div className="flex items-center gap-2 mt-2">
+              <Input
+                type="number"
+                min={1.01}
+                max={10}
+                step={0.05}
+                value={multiplierVal}
+                onChange={(e) => setMultiplierVal(Math.max(1.01, parseFloat(e.target.value) || 1.01))}
+                className="font-mono text-lg font-bold text-center bg-white/5 border-white/10"
+                data-testid="input-coinflip-multiplier"
+              />
+              <span className="text-sm font-bold text-muted-foreground">x</span>
+            </div>
+            <Button
+              className="w-full mt-3"
+              size="sm"
+              variant="secondary"
+              onClick={() => multiplierMutation.mutate(multiplierVal)}
+              disabled={multiplierMutation.isPending}
+              data-testid="button-save-coinflip-multiplier"
+            >
+              {multiplierMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save Payout Odds"}
+            </Button>
+          </div>
+        )}
       </CardContent>
     </Card>
   );
@@ -731,7 +781,7 @@ export default function AdminDashboard() {
                 <div className="flex justify-center py-8"><Loader2 className="h-6 w-6 animate-spin" /></div>
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {gameSettings?.map((s) => (
+                  {gameSettings?.filter(s => ACTIVE_GAME_TYPES.includes(s.gameType)).map((s) => (
                     <GameSettingCard key={s.id} setting={s} />
                   ))}
                 </div>
