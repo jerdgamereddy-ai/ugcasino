@@ -536,19 +536,6 @@ export async function registerRoutes(
     }
   });
 
-  // === GAME ODDS (player-visible) ===
-  app.get("/api/games/:gameType/odds", async (req, res) => {
-    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
-    try {
-      const gameType = req.params.gameType;
-      const settings = await storage.getGameSettings(gameType);
-      const winChance = settings?.winChance ?? 0.3;
-      res.json({ winChance: Math.round(winChance * 100) });
-    } catch (err) {
-      res.status(500).json({ message: "Internal Server Error" });
-    }
-  });
-
   // === HILO GAME ===
   app.post("/api/games/hilo/play", async (req, res) => {
     if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
