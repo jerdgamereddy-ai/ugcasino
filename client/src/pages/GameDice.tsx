@@ -4,9 +4,11 @@ import { Button } from "@/components/ui/button";
 import { Link } from "wouter";
 import { ArrowLeft } from "lucide-react";
 import { useFullscreen, FullscreenButton } from "@/components/FullscreenToggle";
+import { useQuery } from "@tanstack/react-query";
 
 export default function GameDice() {
   const { isFullscreen, toggle, containerRef } = useFullscreen();
+  const { data: odds } = useQuery<{ winChance: number }>({ queryKey: ["/api/games/dice/odds"] });
 
   return (
     <ProtectedLayout>
@@ -24,6 +26,12 @@ export default function GameDice() {
         <div className="text-center mb-8">
             <h1 className="text-5xl md:text-7xl font-display font-bold text-primary mb-2 drop-shadow-[0_0_30px_rgba(212,175,55,0.8)]">Royal Dice</h1>
             <p className="text-white font-black text-xl drop-shadow-[0_2px_10px_rgba(0,0,0,1)] uppercase tracking-widest">Predict high or low rolls for double payouts.</p>
+            {odds && (
+              <div className="mt-3 inline-flex items-center gap-2 bg-black/40 border border-[#D4AF37]/30 rounded-full px-4 py-1.5" data-testid="display-dice-odds">
+                <span className="text-[#D4AF37]/70 text-sm font-medium">Win Odds:</span>
+                <span className="text-[#D4AF37] text-sm font-bold">{odds.winChance}%</span>
+              </div>
+            )}
         </div>
 
         <div className="max-w-6xl mx-auto">
