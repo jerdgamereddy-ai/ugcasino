@@ -33,8 +33,9 @@ const ACTIVE_GAME_TYPES = ["slots", "roulette", "dice", "hilo", "coinflip", "pli
 function GameSettingCard({ setting }: { setting: GameSetting }) {
   const { toast } = useToast();
   const [pct, setPct] = useState(Math.round(setting.winChance * 100));
-  const [multiplierVal, setMultiplierVal] = useState(setting.payoutMultiplier ?? 1.95);
-  const isCoinflip = setting.gameType === "coinflip";
+  const hasMultiplier = ["coinflip", "slots", "dice", "hilo"].includes(setting.gameType);
+  const defaultMultiplier = setting.gameType === "slots" ? 10 : setting.gameType === "coinflip" ? 1.95 : 2;
+  const [multiplierVal, setMultiplierVal] = useState(setting.payoutMultiplier ?? defaultMultiplier);
 
   const mutation = useMutation({
     mutationFn: async (val: number) => {
@@ -57,14 +58,14 @@ function GameSettingCard({ setting }: { setting: GameSetting }) {
       const res = await fetch("/api/games/settings/payout-multiplier", {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ gameType: "coinflip", payoutMultiplier: val }),
+        body: JSON.stringify({ gameType: setting.gameType, payoutMultiplier: val }),
       });
       if (!res.ok) throw new Error("Failed to update");
       return res.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [api.games.settings.get.path] });
-      toast({ title: "Payout Updated", description: `Coin flip payout set to ${multiplierVal}x.` });
+      toast({ title: "Payout Updated", description: `${setting.gameType} payout set to ${multiplierVal}x.` });
     },
   });
 
@@ -94,19 +95,19 @@ function GameSettingCard({ setting }: { setting: GameSetting }) {
             {mutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save"}
           </Button>
         </div>
-        {isCoinflip && (
+        {hasMultiplier && (
           <div className="border-t border-white/10 pt-4">
             <label className="text-xs text-muted-foreground">Payout Odds (Multiplier)</label>
             <div className="flex items-center gap-2 mt-2">
               <Input
                 type="number"
                 min={1.01}
-                max={10}
+                max={100}
                 step={0.05}
                 value={multiplierVal}
                 onChange={(e) => setMultiplierVal(Math.max(1.01, parseFloat(e.target.value) || 1.01))}
                 className="font-mono text-lg font-bold text-center bg-white/5 border-white/10"
-                data-testid="input-coinflip-multiplier"
+                data-testid={`input-multiplier-${setting.gameType}`}
               />
               <span className="text-sm font-bold text-muted-foreground">x</span>
             </div>
@@ -116,7 +117,7 @@ function GameSettingCard({ setting }: { setting: GameSetting }) {
               variant="secondary"
               onClick={() => multiplierMutation.mutate(multiplierVal)}
               disabled={multiplierMutation.isPending}
-              data-testid="button-save-coinflip-multiplier"
+              data-testid={`button-save-multiplier-${setting.gameType}`}
             >
               {multiplierMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save Payout Odds"}
             </Button>

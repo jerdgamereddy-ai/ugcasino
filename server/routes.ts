@@ -525,14 +525,48 @@ export async function registerRoutes(
     
     try {
       const { gameType, payoutMultiplier } = z.object({
-        gameType: z.enum(["coinflip"]),
-        payoutMultiplier: z.number().min(1.01).max(10)
+        gameType: z.enum(["coinflip", "slots", "dice", "hilo"]),
+        payoutMultiplier: z.number().min(1.01).max(100)
       }).parse(req.body);
       
       const settings = await storage.updateGamePayoutMultiplier(gameType as any, payoutMultiplier, req.user.id);
       res.json(settings);
     } catch (err) {
       res.status(400).json({ message: "Invalid input" });
+    }
+  });
+
+  // === GAME SETTINGS ENDPOINTS (per-game multiplier) ===
+  app.get("/api/games/slots/settings", async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    try {
+      const settings = await storage.getGameSettings("slots");
+      const payoutMultiplier = settings?.payoutMultiplier ?? 10;
+      res.json({ payoutMultiplier });
+    } catch (err) {
+      res.status(500).json({ message: "Internal Server Error" });
+    }
+  });
+
+  app.get("/api/games/dice/settings", async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    try {
+      const settings = await storage.getGameSettings("dice");
+      const payoutMultiplier = settings?.payoutMultiplier ?? 2;
+      res.json({ payoutMultiplier });
+    } catch (err) {
+      res.status(500).json({ message: "Internal Server Error" });
+    }
+  });
+
+  app.get("/api/games/hilo/settings", async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    try {
+      const settings = await storage.getGameSettings("hilo");
+      const payoutMultiplier = settings?.payoutMultiplier ?? 2;
+      res.json({ payoutMultiplier });
+    } catch (err) {
+      res.status(500).json({ message: "Internal Server Error" });
     }
   });
 
@@ -564,7 +598,8 @@ export async function registerRoutes(
             : Math.floor(Math.random() * (13 - (lastCard || 7))) + (lastCard || 7) + 1);
       
       const card = Math.max(1, Math.min(13, nextCard));
-      const payout = won ? bet * 2 : 0;
+      const multiplier = settings?.payoutMultiplier ?? 2;
+      const payout = won ? Math.floor(bet * multiplier) : 0;
       const user = won ? await storage.updateUserBalance(req.user.id, payout) : await storage.getUser(req.user.id);
       if (won) await storage.createTransaction({ userId: req.user.id, amount: payout, type: "win", description: "HiLo win" });
 
@@ -647,7 +682,8 @@ export async function registerRoutes(
         ? (choice === "low" ? Math.floor(Math.random() * 3) + 1 : Math.floor(Math.random() * 3) + 4)
         : (choice === "low" ? Math.floor(Math.random() * 3) + 4 : Math.floor(Math.random() * 3) + 1);
       
-      const payout = won ? bet * 2 : 0;
+      const multiplier = settings?.payoutMultiplier ?? 2;
+      const payout = won ? Math.floor(bet * multiplier) : 0;
       const user = won ? await storage.updateUserBalance(req.user.id, payout) : await storage.getUser(req.user.id);
       if (won) await storage.createTransaction({ userId: req.user.id, amount: payout, type: "win", description: "Dice win" });
 
@@ -984,10 +1020,11 @@ export async function registerRoutes(
       let reels: string[];
       let payout = 0;
 
+      const slotsMultiplier = settings?.payoutMultiplier ?? 10;
       if (won) {
         const winSymbol = symbols[Math.floor(Math.random() * symbols.length)];
         reels = [winSymbol, winSymbol, winSymbol];
-        payout = bet * 10;
+        payout = Math.floor(bet * slotsMultiplier);
       } else {
         reels = [
           symbols[Math.floor(Math.random() * symbols.length)],

@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useSpinSlots } from "@/hooks/use-games";
+import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { Coins, Loader2, Sparkles } from "lucide-react";
@@ -78,6 +79,10 @@ export function SlotMachine() {
   const [showWinEffect, setShowWinEffect] = useState(false);
   const { mutate: spin, isPending } = useSpinSlots();
   const { toast } = useToast();
+  const { data: slotsSettings } = useQuery<{ payoutMultiplier: number }>({
+    queryKey: ["/api/games/slots/settings"],
+  });
+  const payoutMultiplier = slotsSettings?.payoutMultiplier ?? 10;
 
   const handleSpin = () => {
     playSound('spin');
@@ -239,7 +244,8 @@ export function SlotMachine() {
         </div>
       </div>
 
-      <div className="text-center text-muted-foreground text-sm">
+      <div className="text-center text-muted-foreground text-sm space-y-1">
+          <p className="text-xs uppercase tracking-widest">Payout: {payoutMultiplier}x</p>
           <p>Min Bet: UGX 500 - 3 Matching Fruits Wins</p>
       </div>
     </div>

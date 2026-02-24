@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useUser } from "@/hooks/use-auth";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { queryClient } from "@/lib/queryClient";
 import { api } from "@shared/routes";
 import { Button } from "@/components/ui/button";
@@ -20,6 +20,10 @@ export function DiceGame() {
   const [choice, setChoice] = useState<"low" | "high">("low");
   const [rolling, setRolling] = useState(false);
   const [result, setResult] = useState<number | null>(null);
+  const { data: diceSettings } = useQuery<{ payoutMultiplier: number }>({
+    queryKey: ["/api/games/dice/settings"],
+  });
+  const payoutMultiplier = diceSettings?.payoutMultiplier ?? 2;
 
   const rollMutation = useMutation({
     mutationFn: async () => {
@@ -142,6 +146,8 @@ export function DiceGame() {
             >
               {rolling ? "ROLLING..." : "ROLL DICE"}
             </Button>
+
+            <p className="text-xs text-muted-foreground uppercase tracking-widest text-center pt-2">Payout: {payoutMultiplier}x</p>
           </div>
         </div>
       </CardContent>

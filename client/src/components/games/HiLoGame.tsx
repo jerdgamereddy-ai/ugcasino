@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useUser } from "@/hooks/use-auth";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { queryClient } from "@/lib/queryClient";
 import { api } from "@shared/routes";
 import { Button } from "@/components/ui/button";
@@ -18,6 +18,10 @@ export function HiLoGame() {
   const [playing, setPlaying] = useState(false);
   const [currentCard, setCurrentCard] = useState<number | null>(null);
   const [loading, setLoading] = useState(false);
+  const { data: hiloSettings } = useQuery<{ payoutMultiplier: number }>({
+    queryKey: ["/api/games/hilo/settings"],
+  });
+  const payoutMultiplier = hiloSettings?.payoutMultiplier ?? 2;
 
   const cardMutation = useMutation({
     mutationFn: async (prediction: "higher" | "lower") => {
@@ -113,6 +117,8 @@ export function HiLoGame() {
               </motion.div>
             </AnimatePresence>
           </div>
+
+          <p className="text-xs text-muted-foreground uppercase tracking-widest">Payout: {payoutMultiplier}x</p>
 
           {!playing ? (
             <div className="w-full max-w-xs space-y-4">
