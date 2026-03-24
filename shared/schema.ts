@@ -49,10 +49,11 @@ export const transactions = pgTable("transactions", {
 
 export const gameSettings = pgTable("game_settings", {
   id: serial("id").primaryKey(),
-  gameType: text("game_type", { enum: ["slots", "roulette", "dice", "hilo", "coinflip", "plinko", "wheel", "fishhunt", "classic-slots"] }).notNull().unique(),
+  gameType: text("game_type", { enum: ["slots", "roulette", "dice", "hilo", "coinflip", "plinko", "wheel", "fishhunt", "classic-slots", "dog-racing", "horse4", "horse-js"] }).notNull().unique(),
   winChance: doublePrecision("win_chance").default(0.3).notNull(),
   minBet: integer("min_bet").default(500).notNull(),
   payoutMultiplier: doublePrecision("payout_multiplier").default(1.95).notNull(),
+  extraSettings: text("extra_settings"),
   updatedBy: integer("updated_by").notNull(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -176,7 +177,7 @@ export const redeemVoucherSchema = z.object({
 });
 
 export const updateGameSettingsSchema = z.object({
-  gameType: z.enum(["slots", "roulette", "dice", "hilo", "coinflip", "plinko", "wheel", "fishhunt", "classic-slots"]),
+  gameType: z.enum(["slots", "roulette", "dice", "hilo", "coinflip", "plinko", "wheel", "fishhunt", "classic-slots", "dog-racing", "horse4", "horse-js"]),
   winChance: z.number().min(0).max(100),
 });
 

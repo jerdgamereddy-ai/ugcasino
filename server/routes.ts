@@ -490,7 +490,7 @@ export async function registerRoutes(
     if (!req.isAuthenticated() || req.user.role === 'user') return res.status(403).send("Forbidden");
     
     let settings = await storage.getAllGameSettings();
-    const gameTypes = ["slots", "roulette", "dice", "hilo", "coinflip", "plinko", "wheel", "fishhunt", "classic-slots"] as const;
+    const gameTypes = ["slots", "roulette", "dice", "hilo", "coinflip", "plinko", "wheel", "fishhunt", "classic-slots", "dog-racing", "horse4", "horse-js"] as const;
     const existingTypes = settings.map(s => s.gameType);
     
     for (const type of gameTypes) {
@@ -509,7 +509,7 @@ export async function registerRoutes(
     
     try {
       const { gameType, winChance } = z.object({
-        gameType: z.enum(["slots", "roulette", "dice", "hilo", "coinflip", "plinko", "wheel", "fishhunt", "classic-slots"]),
+        gameType: z.enum(["slots", "roulette", "dice", "hilo", "coinflip", "plinko", "wheel", "fishhunt", "classic-slots", "dog-racing", "horse4", "horse-js"]),
         winChance: z.number().min(0).max(100)
       }).parse(req.body);
       
@@ -658,6 +658,128 @@ export async function registerRoutes(
     } catch (err) {
       res.status(500).json({ message: "Internal Server Error" });
     }
+  });
+
+  // === DOG RACING GAME ===
+  app.get("/api/games/dog-racing/settings", async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    try {
+      const settings = await storage.getGameSettings("dog-racing");
+      res.json({ winOccurrence: Math.round((settings?.winChance ?? 0.3) * 100) });
+    } catch (err) { res.status(500).json({ message: "Internal Server Error" }); }
+  });
+
+  app.post("/api/games/dog-racing/bet", async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    try {
+      const { totBet } = z.object({ bet: z.number().min(1), totBet: z.number().min(1) }).parse(req.body);
+      if (req.user.balance < totBet) return res.status(400).json({ message: "Insufficient balance" });
+      await storage.updateUserBalance(req.user.id, -totBet);
+      await storage.createTransaction({ userId: req.user.id, amount: -totBet, type: "bet", description: "Greyhound Racing bet" });
+      const user = await storage.getUser(req.user.id);
+      res.json({ balance: user?.balance ?? 0 });
+    } catch (err) { res.status(500).json({ message: "Internal Server Error" }); }
+  });
+
+  app.post("/api/games/dog-racing/win", async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    try {
+      const { winAmount } = z.object({ winAmount: z.number().min(0).max(50000000) }).parse(req.body);
+      if (winAmount > 0) {
+        await storage.updateUserBalance(req.user.id, winAmount);
+        await storage.createTransaction({ userId: req.user.id, amount: winAmount, type: "win", description: "Greyhound Racing win" });
+      }
+      const user = await storage.getUser(req.user.id);
+      res.json({ balance: user?.balance ?? 0 });
+    } catch (err) { res.status(500).json({ message: "Internal Server Error" }); }
+  });
+
+  // === HORSE4 RACING GAME ===
+  app.get("/api/games/horse4/settings", async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    try {
+      const settings = await storage.getGameSettings("horse4");
+      res.json({ winOccurrence: Math.round((settings?.winChance ?? 0.4) * 100) });
+    } catch (err) { res.status(500).json({ message: "Internal Server Error" }); }
+  });
+
+  app.post("/api/games/horse4/bet", async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    try {
+      const { totBet } = z.object({ bet: z.number().min(1), totBet: z.number().min(1) }).parse(req.body);
+      if (req.user.balance < totBet) return res.status(400).json({ message: "Insufficient balance" });
+      await storage.updateUserBalance(req.user.id, -totBet);
+      await storage.createTransaction({ userId: req.user.id, amount: -totBet, type: "bet", description: "Horse4 Racing bet" });
+      const user = await storage.getUser(req.user.id);
+      res.json({ balance: user?.balance ?? 0 });
+    } catch (err) { res.status(500).json({ message: "Internal Server Error" }); }
+  });
+
+  app.post("/api/games/horse4/win", async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    try {
+      const { winAmount } = z.object({ winAmount: z.number().min(0).max(50000000) }).parse(req.body);
+      if (winAmount > 0) {
+        await storage.updateUserBalance(req.user.id, winAmount);
+        await storage.createTransaction({ userId: req.user.id, amount: winAmount, type: "win", description: "Horse4 Racing win" });
+      }
+      const user = await storage.getUser(req.user.id);
+      res.json({ balance: user?.balance ?? 0 });
+    } catch (err) { res.status(500).json({ message: "Internal Server Error" }); }
+  });
+
+  // === HORSE-JS RACING GAME (simple 4-horse) ===
+  app.get("/api/games/horse-js/settings", async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    try {
+      const settings = await storage.getGameSettings("horse-js");
+      const extra = settings?.extraSettings ? JSON.parse(settings.extraSettings) : {};
+      res.json({
+        winOccurrence: Math.round((settings?.winChance ?? 0.25) * 100),
+        maxLaps: extra.maxLaps ?? 1,
+        odds: extra.odds ?? [2.0, 2.5, 3.0, 3.5],
+      });
+    } catch (err) { res.status(500).json({ message: "Internal Server Error" }); }
+  });
+
+  app.post("/api/games/horse-js/settings", async (req, res) => {
+    if (!req.isAuthenticated() || req.user.role !== "admin") return res.status(403).send("Forbidden");
+    try {
+      const { maxLaps, odds } = z.object({
+        maxLaps: z.number().int().min(1).max(10),
+        odds: z.array(z.number().min(1).max(100)).length(4),
+      }).parse(req.body);
+      const existing = await storage.getGameSettings("horse-js");
+      const currentExtra = existing?.extraSettings ? JSON.parse(existing.extraSettings) : {};
+      const newExtra = JSON.stringify({ ...currentExtra, maxLaps, odds });
+      await storage.updateGameExtraSettings("horse-js", newExtra, req.user.id);
+      res.json({ success: true });
+    } catch (err) { res.status(500).json({ message: "Internal Server Error" }); }
+  });
+
+  app.post("/api/games/horse-js/bet", async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    try {
+      const { totBet } = z.object({ bet: z.number().min(500), totBet: z.number().min(500) }).parse(req.body);
+      if (req.user.balance < totBet) return res.status(400).json({ message: "Insufficient balance" });
+      await storage.updateUserBalance(req.user.id, -totBet);
+      await storage.createTransaction({ userId: req.user.id, amount: -totBet, type: "bet", description: "Horse Racing bet" });
+      const user = await storage.getUser(req.user.id);
+      res.json({ balance: user?.balance ?? 0 });
+    } catch (err) { res.status(500).json({ message: "Internal Server Error" }); }
+  });
+
+  app.post("/api/games/horse-js/win", async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    try {
+      const { winAmount } = z.object({ winAmount: z.number().min(0).max(50000000) }).parse(req.body);
+      if (winAmount > 0) {
+        await storage.updateUserBalance(req.user.id, winAmount);
+        await storage.createTransaction({ userId: req.user.id, amount: winAmount, type: "win", description: "Horse Racing win" });
+      }
+      const user = await storage.getUser(req.user.id);
+      res.json({ balance: user?.balance ?? 0 });
+    } catch (err) { res.status(500).json({ message: "Internal Server Error" }); }
   });
 
   // === DICE GAME ===
@@ -995,6 +1117,34 @@ export async function registerRoutes(
 
       const user = await storage.getUser(req.user.id);
       res.json({ caught, payout, multiplier, fishType, balance: user?.balance ?? 0 });
+    } catch (err) {
+      res.status(500).json({ message: "Internal Server Error" });
+    }
+  });
+
+  // === FISH JOY ===
+  app.post("/api/games/fishjoy/bet", async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    try {
+      const { bet } = z.object({ bet: z.number().min(1) }).parse(req.body);
+      if (req.user.balance < bet) return res.status(400).json({ message: "Insufficient balance" });
+      await storage.updateUserBalance(req.user.id, -bet);
+      await storage.createTransaction({ userId: req.user.id, amount: -bet, type: "bet", description: "Fish Joy: Shot fired" });
+      const user = await storage.getUser(req.user.id);
+      res.json({ balance: user?.balance ?? 0 });
+    } catch (err) {
+      res.status(500).json({ message: "Internal Server Error" });
+    }
+  });
+
+  app.post("/api/games/fishjoy/win", async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    try {
+      const { winAmount } = z.object({ winAmount: z.number().min(1) }).parse(req.body);
+      await storage.updateUserBalance(req.user.id, winAmount);
+      await storage.createTransaction({ userId: req.user.id, amount: winAmount, type: "win", description: `Fish Joy: Fish caught (+${winAmount})` });
+      const user = await storage.getUser(req.user.id);
+      res.json({ balance: user?.balance ?? 0 });
     } catch (err) {
       res.status(500).json({ message: "Internal Server Error" });
     }

@@ -1,0 +1,20 @@
+greetings bro, kindly do the following:
+-modify the four attached games to match our lobby game protocals
+ie let all games obtain the playing credit from the user credit account of the player, change the game credits to ugx just as it's 
+with other games, let grey hound and horse racing games(both types of horse racing) allow odd customization by the admin.
+- all games should allow winning level setting just as it's with the already existing games in the lobby.
+- let the existing fish hunt game be replaced by the new attached fish hunt game(keep all the protocals of the game we're replacing)
+and kindly animate the background of the new fishhunt game so that the background water has waves and bubbles just like the 
+tada(gambling game site) oceanking fishhunt game.
+- for the small 4 horse racing game, the max number of laps is customizable by the admin, let the bet amount be in sequence of 500ugx
+and include odd display for each horse which is fully customizable by the admin.
+-let all games open in full screen and for already existing games, enlarge them to fill up atleast 80% of the screen.
+-in the general settings, let the admin be able to upload custom assets/sprites
+ for the games including the background sound for the website homescreen and the inplay background music. 
+-the website background should be customizable too with the admin's will of pics/gifs or videos(mp4).
+-include voucher printing command that directs the voucher to the available printers (via usb or bluetooth).
+-lastly the website seems to be of high traffic which i assume that it keeps pinging frequently 
+and this costs me a lot of data plan and ram, since it's an html website, kindly load assets once and keep only the necessary
+ database variables in sync.(just do what is necessary to keep the traffic very low so that the cpu, ram and dataplan 
+are not over consumed by a very heavy website pinging all time.
+-add more animations of the recent games on the home screen to advertise more of the new games as we did with the first games 

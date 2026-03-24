@@ -28,7 +28,7 @@ import { MessageCircle } from "lucide-react";
 
 type GameFormData = z.infer<typeof updateGameSettingsSchema>;
 
-const ACTIVE_GAME_TYPES = ["slots", "roulette", "dice", "hilo", "coinflip", "plinko", "wheel", "fishhunt", "classic-slots"];
+const ACTIVE_GAME_TYPES = ["slots", "roulette", "dice", "hilo", "coinflip", "plinko", "wheel", "fishhunt", "classic-slots", "dog-racing", "horse4", "horse-js"];
 
 function GameSettingCard({ setting }: { setting: GameSetting }) {
   const { toast } = useToast();
@@ -36,6 +36,10 @@ function GameSettingCard({ setting }: { setting: GameSetting }) {
   const hasMultiplier = ["coinflip", "slots", "dice", "hilo"].includes(setting.gameType);
   const defaultMultiplier = setting.gameType === "slots" ? 10 : setting.gameType === "coinflip" ? 1.95 : 2;
   const [multiplierVal, setMultiplierVal] = useState(setting.payoutMultiplier ?? defaultMultiplier);
+  const isHorseJs = setting.gameType === "horse-js";
+  const extraParsed = (() => { try { return setting.extraSettings ? JSON.parse(setting.extraSettings) : {}; } catch { return {}; } })();
+  const [maxLaps, setMaxLaps] = useState<number>(extraParsed.maxLaps ?? 1);
+  const [horseOdds, setHorseOdds] = useState<number[]>(extraParsed.odds ?? [2.0, 2.5, 3.0, 3.5]);
 
   const mutation = useMutation({
     mutationFn: async (val: number) => {
@@ -66,6 +70,22 @@ function GameSettingCard({ setting }: { setting: GameSetting }) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [api.games.settings.get.path] });
       toast({ title: "Payout Updated", description: `${setting.gameType} payout set to ${multiplierVal}x.` });
+    },
+  });
+
+  const horseJsMutation = useMutation({
+    mutationFn: async () => {
+      const res = await fetch("/api/games/horse-js/settings", {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ maxLaps, odds: horseOdds }),
+      });
+      if (!res.ok) throw new Error("Failed to update horse-js settings");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [api.games.settings.get.path] });
+      toast({ title: "Horse Race Updated", description: "Max laps and horse odds saved." });
     },
   });
 
@@ -120,6 +140,57 @@ function GameSettingCard({ setting }: { setting: GameSetting }) {
               data-testid={`button-save-multiplier-${setting.gameType}`}
             >
               {multiplierMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save Payout Odds"}
+            </Button>
+          </div>
+        )}
+        {isHorseJs && (
+          <div className="border-t border-white/10 pt-4 space-y-3">
+            <label className="text-xs text-muted-foreground font-semibold">Horse Race Settings</label>
+            <div>
+              <label className="text-xs text-muted-foreground">Max Laps</label>
+              <Input
+                type="number"
+                min={1}
+                max={20}
+                step={1}
+                value={maxLaps}
+                onChange={(e) => setMaxLaps(Math.max(1, parseInt(e.target.value) || 1))}
+                className="font-mono font-bold text-center bg-white/5 border-white/10 mt-1"
+                data-testid="input-horse-js-max-laps"
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-xs text-muted-foreground">Per-Horse Odds (x)</label>
+              {horseOdds.map((odd, i) => (
+                <div key={i} className="flex items-center gap-2">
+                  <span className="text-xs text-muted-foreground w-16">Horse {i + 1}</span>
+                  <Input
+                    type="number"
+                    min={1.01}
+                    max={100}
+                    step={0.1}
+                    value={odd}
+                    onChange={(e) => {
+                      const updated = [...horseOdds];
+                      updated[i] = Math.max(1.01, parseFloat(e.target.value) || 1.01);
+                      setHorseOdds(updated);
+                    }}
+                    className="font-mono text-sm text-center bg-white/5 border-white/10"
+                    data-testid={`input-horse-js-odds-${i}`}
+                  />
+                  <span className="text-xs text-muted-foreground">x</span>
+                </div>
+              ))}
+            </div>
+            <Button
+              className="w-full"
+              size="sm"
+              variant="secondary"
+              onClick={() => horseJsMutation.mutate()}
+              disabled={horseJsMutation.isPending}
+              data-testid="button-save-horse-js-settings"
+            >
+              {horseJsMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save Horse Settings"}
             </Button>
           </div>
         )}

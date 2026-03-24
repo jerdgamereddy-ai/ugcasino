@@ -19,8 +19,11 @@ import GameHiLo from "@/pages/GameHiLo";
 import CoinFlip from "@/pages/CoinFlip";
 import GamePlinko from "@/pages/GamePlinko";
 import GameWheel from "@/pages/GameWheel";
-import GameFishHunt from "@/pages/GameFishHunt";
+import GameFishJoy from "@/pages/GameFishJoy";
 import GameClassicSlots from "@/pages/GameClassicSlots";
+import GameDogRacing from "@/pages/GameDogRacing";
+import GameHorse4 from "@/pages/GameHorse4";
+import GameHorseJS from "@/pages/GameHorseJS";
 import Reports from "@/pages/Reports";
 import GameControl from "@/pages/GameControl";
 import ForgotPassword from "@/pages/ForgotPassword";
@@ -43,8 +46,11 @@ function Router() {
       <Route path="/coinflip" component={CoinFlip} />
       <Route path="/plinko" component={GamePlinko} />
       <Route path="/wheel" component={GameWheel} />
-      <Route path="/fishhunt" component={GameFishHunt} />
+      <Route path="/fishhunt" component={GameFishJoy} />
       <Route path="/classic-slots" component={GameClassicSlots} />
+      <Route path="/dog-racing" component={GameDogRacing} />
+      <Route path="/horse4" component={GameHorse4} />
+      <Route path="/horse-racing" component={GameHorseJS} />
       <Route path="/reports" component={Reports} />
       <Route path="/game-control" component={GameControl} />
       <Route component={NotFound} />

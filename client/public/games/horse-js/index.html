@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Horse Racing - UG Casino</title>
+    <link rel="stylesheet" href="game.css" />
+    <style>
+        * { box-sizing: border-box; }
+        #ugcasino-ui {
+            position: fixed; top: 0; left: 0; width: 100%; z-index: 9999;
+            background: linear-gradient(135deg, #1a0a00 0%, #2d1500 100%);
+            border-bottom: 2px solid #c9a227;
+            padding: 6px 14px;
+            display: flex; align-items: center; justify-content: space-between;
+            box-shadow: 0 2px 12px rgba(201,162,39,0.3);
+        }
+        #ugcasino-ui .logo { color: #c9a227; font-size: 16px; font-weight: bold; }
+        #ugcasino-ui .balance { color: #ffd700; font-size: 15px; font-weight: bold; }
+        #bet-panel {
+            position: fixed; bottom: 0; left: 0; width: 100%; z-index: 9999;
+            background: linear-gradient(135deg, #1a0a00 0%, #2d1500 100%);
+            border-top: 2px solid #c9a227;
+            padding: 8px 16px;
+            display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+            box-shadow: 0 -2px 12px rgba(201,162,39,0.3);
+        }
+        #bet-panel label { color: #c9a227; font-weight: bold; font-size: 12px; }
+        #bet-panel select, #bet-panel input {
+            background: #1a0a00; color: #ffd700; border: 1px solid #c9a227;
+            border-radius: 6px; padding: 3px 7px; font-size: 12px;
+        }
+        #start-btn {
+            background: linear-gradient(135deg, #c9a227 0%, #f0c040 100%);
+            color: #1a0a00; font-weight: bold; font-size: 13px;
+            border: none; border-radius: 8px; padding: 7px 20px;
+            cursor: pointer; box-shadow: 0 2px 8px rgba(201,162,39,0.4);
+        }
+        #start-btn:hover { opacity: 0.9; }
+        #start-btn:disabled { background: #555; color: #888; cursor: not-allowed; }
+        .odds-display { display: flex; gap: 6px; align-items: center; }
+        .horse-odd {
+            background: rgba(201,162,39,0.1); border: 1px solid #c9a227;
+            color: #ffd700; padding: 2px 7px; border-radius: 4px; font-size: 11px;
+        }
+        .horse-odd.selected { background: #c9a227; color: #1a0a00; font-weight: bold; }
+        #result-msg {
+            position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            background: rgba(0,0,0,0.93); border: 2px solid #c9a227;
+            color: #ffd700; padding: 18px 36px; border-radius: 12px;
+            font-size: 20px; font-weight: bold; text-align: center;
+            z-index: 10000; display: none;
+        }
+        #result-msg .sub { font-size: 13px; color: #aaa; margin-top: 6px; }
+        .track { margin-top: 45px !important; margin-bottom: 58px !important; }
+        .bet-step-btn {
+            background: #2d1500; color: #c9a227; border: 1px solid #c9a227;
+            border-radius: 4px; padding: 2px 7px; cursor: pointer; font-size: 11px;
+        }
+        .bet-step-btn:hover { background: #c9a227; color: #1a0a00; }
+    </style>
+</head>
+<body>
+    <div id="ugcasino-ui">
+        <div class="logo">🏇 UG Casino - Horse Racing</div>
+        <div class="balance">Balance: <span id="balance-display">0</span> UGX</div>
+    </div>
+
+    <div id="result-msg">
+        <div id="result-text"></div>
+        <div class="sub" id="result-sub"></div>
+    </div>
+
+    <div id="horse1" class="horse standRight">
+        <div class="rider"><div class="head"></div><div class="body"></div></div>
+    </div>
+    <div id="horse2" class="horse standRight">
+        <div class="rider"><div class="head"></div><div class="body"></div></div>
+    </div>
+    <div id="horse3" class="horse standRight">
+        <div class="rider"><div class="head"></div><div class="body"></div></div>
+    </div>
+    <div id="horse4" class="horse standRight">
+        <div class="rider"><div class="head"></div><div class="body"></div></div>
+    </div>
+
+    <div class="track">
+        <div id="startline"></div>
+        <div class="inner">
+            <button id="start-btn" onclick="startRace()" disabled>Start Race</button>
+            <div style="color:#c9a227;font-size:11px;margin-top:4px">Laps: <span id="lap-count">1</span></div>
+            <img src="images/tree.png" class="tree" />
+            <br>
+            <table id="results">
+                <thead><tr><th>Results</th><th></th></tr></thead>
+                <tbody>
+                    <tr><td>1st</td><td class="result horse1"></td></tr>
+                    <tr><td>2nd</td><td class="result horse2"></td></tr>
+                    <tr><td>3rd</td><td class="result horse3"></td></tr>
+                    <tr><td>4th</td><td class="result horse4"></td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div id="bet-panel">
+        <div style="display:flex;align-items:center;gap:6px">
+            <label>Bet (UGX):</label>
+            <button class="bet-step-btn" onclick="changeBet(-500)">-</button>
+            <input type="number" id="amount" value="500" min="500" step="500" style="width:80px" readonly />
+            <button class="bet-step-btn" onclick="changeBet(500)">+</button>
+        </div>
+        <div style="display:flex;align-items:center;gap:6px">
+            <label>Horse:</label>
+            <select id="bethorse" onchange="updateOddsHighlight()">
+                <option value="1">Horse 1</option>
+                <option value="2">Horse 2</option>
+                <option value="3">Horse 3</option>
+                <option value="4">Horse 4</option>
+            </select>
+        </div>
+        <div class="odds-display" id="odds-display"></div>
+        <button id="start-btn2" onclick="startRace()" disabled style="background:linear-gradient(135deg,#c9a227,#f0c040);color:#1a0a00;font-weight:bold;font-size:13px;border:none;border-radius:8px;padding:7px 20px;cursor:pointer">Start Race</button>
+    </div>
+
+    <script>
+        var _balance = 0;
+        var _gameInitialized = false;
+        var _maxLaps = 1;
+        var _odds = [2.0, 2.5, 3.0, 3.5];
+        var _raceInProgress = false;
+        var _pendingBet = 0;
+        var _betHorse = 1;
+        var _horse1, _horse2, _horse3, _horse4;
+        var results = [];
+
+        function sendToParent(type, data) {
+            if (window.parent !== window) {
+                window.parent.postMessage(Object.assign({ type: type }, data || {}), '*');
+            }
+        }
+
+        window.addEventListener('message', function(event) {
+            if (!event.data || !event.data.type) return;
+            if (event.data.type === 'init_balance' && !_gameInitialized) {
+                _gameInitialized = true;
+                _balance = event.data.balance || 0;
+                if (typeof event.data.maxLaps === 'number') _maxLaps = event.data.maxLaps;
+                if (Array.isArray(event.data.odds)) _odds = event.data.odds;
+                document.getElementById('lap-count').textContent = _maxLaps;
+                updateUI();
+                renderOdds();
+                document.getElementById('start-btn').disabled = false;
+                document.getElementById('start-btn2').disabled = false;
+            }
+        });
+
+        function updateUI() {
+            document.getElementById('balance-display').textContent = _balance.toLocaleString();
+        }
+
+        function renderOdds() {
+            var container = document.getElementById('odds-display');
+            var horseNames = ['Horse 1', 'Horse 2', 'Horse 3', 'Horse 4'];
+            container.innerHTML = _odds.map(function(o, i) {
+                return '<span class="horse-odd" id="odd-' + (i+1) + '">' + horseNames[i] + ': ' + o.toFixed(2) + 'x</span>';
+            }).join('');
+            updateOddsHighlight();
+        }
+
+        function updateOddsHighlight() {
+            var sel = parseInt(document.getElementById('bethorse').value);
+            for (var i = 1; i <= 4; i++) {
+                var el = document.getElementById('odd-' + i);
+                if (el) el.className = 'horse-odd' + (i === sel ? ' selected' : '');
+            }
+        }
+
+        function changeBet(delta) {
+            var inp = document.getElementById('amount');
+            var val = parseInt(inp.value) || 500;
+            val = Math.max(500, val + delta);
+            val = Math.round(val / 500) * 500;
+            inp.value = val;
+        }
+
+        function startRace() {
+            if (_raceInProgress || !_gameInitialized) return;
+            var amount = parseInt(document.getElementById('amount').value) || 500;
+            amount = Math.round(amount / 500) * 500;
+            if (amount < 500) amount = 500;
+
+            if (_balance < amount) {
+                showResult('Insufficient balance!', 'Please top up your account', false);
+                return;
+            }
+
+            _betHorse = parseInt(document.getElementById('bethorse').value);
+            _pendingBet = amount;
+            _balance -= amount;
+            updateUI();
+
+            sendToParent('bet_placed', { bet: amount, tot_bet: amount });
+
+            _raceInProgress = true;
+            document.getElementById('start-btn').disabled = true;
+            document.getElementById('start-btn2').disabled = true;
+            results = [];
+
+            var tds = document.querySelectorAll('#results .result');
+            for (var i = 0; i < tds.length; i++) tds[i].className = 'result';
+
+            _horse1.run();
+            _horse2.run();
+            _horse3.run();
+            _horse4.run();
+        }
+
+        function onHorseArrive(horseNumber) {
+            var tds = document.querySelectorAll('#results .result');
+            tds[results.length].className = 'result horse' + horseNumber;
+            results.push(horseNumber);
+
+            if (results.length === 1) {
+                var winHorse = horseNumber;
+                var betAmount = _pendingBet;
+                var odd = _odds[_betHorse - 1] || 2.0;
+
+                if (winHorse === _betHorse) {
+                    var payout = Math.floor(betAmount * odd);
+                    _balance += payout;
+                    updateUI();
+                    sendToParent('win_result', { winAmount: payout, balance: _balance });
+                    showResult('You WIN! 🏆', '+' + payout.toLocaleString() + ' UGX (x' + odd.toFixed(2) + ')', true);
+                } else {
+                    sendToParent('win_result', { winAmount: 0, balance: _balance });
+                    showResult('You LOSE 😞', 'Horse ' + winHorse + ' won the race', false);
+                }
+                sendToParent('save_score', { money: _balance });
+            }
+
+            if (results.length === 4) {
+                _raceInProgress = false;
+                _pendingBet = 0;
+                document.getElementById('start-btn').disabled = false;
+                document.getElementById('start-btn2').disabled = false;
+            }
+        }
+
+        function showResult(title, sub, isWin) {
+            var el = document.getElementById('result-msg');
+            document.getElementById('result-text').textContent = title;
+            document.getElementById('result-sub').textContent = sub;
+            el.style.display = 'block';
+            el.style.borderColor = isWin ? '#00ff88' : '#ff4444';
+            el.style.color = isWin ? '#00ff88' : '#ff6666';
+            setTimeout(function() { el.style.display = 'none'; }, 3500);
+        }
+    </script>
+    <script src="game.js"></script>
+</body>
+</html>

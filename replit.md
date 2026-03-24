@@ -44,9 +44,12 @@ Preferred communication style: Simple, everyday language.
 ### Game Mechanics
 - **Slots**: 3-reel slot machine with emoji symbols, configurable win chance
 - **Roulette**: European-style with number, color, and parity betting options
-- **Fish Hunt**: Underwater arcade shooter with 10 sea creature types (small fish to Scorpion King), click-to-shoot mechanics, multipliers from x2 to x50, animated SVG fish with health bars, cannon aiming, bubble effects, and 3D perspective scene
+- **Fish Joy**: Arcade cannon-shooting fish game (replaces old Fish Hunt). Players fire at 12 fish types (1-200 coin rewards). 500 UGX per coin scale; shots cost 500-3500 UGX; embedded iframe with postMessage protocol; backend `/api/games/fishjoy/bet` and `/api/games/fishjoy/win`
 - **Classic Slots**: Imported HTML5 canvas 5-reel 3-row 20-payline slot machine embedded via iframe, uses jQuery/CreateJS/Howler, UGX currency with bet steps 100-5000, postMessage handshake for balance sync with parent React page, backend bet/win API endpoints
-- **House Edge**: Administrators can adjust win probabilities per game type and coinflip payout multiplier through the Game Control panel
+- **Greyhound Racing** (`/dog-racing`): Imported greyhound race HTML5 game with postMessage protocol; bet/win backend endpoints at `/api/games/dog-racing/bet` and `/api/games/dog-racing/win`
+- **Horse4 Racing** (`/horse4`): Imported 4-horse racing HTML5 game (CMain/CHorse/CreateJS stack) with postMessage protocol; backend endpoints at `/api/games/horse4/bet` and `/api/games/horse4/win`
+- **Quick Horse Race** (`/horse-racing`): Custom 4-horse race JS game with UGX UI, 500 UGX bet steps, per-horse odds configurable by admin (stored in extraSettings JSON), admin-configurable max laps; backend settings at `/api/games/horse-js/settings`, bet/win at `/api/games/horse-js/bet` and `/api/games/horse-js/win`
+- **House Edge**: Administrators can adjust win probabilities per game type and coinflip payout multiplier through the Game Control panel; horse-js has special panel for per-horse odds and max laps
 
 ### Role-Based Access Control (4-tier hierarchy)
 - **User**: Play games, redeem vouchers, view balance

@@ -505,8 +505,8 @@ export default function Lobby() {
               icon: Fish as LucideIcon,
               tag: "NEW",
               tagColor: "bg-cyan-600",
-              title: "Fish Hunt",
-              desc: "Hunt legendary sea creatures for massive multipliers!",
+              title: "Fish Joy",
+              desc: "Fire your cannon to catch fish and win big rewards!",
               id: "fishhunt"
             },
             {
@@ -518,6 +518,36 @@ export default function Lobby() {
               title: "Classic Slots",
               desc: "5-reel 20-payline classic slot machine with big multipliers!",
               id: "classic-slots"
+            },
+            {
+              href: "/dog-racing",
+              img: "https://images.unsplash.com/photo-1587300003388-59208cc962cb?q=80&w=2070",
+              icon: Zap as LucideIcon,
+              tag: "NEW",
+              tagColor: "bg-green-700",
+              title: "Greyhound Racing",
+              desc: "Bet on lightning-fast greyhounds in the ultimate race!",
+              id: "dog-racing"
+            },
+            {
+              href: "/horse4",
+              img: "https://images.unsplash.com/photo-1553284965-83fd3e82fa5a?q=80&w=2071",
+              icon: Trophy as LucideIcon,
+              tag: "NEW",
+              tagColor: "bg-yellow-700",
+              title: "Horse Racing",
+              desc: "Pick your champion horse and win big at the track!",
+              id: "horse4"
+            },
+            {
+              href: "/horse-racing",
+              img: "https://images.unsplash.com/photo-1574096163878-c3e4b3a79dcd?q=80&w=2070",
+              icon: Star as LucideIcon,
+              tag: "NEW",
+              tagColor: "bg-red-700",
+              title: "Quick Horse Race",
+              desc: "Fast 4-horse race with custom odds and lap settings!",
+              id: "horse-racing"
             }
           ].map((game, idx) => (
             <motion.div 

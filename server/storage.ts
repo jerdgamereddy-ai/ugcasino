@@ -46,6 +46,7 @@ export interface IStorage {
   getAllGameSettings(): Promise<GameSetting[]>;
   updateGameSettings(gameType: string, winChance: number, updatedBy: number): Promise<GameSetting>;
   updateGamePayoutMultiplier(gameType: string, payoutMultiplier: number, updatedBy: number): Promise<GameSetting>;
+  updateGameExtraSettings(gameType: string, extraSettings: string, updatedBy: number): Promise<GameSetting>;
 
   createWithdrawalRequest(req: { userId: number, amount: number, managerCode?: string, managerId?: number }): Promise<WithdrawalRequest>;
   getWithdrawalRequest(id: number): Promise<WithdrawalRequest | undefined>;
@@ -263,6 +264,17 @@ export class DatabaseStorage implements IStorage {
       .onConflictDoUpdate({
         target: gameSettings.gameType,
         set: { payoutMultiplier, updatedBy, updatedAt: new Date() }
+      })
+      .returning();
+    return updated;
+  }
+
+  async updateGameExtraSettings(gameType: string, extraSettings: string, updatedBy: number): Promise<GameSetting> {
+    const [updated] = await db.insert(gameSettings)
+      .values({ gameType: gameType as any, winChance: 0.3, payoutMultiplier: 2.0, extraSettings, updatedBy })
+      .onConflictDoUpdate({
+        target: gameSettings.gameType,
+        set: { extraSettings, updatedBy, updatedAt: new Date() }
       })
       .returning();
     return updated;

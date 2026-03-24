@@ -1,0 +1,104 @@
+root { 
+    display: block;
+}
+
+body{
+    background-color: #000;
+    background-repeat: repeat-x;
+    background-position: top;   
+}
+
+
+*, *:before, *:after {
+    -webkit-touch-callout: none; /* iOS Safari */
+    -webkit-user-select: none; /* Safari */
+    -khtml-user-select: none; /* Konqueror HTML */
+    -moz-user-select: none; /* Old versions of Firefox */
+    -ms-user-select: none; /* Internet Explorer/Edge */
+    user-select: none; /* Non-prefixed version, currently
+                                  supported by Chrome, Edge, Opera and Firefox */
+}
+
+input, input:before, input:after {
+    -webkit-touch-callout: none; /* iOS Safari */
+    -webkit-user-select: none; /* Safari */
+    -khtml-user-select: none; /* Konqueror HTML */
+    -moz-user-select: none; /* Old versions of Firefox */
+    -ms-user-select: none; /* Internet Explorer/Edge */
+    user-select: none; /* Non-prefixed version, currently
+                                  supported by Chrome, Edge, Opera and Firefox */
+}
+
+::selection { background: transparent;color:inherit; }
+::-moz-selection { background: transparent;color:inherit; }
+
+#canvas{ 
+    position: fixed; 
+}
+
+canvas {
+    image-rendering:-o-crisp-edges;
+    image-rendering:-webkit-optimize-contrast;
+    -ms-interpolation-mode: nearest-neighbor;
+	-ms-touch-action: none;
+}
+
+.ani_hack{
+    -webkit-perspective: 1000;
+    -webkit-backface-visibility: hidden;
+    
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    -khtml-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+    outline: none;
+    -webkit-tap-highlight-color: transparent; /* mobile webkit */
+}
+
+/***************FONTS*******************/
+.check-fonts{
+                position: fixed;
+                opacity:0;
+}
+
+.check-font-1{
+        font-family: 'impactregular';
+}
+
+.check-font-2{
+        font-family: 'Digital-7';
+}
+
+.check-font-3{
+        font-family: 'InfiniteJustice';
+}
+@font-face {
+    font-family: 'impactregular';
+    src: url('../fonts/impact-webfont.eot');
+    src: url('../fonts/impact-webfont.eot#iefix') format('embedded-opentype'),
+         url('../fonts/impact-webfont.woff2') format('woff2'),
+         url('../fonts/impact-webfont.woff') format('woff'),
+         url('../fonts/impact-webfont.ttf') format('truetype'),
+         url('../images/impact-webfont.svg#impactregular') format('svg');
+    font-weight: normal;
+    font-style: normal;
+
+}
+
+@font-face {
+	font-family: 'Digital-7';
+	src: url('../fonts/Digital-7.eot') format('eot'), 
+	     url('../fonts/Digital-7.woff') format('woff'), 
+	     url('../fonts/Digital-7.ttf')  format('truetype'),
+	     url('../images/Digital-7.svg#Digital-7') format('svg');
+}
+
+
+@font-face {
+  font-family: 'InfiniteJustice';
+  src: url('../fonts/InfiniteJustice.eot#iefix') format('embedded-opentype'),  url('../fonts/InfiniteJustice.woff') format('woff'), url('../fonts/InfiniteJustice.ttf')  format('truetype'), url('../images/InfiniteJustice.svg#InfiniteJustice') format('svg');
+  font-weight: normal;
+  font-style: normal;
+}
