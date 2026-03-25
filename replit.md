@@ -97,7 +97,9 @@ Preferred communication style: Simple, everyday language.
 
 ### Manager Voucher Creation
 - **Create Vouchers**: Managers can generate deposit vouchers from "Vouchers" tab
-- **View Vouchers**: Managers see list of their created vouchers with code, amount, status, and copy button
+- **View Vouchers**: Managers see list of their created vouchers with code, amount, status, copy and print buttons
+- **Print Voucher**: Individual print button per voucher opens a print-ready styled popup with code, amount, date; "Print All" button prints all unredeemed vouchers in a grid
+- **Admin Vouchers**: Admin voucher table also has per-voucher print and "Print All Active" buttons
 - **API**: `GET /api/manager/vouchers`, `POST /api/vouchers` (existing, already allows manager role)
 
 ### Broadcast System

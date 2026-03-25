@@ -23,13 +23,13 @@ export function ChatPanel({ currentUserId, chatTargets, title = "Chat" }: ChatPa
 
   const { data: contacts } = useQuery<{ userId: number; lastMessage: string; lastMessageAt: string | null; unreadCount: number }[]>({
     queryKey: ["/api/messages/contacts"],
-    refetchInterval: 5000,
+    refetchInterval: 20000,
   });
 
   const { data: conversation, isLoading: conversationLoading } = useQuery<Message[]>({
     queryKey: ["/api/messages", selectedUserId],
     enabled: !!selectedUserId,
-    refetchInterval: 3000,
+    refetchInterval: 15000,
   });
 
   const sendMutation = useMutation({

@@ -257,5 +257,10 @@
         }
     </script>
     <script src="game.js"></script>
+    <script>
+        window.addEventListener('load', function() {
+            sendToParent('game_ready', {});
+        });
+    </script>
 </body>
 </html>

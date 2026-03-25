@@ -9,7 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useState, useRef } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { Shield, Plus, Users, Ticket, Copy, Banknote, CheckCircle, Loader2, Ban, Trash2, ArrowUpCircle, KeyRound, UserCog, Lock, BarChart3, Settings2, ChevronUp, ChevronDown, Megaphone, Calculator, Phone, CircleDot, Crown, Briefcase } from "lucide-react";
+import { Shield, Plus, Users, Ticket, Copy, Banknote, CheckCircle, Loader2, Ban, Trash2, ArrowUpCircle, KeyRound, UserCog, Lock, BarChart3, Settings2, ChevronUp, ChevronDown, Megaphone, Calculator, Phone, CircleDot, Crown, Briefcase, Printer } from "lucide-react";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -440,6 +440,66 @@ export default function AdminDashboard() {
     toast({ title: "Copied!", description: code });
   };
 
+  const printVoucher = (v: { code: string; amount: number; createdAt?: string | null }) => {
+    const w = window.open("", "_blank", "width=400,height=520");
+    if (!w) return;
+    w.document.write(`<!DOCTYPE html><html><head><title>UG Casino Voucher</title>
+    <style>
+      body { font-family: Arial, sans-serif; margin: 0; padding: 20px; background: #fff; }
+      .voucher { border: 3px dashed #c9a227; border-radius: 12px; padding: 24px; max-width: 340px; margin: 0 auto; text-align: center; }
+      .logo { font-size: 22px; font-weight: bold; color: #c9a227; margin-bottom: 4px; }
+      .subtitle { font-size: 12px; color: #666; margin-bottom: 16px; }
+      .label { font-size: 11px; color: #888; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px; }
+      .code { font-size: 28px; font-weight: bold; color: #1a0a00; letter-spacing: 6px; border: 2px solid #c9a227; border-radius: 8px; padding: 10px 16px; margin: 8px 0; background: #fff9e6; }
+      .amount { font-size: 22px; font-weight: bold; color: #c9a227; margin: 8px 0; }
+      .date { font-size: 11px; color: #aaa; margin-top: 12px; }
+      .note { font-size: 10px; color: #bbb; margin-top: 8px; border-top: 1px solid #eee; padding-top: 8px; }
+    </style></head><body>
+    <div class="voucher">
+      <div class="logo">🎰 UG Casino</div>
+      <div class="subtitle">Deposit Voucher</div>
+      <div class="label">Voucher Code</div>
+      <div class="code">${v.code}</div>
+      <div class="label">Amount</div>
+      <div class="amount">UGX ${v.amount.toLocaleString()}</div>
+      <div class="date">Generated: ${v.createdAt ? new Date(v.createdAt).toLocaleString() : new Date().toLocaleString()}</div>
+      <div class="note">Valid for one-time use only. Not redeemable if scratched or tampered.</div>
+    </div>
+    <script>window.onload = function() { window.print(); window.onafterprint = function() { window.close(); }; }</script>
+    </body></html>`);
+    w.document.close();
+  };
+
+  const printAllVouchers = (voucherList: { code: string; amount: number; isRedeemed: boolean }[]) => {
+    const unredeemed = voucherList.filter(v => !v.isRedeemed);
+    if (unredeemed.length === 0) { toast({ title: "No active vouchers to print", variant: "destructive" }); return; }
+    const w = window.open("", "_blank", "width=800,height=600");
+    if (!w) return;
+    const rows = unredeemed.map(v => `
+      <div class="voucher">
+        <div class="logo">🎰 UG Casino</div>
+        <div class="label">Voucher Code</div>
+        <div class="code">${v.code}</div>
+        <div class="amount">UGX ${v.amount.toLocaleString()}</div>
+        <div class="note">One-time use only</div>
+      </div>`).join("");
+    w.document.write(`<!DOCTYPE html><html><head><title>UG Casino Vouchers</title>
+    <style>
+      body { font-family: Arial, sans-serif; margin: 0; padding: 16px; background: #fff; }
+      .grid { display: flex; flex-wrap: wrap; gap: 16px; justify-content: center; }
+      .voucher { border: 2px dashed #c9a227; border-radius: 8px; padding: 16px; width: 200px; text-align: center; page-break-inside: avoid; }
+      .logo { font-size: 14px; font-weight: bold; color: #c9a227; margin-bottom: 4px; }
+      .label { font-size: 9px; color: #888; text-transform: uppercase; letter-spacing: 1px; }
+      .code { font-size: 16px; font-weight: bold; letter-spacing: 3px; border: 1px solid #c9a227; border-radius: 4px; padding: 6px; margin: 4px 0; background: #fff9e6; }
+      .amount { font-size: 16px; font-weight: bold; color: #c9a227; }
+      .note { font-size: 8px; color: #bbb; margin-top: 6px; }
+    </style></head><body>
+    <div class="grid">${rows}</div>
+    <script>window.onload = function() { window.print(); window.onafterprint = function() { window.close(); }; }</script>
+    </body></html>`);
+    w.document.close();
+  };
+
   const superManagers = users?.filter(u => u.role === 'super_manager') || [];
   const managers = users?.filter(u => u.role === 'manager') || [];
   const players = users?.filter(u => u.role === 'user') || [];
@@ -752,7 +812,14 @@ export default function AdminDashboard() {
 
               <Card className="md:col-span-2 glass-card">
                 <CardHeader>
-                  <CardTitle className="flex items-center gap-2"><Ticket className="w-5 h-5" /> Recent Vouchers</CardTitle>
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="flex items-center gap-2"><Ticket className="w-5 h-5" /> Recent Vouchers</CardTitle>
+                    {vouchers && vouchers.length > 0 && (
+                      <Button size="sm" variant="outline" onClick={() => printAllVouchers(vouchers)} data-testid="button-print-all-vouchers">
+                        <Printer className="w-4 h-4 mr-1" /> Print All Active
+                      </Button>
+                    )}
+                  </div>
                 </CardHeader>
                 <CardContent>
                   <Table>
@@ -780,9 +847,14 @@ export default function AdminDashboard() {
                               </span>
                             </TableCell>
                             <TableCell>
-                              <Button size="icon" variant="ghost" onClick={() => copyToClipboard(v.code)} data-testid={`button-copy-${v.id}`}>
-                                <Copy className="w-4 h-4" />
-                              </Button>
+                              <div className="flex gap-1">
+                                <Button size="icon" variant="ghost" onClick={() => copyToClipboard(v.code)} data-testid={`button-copy-${v.id}`}>
+                                  <Copy className="w-4 h-4" />
+                                </Button>
+                                <Button size="icon" variant="ghost" onClick={() => printVoucher(v)} data-testid={`button-print-${v.id}`}>
+                                  <Printer className="w-4 h-4" />
+                                </Button>
+                              </div>
                             </TableCell>
                           </TableRow>
                         ))

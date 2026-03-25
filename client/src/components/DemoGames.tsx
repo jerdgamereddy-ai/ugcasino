@@ -39,11 +39,11 @@ function MiniSlots() {
           });
           setSpinning(false);
         }
-      }, 80);
+      }, 150);
     };
 
     spin();
-    const loop = setInterval(spin, 4000);
+    const loop = setInterval(spin, 8000);
     return () => { clearInterval(loop); if (innerRef.current) clearInterval(innerRef.current); };
   }, []);
 

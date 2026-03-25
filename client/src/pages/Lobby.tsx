@@ -57,7 +57,7 @@ function JackpotTicker() {
   useEffect(() => {
     const interval = setInterval(() => {
       setJackpot(prev => prev + Math.floor(Math.random() * 5000) + 1000);
-    }, 100);
+    }, 3000);
     return () => clearInterval(interval);
   }, []);
 

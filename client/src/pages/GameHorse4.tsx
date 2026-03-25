@@ -11,11 +11,10 @@ export default function GameHorse4() {
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
-  const [gameReady, setGameReady] = useState(false);
   const balanceSentRef = useRef(false);
+  const iframeLoadedRef = useRef(false);
 
   const { data: user } = useQuery<User>({ queryKey: ["/api/user"] });
-
   const { data: gameSettings } = useQuery<{ winOccurrence: number }>({
     queryKey: ["/api/games/horse4/settings"],
   });
@@ -48,21 +47,29 @@ export default function GameHorse4() {
     },
   });
 
-  const sendBalanceToIframe = useCallback(() => {
-    if (user && gameSettings && iframeRef.current?.contentWindow && gameReady && !balanceSentRef.current) {
-      iframeRef.current.contentWindow.postMessage(
-        { type: "init_balance", balance: user.balance, winOccurrence: gameSettings.winOccurrence },
-        "*"
-      );
-      balanceSentRef.current = true;
-    }
-  }, [user, gameReady, gameSettings]);
+  const trySendBalance = useCallback(() => {
+    if (balanceSentRef.current || !iframeLoadedRef.current) return;
+    if (!user || !gameSettings || !iframeRef.current?.contentWindow) return;
+    iframeRef.current.contentWindow.postMessage(
+      { type: "init_balance", balance: user.balance, winOccurrence: gameSettings.winOccurrence },
+      "*"
+    );
+    balanceSentRef.current = true;
+  }, [user, gameSettings]);
+
+  const handleIframeLoad = useCallback(() => {
+    iframeLoadedRef.current = true;
+    trySendBalance();
+  }, [trySendBalance]);
+
+  useEffect(() => { trySendBalance(); }, [trySendBalance]);
 
   const handleMessage = useCallback((event: MessageEvent) => {
     if (!event.data || !event.data.type) return;
     switch (event.data.type) {
       case "game_ready":
-        setGameReady(true);
+        iframeLoadedRef.current = true;
+        trySendBalance();
         break;
       case "bet_placed":
         lastBetRef.current = event.data.tot_bet;
@@ -94,14 +101,12 @@ export default function GameHorse4() {
         navigate("/");
         break;
     }
-  }, [betMutation, winMutation, navigate]);
+  }, [betMutation, winMutation, navigate, trySendBalance]);
 
   useEffect(() => {
     window.addEventListener("message", handleMessage);
     return () => window.removeEventListener("message", handleMessage);
   }, [handleMessage]);
-
-  useEffect(() => { sendBalanceToIframe(); }, [sendBalanceToIframe]);
 
   const toggleFullscreen = useCallback(() => {
     if (!containerRef.current) return;
@@ -142,6 +147,7 @@ export default function GameHorse4() {
             className="w-full border-0 rounded-lg"
             style={{ height: "calc(100vh - 80px)", minHeight: "500px" }}
             allow="autoplay; fullscreen"
+            onLoad={handleIframeLoad}
             data-testid="iframe-horse4"
           />
         </div>
