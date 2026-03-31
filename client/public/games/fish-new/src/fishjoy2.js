@@ -79,7 +79,7 @@ game.load = function(container)
 		top: (this.height >> 1) + "px",
 		textAlign: "center",
 		color: "#fff",
-		font: Q.isMobile ?  'bold 16px Đen' : 'bold 16px Times New Roman',
+		font: Q.isMobile ?  'bold 16px Arial' : 'bold 16px Times New Roman',
 		textShadow: "0 2px 2px #111"
 	}});
 	this.container.appendChild(div);
@@ -105,7 +105,7 @@ game.load = function(container)
 
 game.onLoadLoaded = function(e)
 {
-	var content = "Đang tải game, vui lòng chờ...<br>(" + Math.round(e.target.getLoadedSize()/e.target.getTotalSize()*100) + "%)";
+	var content = "Loading game, please wait...<br>(" + Math.round(e.target.getLoadedSize()/e.target.getTotalSize()*100) + "%)";
 	//this.loader.innerHTML = content;
 };
 

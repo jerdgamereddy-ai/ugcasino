@@ -38,7 +38,7 @@ R.sources =
 	{id:"numBlack", size:1, src:"images/number_black.png"},
 	{id:"coinAni1", size:19, src:"images/coinAni1.png"},
 	{id:"coinAni2", size:22, src:"images/coinAni2.png"},
-	{id:"coinText", size:16, src:"images/coinText.png}
+	{id:"coinText", size:16, src:"images/coinText.png"}
 ];
 
 R.init = function(images)
