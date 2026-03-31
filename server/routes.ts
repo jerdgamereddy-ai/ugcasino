@@ -1126,6 +1126,26 @@ export async function registerRoutes(
     }
   });
 
+  // === FISH JOY SETTINGS ===
+  app.get("/api/games/fishjoy/settings", async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    try {
+      const settings = await storage.getGameSettings("fishjoy");
+      const extra = (() => { try { return settings?.extraSettings ? JSON.parse(settings.extraSettings) : {}; } catch { return {}; } })();
+      const fishOdds = extra.fishOdds ?? [2, 4, 6, 10, 15, 25, 40, 60, 80, 100, 150, 300];
+      res.json({ fishOdds });
+    } catch (err) { res.status(500).json({ message: "Internal Server Error" }); }
+  });
+
+  app.post("/api/games/fishjoy/settings", async (req, res) => {
+    if (!req.isAuthenticated() || req.user.role !== "admin") return res.status(403).send("Forbidden");
+    try {
+      const { fishOdds } = z.object({ fishOdds: z.array(z.number().min(0.1).max(10000)).length(12) }).parse(req.body);
+      await storage.updateGameExtraSettings("fishjoy", JSON.stringify({ fishOdds }), req.user.id);
+      res.json({ success: true, fishOdds });
+    } catch (err) { res.status(500).json({ message: "Internal Server Error" }); }
+  });
+
   // === CLASSIC SLOTS ===
   app.get("/api/games/classic-slots/settings", async (req, res) => {
     if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");

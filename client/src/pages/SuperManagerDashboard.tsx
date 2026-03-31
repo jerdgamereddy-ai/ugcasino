@@ -104,6 +104,7 @@ export default function SuperManagerDashboard() {
     },
   });
 
+  const [playerSearch, setPlayerSearch] = useState("");
   const [userPasswords, setUserPasswords] = useState<Record<number, string>>({});
   const [withdrawCodes, setWithdrawCodes] = useState<Record<number, string>>({});
 
@@ -315,6 +316,15 @@ export default function SuperManagerDashboard() {
                 <CardDescription>Players created by your managers.</CardDescription>
               </CardHeader>
               <CardContent>
+                <div className="mb-3">
+                  <Input
+                    placeholder="Search by username..."
+                    value={playerSearch}
+                    onChange={e => setPlayerSearch(e.target.value)}
+                    className="bg-white/5 border-white/10 max-w-xs"
+                    data-testid="input-search-players"
+                  />
+                </div>
                 {usersLoading ? (
                   <div className="flex justify-center p-8"><Loader2 className="w-6 h-6 animate-spin" /></div>
                 ) : players.length === 0 ? (
@@ -331,7 +341,7 @@ export default function SuperManagerDashboard() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {players.map((p) => (
+                      {players.filter(p => p.username.toLowerCase().includes(playerSearch.toLowerCase())).map((p) => (
                         <TableRow key={p.id} className="border-white/10" data-testid={`row-player-${p.id}`}>
                           <TableCell>#{p.id}</TableCell>
                           <TableCell>{p.username}</TableCell>

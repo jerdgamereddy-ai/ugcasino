@@ -6,115 +6,214 @@
 <meta name="viewport" content="user-scalable=no, initial-scale=1.0, minimum-scale=1, maximum-scale=1" />
 
 <style type="text/css">
-body, div, canvas
-{
-    image-rendering: optimizeSpeed;
-    -webkit-image-rendering: optimizeSpeed;
-    -webkit-interpolation-mode: nearest-neighbor;
+body, div, canvas { image-rendering: optimizeSpeed; -webkit-image-rendering: optimizeSpeed; -webkit-interpolation-mode: nearest-neighbor; }
+body { padding:0; margin:0; font-size:12px; background-color:#000; }
+body, html { height:100%; width:100%; overflow:hidden; }
+#container {
+  position:fixed; top:0; left:0;
+  width:100vw !important; height:100vh !important;
+  background-image:url('images/game_bg_2_hd.jpg');
+  background-size:cover; background-position:center;
+  overflow:hidden;
 }
-body{padding:0; margin:0; font-size:12px; background-color:#000;}
-body, html{height: 100%; width: 100%; overflow: hidden;}
-#container{
-    position: fixed;
-    top: 0; left: 0;
-    width: 100vw !important;
-    height: 100vh !important;
-    background-image: url('images/game_bg_2_hd.jpg');
-    background-size: cover;
-    background-position: center;
-    overflow: hidden;
+#bet-wrap {
+  position:fixed; bottom:0; left:0; right:0; z-index:500;
+  display:flex; justify-content:center; padding:6px 0 0;
+  pointer-events:none;
 }
+#bet-inner {
+  background:rgba(0,0,0,0.84);
+  border-radius:10px 10px 0 0;
+  padding:7px 14px;
+  display:flex; align-items:center; gap:4px;
+  pointer-events:all;
+  box-shadow:0 -2px 12px rgba(0,0,0,0.6);
+}
+.bet-btn {
+  border:2px solid transparent;
+  cursor:pointer; border-radius:6px;
+  padding:5px 10px; font-size:13px; font-weight:bold;
+  background:rgba(255,255,255,0.1); color:#ccc;
+  transition:all 0.15s;
+  font-family:Arial,sans-serif;
+}
+.bet-btn:hover { background:rgba(255,255,255,0.2); color:#fff; }
+.bet-btn.active {
+  background:#D4AF37; color:#000;
+  border-color:#ffdb70;
+  box-shadow:0 0 10px rgba(212,175,55,0.5);
+}
+#odds-wrap {
+  position:fixed; top:50%; right:0; transform:translateY(-50%);
+  z-index:500; pointer-events:none;
+}
+#odds-inner {
+  background:rgba(0,0,0,0.86);
+  border-radius:8px 0 0 8px;
+  padding:8px 10px;
+  pointer-events:all;
+  max-height:80vh; overflow-y:auto;
+  min-width:110px;
+  box-shadow:-2px 0 10px rgba(0,0,0,0.5);
+}
+.odds-title {
+  color:#D4AF37; font-weight:bold; font-size:10px;
+  text-align:center; letter-spacing:1px;
+  margin-bottom:5px; font-family:Arial,sans-serif;
+}
+.odds-row {
+  display:flex; align-items:center; gap:4px;
+  padding:3px 0; border-bottom:1px solid rgba(255,255,255,0.07);
+}
+.odds-emoji { font-size:13px; }
+.odds-name { color:#aaa; font-size:9px; flex:1; white-space:nowrap; font-family:Arial,sans-serif; }
+.odds-val { color:#D4AF37; font-weight:bold; font-size:10px; font-family:Arial,sans-serif; }
 </style>
 
 <title>Fish Joy</title>
 
-<script type="text/javascript" src="js/quark.base-1.0.0.alpha.min.js?v=4"></script>
-<script type="text/javascript" src="src/R.js?v=4"></script>
-<script type="text/javascript" src="src/Utils.js?v=4"></script>
-<script type="text/javascript" src="src/fishjoy.js?v=4"></script>
-<script type="text/javascript" src="src/FishManager.js?v=4"></script>
-<script type="text/javascript" src="src/FishGroup.js?v=4"></script>
-<script type="text/javascript" src="src/views/Fish.js?v=4"></script>
-<script type="text/javascript" src="src/views/Cannon.js?v=4"></script>
-<script type="text/javascript" src="src/views/Bullet.js?v=4"></script>
-<script type="text/javascript" src="src/views/Num.js?v=4"></script>
-<script type="text/javascript" src="src/views/Player.js?v=4"></script>
+<script type="text/javascript" src="js/quark.base-1.0.0.alpha.min.js?v=5"></script>
+<script type="text/javascript" src="src/R.js?v=5"></script>
+<script type="text/javascript" src="src/Utils.js?v=5"></script>
+<script type="text/javascript" src="src/fishjoy.js?v=5"></script>
+<script type="text/javascript" src="src/FishManager.js?v=5"></script>
+<script type="text/javascript" src="src/FishGroup.js?v=5"></script>
+<script type="text/javascript" src="src/views/Fish.js?v=5"></script>
+<script type="text/javascript" src="src/views/Cannon.js?v=5"></script>
+<script type="text/javascript" src="src/views/Bullet.js?v=5"></script>
+<script type="text/javascript" src="src/views/Num.js?v=5"></script>
+<script type="text/javascript" src="src/views/Player.js?v=5"></script>
 
 <script type="text/javascript">
+var BET_VALUES  = [0, 100, 200, 500, 1000, 2000, 5000, 10000];
+var BET_LABELS  = ['', '100', '200', '500', '1K', '2K', '5K', '10K'];
+var FISH_INFO   = [
+  { name:'Tiny Fish',   emoji:'🐟' },
+  { name:'Small Fish',  emoji:'🐟' },
+  { name:'Sea Fish',    emoji:'🐟' },
+  { name:'Stripe Fish', emoji:'🐠' },
+  { name:'Angel Fish',  emoji:'🐠' },
+  { name:'Puffer Fish', emoji:'🐡' },
+  { name:'Sword Fish',  emoji:'🐡' },
+  { name:'Bat Fish',    emoji:'🐡' },
+  { name:'Coral Fish',  emoji:'🐡' },
+  { name:'Bull Fish',   emoji:'🐡' },
+  { name:'Shark',       emoji:'🦈' },
+  { name:'Giant Shark', emoji:'🦈' }
+];
+var FISH_COIN_IDX = {1:0, 3:1, 5:2, 8:3, 10:4, 20:5, 30:6, 40:7, 50:8, 60:9, 100:10, 200:11};
+
+var _fishOdds      = [2, 4, 6, 10, 15, 25, 40, 60, 80, 100, 150, 300];
+var _currentPower  = 1;
 var _parentBalance = 0;
-var _gameReady = false;
-var _pendingBalance = null;
-var COINS_PER_UGX = 500;
+var _gameReady     = false;
+var _pendingCoins  = null;
 
 function sendToParent(type, data) {
-    if (window.parent && window.parent !== window) {
-        window.parent.postMessage(Object.assign({ type: type }, data), '*');
-    }
+  if (window.parent && window.parent !== window)
+    window.parent.postMessage(Object.assign({ type: type }, data || {}), '*');
 }
 
-window.addEventListener('message', function(event) {
-    if (!event.data) return;
-    if (event.data.type === 'init_balance') {
-        _parentBalance = event.data.balance || 0;
-        var coins = Math.floor(_parentBalance / COINS_PER_UGX);
-        if (_gameReady) {
-            setPlayerCoins(coins);
-        } else {
-            _pendingBalance = coins;
-        }
-    }
+window.addEventListener('message', function(ev) {
+  if (!ev.data) return;
+  if (ev.data.type === 'init_balance') {
+    _parentBalance = ev.data.balance || 0;
+    var coins = Math.floor(_parentBalance / 100);
+    if (_gameReady) setPlayerCoins(coins);
+    else _pendingCoins = coins;
+  } else if (ev.data.type === 'init_settings') {
+    if (Array.isArray(ev.data.fishOdds) && ev.data.fishOdds.length === 12)
+      _fishOdds = ev.data.fishOdds;
+    renderOddsPanel();
+  }
 });
 
 function setPlayerCoins(coins) {
-    var ns = Q && Q.use ? Q.use('fish') : null;
-    if (ns && ns.game && ns.game.player) {
-        ns.game.player.updateCoin(coins, false);
-    }
+  var ns = Q && Q.use ? Q.use('fish') : null;
+  if (ns && ns.game && ns.game.player)
+    ns.game.player.updateCoin(coins, false);
 }
 
 function patchPlayer() {
-    var ns = Q.use('fish');
-    if (!ns || !ns.game || !ns.game.player) {
-        setTimeout(patchPlayer, 200);
-        return;
-    }
-    var player = ns.game.player;
-    var origFire = player.fire.bind(player);
-    var origCapture = player.captureFish.bind(player);
+  var ns = Q.use('fish');
+  if (!ns || !ns.game || !ns.game.player) { setTimeout(patchPlayer, 200); return; }
+  var player = ns.game.player;
+  var origFire    = player.fire.bind(player);
+  var origCapture = player.captureFish.bind(player);
 
-    player.fire = function(targetPoint) {
-        var power = this.cannon ? this.cannon.power : 1;
-        var betAmount = power * COINS_PER_UGX;
-        if (this.coin < power) return;
-        sendToParent('bet', { amount: betAmount });
-        origFire(targetPoint);
-    };
+  player.fire = function(targetPoint) {
+    var power     = _currentPower;
+    var betAmount = BET_VALUES[power];
+    if (betAmount > _parentBalance) return;
+    sendToParent('bet', { amount: betAmount });
+    this.cannon.setPower(power, false);
+    origFire.call(this, targetPoint);
+  };
 
-    player.captureFish = function(fish) {
-        var winAmount = (fish.coin || 0) * COINS_PER_UGX;
-        sendToParent('win', { amount: winAmount });
-        origCapture(fish);
-    };
+  player.captureFish = function(fish) {
+    var idx        = (FISH_COIN_IDX[fish.coin] !== undefined) ? FISH_COIN_IDX[fish.coin] : 0;
+    var multiplier = _fishOdds[idx] || 1;
+    var winAmount  = Math.round(BET_VALUES[_currentPower] * multiplier);
+    sendToParent('win', { amount: winAmount });
+    origCapture.call(this, fish);
+  };
 
-    _gameReady = true;
-    if (_pendingBalance !== null) {
-        setPlayerCoins(_pendingBalance);
-        _pendingBalance = null;
-    }
-    sendToParent('ready', {});
+  _gameReady = true;
+  if (_pendingCoins !== null) { setPlayerCoins(_pendingCoins); _pendingCoins = null; }
+  sendToParent('ready', {});
+  renderBetPanel();
+  renderOddsPanel();
 }
 
-window.addEventListener('load', function() {
-    setTimeout(patchPlayer, 800);
-});
+function renderBetPanel() {
+  var inner = document.getElementById('bet-inner');
+  if (!inner) return;
+  inner.innerHTML = '<span style="color:#888;font-size:10px;margin-right:6px;letter-spacing:1px;font-family:Arial,sans-serif;">BET/SHOT</span>';
+  for (var i = 1; i <= 7; i++) {
+    (function(idx) {
+      var btn = document.createElement('button');
+      btn.className = 'bet-btn' + (idx === _currentPower ? ' active' : '');
+      btn.textContent = BET_LABELS[idx];
+      btn.onclick = function(e) {
+        e.stopPropagation();
+        _currentPower = idx;
+        var ns = Q && Q.use ? Q.use('fish') : null;
+        if (ns && ns.game && ns.game.player) ns.game.player.cannon.setPower(idx, false);
+        renderBetPanel();
+      };
+      inner.appendChild(btn);
+    })(i);
+  }
+}
+
+function renderOddsPanel() {
+  var inner = document.getElementById('odds-inner');
+  if (!inner) return;
+  inner.innerHTML = '<div class="odds-title">FISH ODDS</div>';
+  for (var i = 0; i < FISH_INFO.length; i++) {
+    (function(idx) {
+      var row = document.createElement('div');
+      row.className = 'odds-row';
+      row.innerHTML =
+        '<span class="odds-emoji">' + FISH_INFO[idx].emoji + '</span>' +
+        '<span class="odds-name">'  + FISH_INFO[idx].name  + '</span>' +
+        '<span class="odds-val">'   + _fishOdds[idx] + 'x' + '</span>';
+      inner.appendChild(row);
+    })(i);
+  }
+}
+
+window.addEventListener('load', function() { setTimeout(patchPlayer, 800); });
 </script>
 
 </head>
-
 <body>
 
 <div id="container"></div>
 
-</body>
+<div id="bet-wrap"><div id="bet-inner"></div></div>
 
+<div id="odds-wrap"><div id="odds-inner"></div></div>
+
+</body>
 </html>

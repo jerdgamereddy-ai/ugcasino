@@ -8,13 +8,16 @@ import type { User } from "@shared/schema";
 
 export default function GameFishJoy() {
   const [, navigate] = useLocation();
-  const iframeRef = useRef<HTMLIFrameElement>(null);
+  const iframeRef    = useRef<HTMLIFrameElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
-  const [gameReady, setGameReady] = useState(false);
-  const balanceSentRef = useRef(false);
+  const [gameReady,    setGameReady]    = useState(false);
+  const initSentRef = useRef(false);
 
-  const { data: user } = useQuery<User>({ queryKey: ["/api/user"] });
+  const { data: user }         = useQuery<User>({ queryKey: ["/api/user"] });
+  const { data: fishSettings } = useQuery<{ fishOdds: number[] }>({
+    queryKey: ["/api/games/fishjoy/settings"],
+  });
 
   const betMutation = useMutation({
     mutationFn: async (data: { bet: number }) => {
@@ -23,12 +26,9 @@ export default function GameFishJoy() {
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["/api/user"] });
-      if (iframeRef.current?.contentWindow) {
-        iframeRef.current.contentWindow.postMessage(
-          { type: "init_balance", balance: data.balance },
-          "*"
-        );
-      }
+      iframeRef.current?.contentWindow?.postMessage(
+        { type: "init_balance", balance: data.balance }, "*"
+      );
     },
   });
 
@@ -39,40 +39,35 @@ export default function GameFishJoy() {
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["/api/user"] });
-      if (iframeRef.current?.contentWindow) {
-        iframeRef.current.contentWindow.postMessage(
-          { type: "init_balance", balance: data.balance },
-          "*"
-        );
-      }
+      iframeRef.current?.contentWindow?.postMessage(
+        { type: "init_balance", balance: data.balance }, "*"
+      );
     },
   });
 
-  const sendBalanceToIframe = useCallback(() => {
-    if (user && iframeRef.current?.contentWindow && gameReady && !balanceSentRef.current) {
-      iframeRef.current.contentWindow.postMessage(
-        { type: "init_balance", balance: user.balance },
-        "*"
-      );
-      balanceSentRef.current = true;
-    }
-  }, [user, gameReady]);
+  const sendInitToIframe = useCallback(() => {
+    if (!user || !iframeRef.current?.contentWindow || !gameReady || initSentRef.current) return;
+    if (!fishSettings) return;
+    initSentRef.current = true;
+    iframeRef.current.contentWindow.postMessage(
+      { type: "init_balance", balance: user.balance }, "*"
+    );
+    iframeRef.current.contentWindow.postMessage(
+      { type: "init_settings", fishOdds: fishSettings.fishOdds }, "*"
+    );
+  }, [user, gameReady, fishSettings]);
 
   const handleMessage = useCallback((event: MessageEvent) => {
-    if (!event.data || !event.data.type) return;
+    if (!event.data?.type) return;
     switch (event.data.type) {
       case "ready":
         setGameReady(true);
         break;
       case "bet":
-        if (event.data.amount > 0) {
-          betMutation.mutate({ bet: event.data.amount });
-        }
+        if (event.data.amount > 0) betMutation.mutate({ bet: event.data.amount });
         break;
       case "win":
-        if (event.data.amount > 0) {
-          winMutation.mutate({ winAmount: event.data.amount });
-        }
+        if (event.data.amount > 0) winMutation.mutate({ winAmount: event.data.amount });
         break;
       case "game_exit":
         navigate("/");
@@ -85,15 +80,14 @@ export default function GameFishJoy() {
     return () => window.removeEventListener("message", handleMessage);
   }, [handleMessage]);
 
-  useEffect(() => { sendBalanceToIframe(); }, [sendBalanceToIframe]);
+  useEffect(() => { sendInitToIframe(); }, [sendInitToIframe]);
 
   const toggleFullscreen = useCallback(() => {
     if (!containerRef.current) return;
-    if (!document.fullscreenElement) {
+    if (!document.fullscreenElement)
       containerRef.current.requestFullscreen().then(() => setIsFullscreen(true));
-    } else {
+    else
       document.exitFullscreen().then(() => setIsFullscreen(false));
-    }
   }, []);
 
   useEffect(() => {
@@ -109,8 +103,7 @@ export default function GameFishJoy() {
       {!isFullscreen && (
         <div className="flex items-center justify-between p-3" style={{ height: "56px" }}>
           <Button variant="ghost" size="sm" onClick={() => navigate("/")} className="text-[#D4AF37]" data-testid="button-back-lobby">
-            <ArrowLeft className="w-4 h-4 mr-1" />
-            Lobby
+            <ArrowLeft className="w-4 h-4 mr-1" /> Lobby
           </Button>
           <div className="flex items-center gap-4">
             <span className="text-[#D4AF37] font-bold text-sm" data-testid="text-balance">
@@ -124,9 +117,7 @@ export default function GameFishJoy() {
       )}
       {isFullscreen && (
         <Button
-          variant="ghost"
-          size="icon"
-          onClick={toggleFullscreen}
+          variant="ghost" size="icon" onClick={toggleFullscreen}
           className="text-[#D4AF37] absolute top-2 right-2 z-50"
           data-testid="button-fullscreen-exit"
           style={{ background: "rgba(0,0,0,0.5)" }}
@@ -138,10 +129,7 @@ export default function GameFishJoy() {
         ref={iframeRef}
         src="/games/fish-new/index.html"
         className="w-full border-0"
-        style={{
-          height: isFullscreen ? "100vh" : "calc(100vh - 56px)",
-          display: "block",
-        }}
+        style={{ height: isFullscreen ? "100vh" : "calc(100vh - 56px)", display: "block" }}
         allow="autoplay; fullscreen"
         data-testid="iframe-fish-joy"
       />

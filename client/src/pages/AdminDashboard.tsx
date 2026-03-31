@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { Shield, Plus, Users, Ticket, Copy, Banknote, CheckCircle, Loader2, Ban, Trash2, ArrowUpCircle, KeyRound, UserCog, Lock, BarChart3, Settings2, ChevronUp, ChevronDown, Megaphone, Calculator, Phone, CircleDot, Crown, Briefcase, Printer } from "lucide-react";
@@ -27,6 +27,68 @@ import { ChatPanel } from "@/components/ChatPanel";
 import { MessageCircle } from "lucide-react";
 
 type GameFormData = z.infer<typeof updateGameSettingsSchema>;
+
+const FISH_JOY_NAMES = ['Tiny Fish','Small Fish','Sea Fish','Stripe Fish','Angel Fish','Puffer Fish','Sword Fish','Bat Fish','Coral Fish','Bull Fish','Shark','Giant Shark'];
+const FISH_JOY_DEFAULT_ODDS = [2, 4, 6, 10, 15, 25, 40, 60, 80, 100, 150, 300];
+
+function FishJoyOddsCard() {
+  const { toast } = useToast();
+  const [odds, setOdds] = useState<number[]>(FISH_JOY_DEFAULT_ODDS);
+  const { data: settings } = useQuery<{ fishOdds: number[] }>({ queryKey: ["/api/games/fishjoy/settings"] });
+  const loadedRef = useRef(false);
+  useEffect(() => {
+    if (settings?.fishOdds && !loadedRef.current) { loadedRef.current = true; setOdds(settings.fishOdds); }
+  }, [settings]);
+
+  const mutation = useMutation({
+    mutationFn: async () => {
+      const res = await fetch("/api/games/fishjoy/settings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ fishOdds: odds }),
+      });
+      if (!res.ok) throw new Error("Failed to save");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/games/fishjoy/settings"] });
+      toast({ title: "Fish Joy Updated", description: "Fish odds saved." });
+    },
+  });
+
+  return (
+    <Card className="glass-card">
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2 text-base">🐟 Fish Joy — Fish Odds (×Bet)</CardTitle>
+        <CardDescription>Multiplier applied to the bet amount when each fish type is caught.</CardDescription>
+      </CardHeader>
+      <CardContent>
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-4">
+          {FISH_JOY_NAMES.map((name, i) => (
+            <div key={i} className="flex flex-col gap-1">
+              <label className="text-xs text-muted-foreground">{name}</label>
+              <Input
+                type="number"
+                min={0.1}
+                step={0.5}
+                value={odds[i]}
+                onChange={e => {
+                  const v = parseFloat(e.target.value) || 1;
+                  setOdds(prev => { const n = [...prev]; n[i] = v; return n; });
+                }}
+                className="bg-white/5 border-white/10 h-8 text-sm"
+                data-testid={`input-fish-odds-${i}`}
+              />
+            </div>
+          ))}
+        </div>
+        <Button onClick={() => mutation.mutate()} disabled={mutation.isPending} size="sm" data-testid="button-save-fish-odds">
+          {mutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save Fish Odds"}
+        </Button>
+      </CardContent>
+    </Card>
+  );
+}
 
 const ACTIVE_GAME_TYPES = ["classic-slots", "roulette", "dice", "hilo", "coinflip", "plinko", "wheel", "fishhunt", "dog-racing", "horse4", "horse-js"];
 
@@ -394,6 +456,7 @@ export default function AdminDashboard() {
   });
 
   const [amount, setAmount] = useState("");
+  const [userSearch, setUserSearch] = useState("");
   const [userPasswords, setUserPasswords] = useState<Record<number, string>>({});
   const [smPasswords, setSmPasswords] = useState<Record<number, string>>({});
   const [withdrawCodes, setWithdrawCodes] = useState<Record<number, string>>({});
@@ -671,6 +734,7 @@ export default function AdminDashboard() {
   const managers = users?.filter(u => u.role === 'manager') || [];
   const players = users?.filter(u => u.role === 'user') || [];
   const allNonAdmin = users?.filter(u => u.role !== 'admin') || [];
+  const filteredUsers = allNonAdmin.filter(u => u.username.toLowerCase().includes(userSearch.toLowerCase()));
 
   const getRoleBadge = (role: string) => {
     switch (role) {
@@ -859,10 +923,19 @@ export default function AdminDashboard() {
 
             <Card className="glass-card">
               <CardHeader>
-                <CardTitle className="flex items-center gap-2"><Users className="w-5 h-5" /> All Users ({allNonAdmin.length})</CardTitle>
+                <CardTitle className="flex items-center gap-2"><Users className="w-5 h-5" /> All Users ({filteredUsers.length}{userSearch ? ` of ${allNonAdmin.length}` : ""})</CardTitle>
                 <CardDescription>Promote any user to Super Manager.</CardDescription>
               </CardHeader>
               <CardContent>
+                <div className="mb-3">
+                  <Input
+                    placeholder="Search by username..."
+                    value={userSearch}
+                    onChange={e => setUserSearch(e.target.value)}
+                    className="bg-white/5 border-white/10 max-w-xs"
+                    data-testid="input-search-users"
+                  />
+                </div>
                 {usersLoading ? (
                   <div className="flex justify-center p-8"><Loader2 className="w-6 h-6 animate-spin" /></div>
                 ) : (
@@ -880,7 +953,7 @@ export default function AdminDashboard() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {allNonAdmin.map((u) => (
+                      {filteredUsers.map((u) => (
                         <TableRow key={u.id} className="border-white/10" data-testid={`row-user-${u.id}`}>
                           <TableCell>#{u.id}</TableCell>
                           <TableCell className="font-medium">{u.username}</TableCell>
@@ -1082,21 +1155,24 @@ export default function AdminDashboard() {
           </TabsContent>
 
           <TabsContent value="gamecontrol" className="mt-6">
-            <div className="space-y-4">
-              <div className="flex items-center gap-2 mb-2">
-                <Settings2 className="w-5 h-5 text-primary" />
-                <h2 className="text-xl font-bold">Game Win Probabilities</h2>
-              </div>
-              <p className="text-sm text-muted-foreground mb-4">Set the win probability percentage for each game. Higher values mean players win more often.</p>
-              {gameSettingsLoading ? (
-                <div className="flex justify-center py-8"><Loader2 className="h-6 w-6 animate-spin" /></div>
-              ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {gameSettings?.filter(s => ACTIVE_GAME_TYPES.includes(s.gameType)).map((s) => (
-                    <GameSettingCard key={s.id} setting={s} />
-                  ))}
+            <div className="space-y-6">
+              <div>
+                <div className="flex items-center gap-2 mb-2">
+                  <Settings2 className="w-5 h-5 text-primary" />
+                  <h2 className="text-xl font-bold">Game Win Probabilities</h2>
                 </div>
-              )}
+                <p className="text-sm text-muted-foreground mb-4">Set the win probability percentage for each game. Higher values mean players win more often.</p>
+                {gameSettingsLoading ? (
+                  <div className="flex justify-center py-8"><Loader2 className="h-6 w-6 animate-spin" /></div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {gameSettings?.filter(s => ACTIVE_GAME_TYPES.includes(s.gameType)).map((s) => (
+                      <GameSettingCard key={s.id} setting={s} />
+                    ))}
+                  </div>
+                )}
+              </div>
+              <FishJoyOddsCard />
             </div>
           </TabsContent>
 
