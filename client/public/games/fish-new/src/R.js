@@ -10,34 +10,34 @@ var R = ns.R = {};
 
 R.sources = 
 [
-	//{id:"cannon", size:50, src:"images/cannon-hd.png},
-	//{id:"fish", size:50, src:"images/fish-hd.png},
-	//{id:"shark", size:50, src:"images/shark-hd.png},
-	{id:"bottom", size:50, src:"images/bottom.png},
-	{id:"fish1", size:6, src:"images/fish1.png},
-	{id:"fish2", size:16, src:"images/fish2.png},
-	{id:"fish3", size:11, src:"images/fish3.png},
-	{id:"fish4", size:15, src:"images/fish4.png},
-	{id:"fish5", size:43, src:"images/fish5.png},
-	{id:"fish6", size:45, src:"images/fish6.png},
-	{id:"fish7", size:80, src:"images/fish7.png},
-	{id:"fish8", size:100, src:"images/fish8.png},
-	{id:"fish9", size:104, src:"images/fish9.png},
-	{id:"fish10", size:121, src:"images/fish10.png},
-	{id:"shark1", size:287, src:"images/shark1.png},
-	{id:"shark2", size:382, src:"images/shark2.png},
-	{id:"cannon1", size:11, src:"images/cannon1.png},
-	{id:"cannon2", size:11, src:"images/cannon2.png},
-	{id:"cannon3", size:11, src:"images/cannon3.png},
-	{id:"cannon4", size:13, src:"images/cannon4.png},
-	{id:"cannon5", size:13, src:"images/cannon5.png},
-	{id:"cannon6", size:15, src:"images/cannon6.png},
-	{id:"cannon7", size:17, src:"images/cannon7.png},
-	{id:"bullet", size:8, src:"images/bullet.png},
-	{id:"web", size:93, src:"images/web.png},
-	{id:"numBlack", size:1, src:"images/number_black.png},
-	{id:"coinAni1", size:19, src:"images/coinAni1.png},
-	{id:"coinAni2", size:22, src:"images/coinAni2.png},
+	//{id:"cannon", size:50, src:"images/cannon-hd.png"},
+	//{id:"fish", size:50, src:"images/fish-hd.png"},
+	//{id:"shark", size:50, src:"images/shark-hd.png"},
+	{id:"bottom", size:50, src:"images/bottom.png"},
+	{id:"fish1", size:6, src:"images/fish1.png"},
+	{id:"fish2", size:16, src:"images/fish2.png"},
+	{id:"fish3", size:11, src:"images/fish3.png"},
+	{id:"fish4", size:15, src:"images/fish4.png"},
+	{id:"fish5", size:43, src:"images/fish5.png"},
+	{id:"fish6", size:45, src:"images/fish6.png"},
+	{id:"fish7", size:80, src:"images/fish7.png"},
+	{id:"fish8", size:100, src:"images/fish8.png"},
+	{id:"fish9", size:104, src:"images/fish9.png"},
+	{id:"fish10", size:121, src:"images/fish10.png"},
+	{id:"shark1", size:287, src:"images/shark1.png"},
+	{id:"shark2", size:382, src:"images/shark2.png"},
+	{id:"cannon1", size:11, src:"images/cannon1.png"},
+	{id:"cannon2", size:11, src:"images/cannon2.png"},
+	{id:"cannon3", size:11, src:"images/cannon3.png"},
+	{id:"cannon4", size:13, src:"images/cannon4.png"},
+	{id:"cannon5", size:13, src:"images/cannon5.png"},
+	{id:"cannon6", size:15, src:"images/cannon6.png"},
+	{id:"cannon7", size:17, src:"images/cannon7.png"},
+	{id:"bullet", size:8, src:"images/bullet.png"},
+	{id:"web", size:93, src:"images/web.png"},
+	{id:"numBlack", size:1, src:"images/number_black.png"},
+	{id:"coinAni1", size:19, src:"images/coinAni1.png"},
+	{id:"coinAni2", size:22, src:"images/coinAni2.png"},
 	{id:"coinText", size:16, src:"images/coinText.png}
 ];
 
@@ -50,7 +50,6 @@ R.init = function(images)
 
 R.initResources = function()
 {
-
 	this.bottom = this.getImage("bottom");
 	
 	this.bottombar = {image:this.bottom, rect:[0,0,765,72]};
