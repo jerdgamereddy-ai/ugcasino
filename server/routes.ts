@@ -1131,9 +1131,11 @@ export async function registerRoutes(
     if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
     try {
       const settings = await storage.getGameSettings("fishjoy");
+      const fishhuntSettings = await storage.getGameSettings("fishhunt");
       const extra = (() => { try { return settings?.extraSettings ? JSON.parse(settings.extraSettings) : {}; } catch { return {}; } })();
       const fishOdds = extra.fishOdds ?? [2, 4, 6, 10, 15, 25, 40, 60, 80, 100, 150, 300];
-      res.json({ fishOdds });
+      const winOccurrence = Math.round((fishhuntSettings?.winChance ?? 0.45) * 100);
+      res.json({ fishOdds, winOccurrence });
     } catch (err) { res.status(500).json({ message: "Internal Server Error" }); }
   });
 

@@ -108,6 +108,7 @@ var _currentPower  = 1;
 var _parentBalance = 0;
 var _gameReady     = false;
 var _pendingCoins  = null;
+var _winOccurrence = null;
 
 function sendToParent(type, data) {
   if (window.parent && window.parent !== window)
@@ -124,9 +125,35 @@ window.addEventListener('message', function(ev) {
   } else if (ev.data.type === 'init_settings') {
     if (Array.isArray(ev.data.fishOdds) && ev.data.fishOdds.length === 12)
       _fishOdds = ev.data.fishOdds;
+    if (typeof ev.data.winOccurrence === 'number')
+      _winOccurrence = ev.data.winOccurrence / 100;
     renderOddsPanel();
+    patchFishCapture();
   }
 });
+
+function patchFishCapture() {
+  var ns = Q && Q.use ? Q.use('fish') : null;
+  if (!ns || !ns.game || !ns.game.fishManager) { setTimeout(patchFishCapture, 300); return; }
+  var fm = ns.game.fishManager;
+  var sample = (fm.fishes && fm.fishes.length > 0) ? fm.fishes[0]
+             : (fm.fishPool && fm.fishPool.length > 0) ? fm.fishPool[0]
+             : null;
+  if (!sample) { setTimeout(patchFishCapture, 300); return; }
+  var proto = sample.constructor.prototype;
+  if (proto._capturePatched) {
+    proto._winOccurrence = _winOccurrence;
+    return;
+  }
+  proto._capturePatched = true;
+  proto._winOccurrence  = _winOccurrence;
+  var origCBC = proto.canBeCaptured;
+  proto.canBeCaptured = function(a) {
+    var wr = this.constructor.prototype._winOccurrence;
+    if (wr !== null && wr !== undefined) return wr > Math.random();
+    return origCBC.call(this, a);
+  };
+}
 
 function setPlayerCoins(coins) {
   var ns = Q && Q.use ? Q.use('fish') : null;
@@ -163,6 +190,7 @@ function patchPlayer() {
   sendToParent('ready', {});
   renderBetPanel();
   renderOddsPanel();
+  patchFishCapture();
 }
 
 function renderBetPanel() {
