@@ -12,28 +12,33 @@ body, div, canvas
     -webkit-image-rendering: optimizeSpeed;
     -webkit-interpolation-mode: nearest-neighbor;
 }
-body{padding:0; margin:0;font-size:12px;background-color:#000;}
+body{padding:0; margin:0; font-size:12px; background-color:#000;}
 body, html{height: 100%; width: 100%; overflow: hidden;}
-#outer{height:100%; width:100%; overflow:hidden; position:relative;}
-#outer[id]{display:table; position:static;}
-#middle{position:absolute; top:50%;}
-#middle[id]{display:table-cell; vertical-align:middle; position:static;}
-#container{width:100% !important; height:100% !important; background-image:url('images/game_bg_2_hd.jpg'); background-size:cover; background-position:center;}
+#container{
+    position: fixed;
+    top: 0; left: 0;
+    width: 100vw !important;
+    height: 100vh !important;
+    background-image: url('images/game_bg_2_hd.jpg');
+    background-size: cover;
+    background-position: center;
+    overflow: hidden;
+}
 </style>
 
 <title>Fish Joy</title>
 
-<script type="text/javascript" src="js/quark.base-1.0.0.alpha.min.js?v=3"></script>
-<script type="text/javascript" src="src/R.js?v=3"></script>
-<script type="text/javascript" src="src/Utils.js?v=3"></script>
-<script type="text/javascript" src="src/fishjoy.js?v=3"></script>
-<script type="text/javascript" src="src/FishManager.js?v=3"></script>
-<script type="text/javascript" src="src/FishGroup.js?v=3"></script>
-<script type="text/javascript" src="src/views/Fish.js?v=3"></script>
-<script type="text/javascript" src="src/views/Cannon.js?v=3"></script>
-<script type="text/javascript" src="src/views/Bullet.js?v=3"></script>
-<script type="text/javascript" src="src/views/Num.js?v=3"></script>
-<script type="text/javascript" src="src/views/Player.js?v=3"></script>
+<script type="text/javascript" src="js/quark.base-1.0.0.alpha.min.js?v=4"></script>
+<script type="text/javascript" src="src/R.js?v=4"></script>
+<script type="text/javascript" src="src/Utils.js?v=4"></script>
+<script type="text/javascript" src="src/fishjoy.js?v=4"></script>
+<script type="text/javascript" src="src/FishManager.js?v=4"></script>
+<script type="text/javascript" src="src/FishGroup.js?v=4"></script>
+<script type="text/javascript" src="src/views/Fish.js?v=4"></script>
+<script type="text/javascript" src="src/views/Cannon.js?v=4"></script>
+<script type="text/javascript" src="src/views/Bullet.js?v=4"></script>
+<script type="text/javascript" src="src/views/Num.js?v=4"></script>
+<script type="text/javascript" src="src/views/Player.js?v=4"></script>
 
 <script type="text/javascript">
 var _parentBalance = 0;
@@ -108,12 +113,7 @@ window.addEventListener('load', function() {
 
 <body>
 
-<div id="outer">
-    <div id="middle">
-        <div id="container" style="position:relative;width:980px;height:545px;top:-50%;margin:0 auto;"></div>
-        <div id="msg"></div>
-    </div>
-</div>
+<div id="container"></div>
 
 </body>
 

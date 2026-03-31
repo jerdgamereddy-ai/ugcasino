@@ -41,8 +41,8 @@ game.load = function(container)
 	}else
 	{		
 		Q.addMeta({name:"viewport", content:"user-scalable=no, initial-scale=1.0, minimum-scale=1, maximum-scale=1"});
-		this.width = Math.min(1024, window.innerWidth);
-		this.height = Math.min(768, window.innerHeight);
+		this.width = window.innerWidth;
+		this.height = window.innerHeight;
 	}
 
 	if(params.width) this.width = Number(params.width) || this.width;
