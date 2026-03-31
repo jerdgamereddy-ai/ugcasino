@@ -286,7 +286,7 @@ function GameSettingCard({ setting }: { setting: GameSetting }) {
               <label className="text-xs text-muted-foreground">Per-Horse Win Odds (x)</label>
               {horseOdds.map((odd, i) => (
                 <div key={i} className="flex items-center gap-2">
-                  <span className="text-xs text-muted-foreground w-16">{(['Green','White','Blue','Brown'])[i]}</span>
+                  <span className="text-xs text-muted-foreground w-16">{(['White','Blue','Green','Brown'])[i]}</span>
                   <Input
                     type="number"
                     min={1.01}
