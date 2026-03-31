@@ -15,7 +15,7 @@ export default function GameFishJoy() {
   const initSentRef = useRef(false);
 
   const { data: user }         = useQuery<User>({ queryKey: ["/api/user"] });
-  const { data: fishSettings } = useQuery<{ fishOdds: number[]; winOccurrence?: number }>({
+  const { data: fishSettings } = useQuery<{ fishOdds: number[]; fishWinRates?: number[] }>({
     queryKey: ["/api/games/fishjoy/settings"],
   });
 
@@ -53,7 +53,7 @@ export default function GameFishJoy() {
       { type: "init_balance", balance: user.balance }, "*"
     );
     iframeRef.current.contentWindow.postMessage(
-      { type: "init_settings", fishOdds: fishSettings.fishOdds, winOccurrence: fishSettings.winOccurrence ?? 45 }, "*"
+      { type: "init_settings", fishOdds: fishSettings.fishOdds, fishWinRates: fishSettings.fishWinRates ?? [55,50,45,40,35,30,25,20,15,10,5,2] }, "*"
     );
   }, [user, gameReady, fishSettings]);
 

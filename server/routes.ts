@@ -1131,24 +1131,30 @@ export async function registerRoutes(
   });
 
   // === FISH JOY SETTINGS ===
+  const DEFAULT_FISH_WIN_RATES = [55, 50, 45, 40, 35, 30, 25, 20, 15, 10, 5, 2];
+
   app.get("/api/games/fishjoy/settings", async (req, res) => {
     if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
     try {
       const settings = await storage.getGameSettings("fishjoy");
-      const fishhuntSettings = await storage.getGameSettings("fishhunt");
       const extra = (() => { try { return settings?.extraSettings ? JSON.parse(settings.extraSettings) : {}; } catch { return {}; } })();
       const fishOdds = extra.fishOdds ?? [2, 4, 6, 10, 15, 25, 40, 60, 80, 100, 150, 300];
-      const winOccurrence = Math.round((fishhuntSettings?.winChance ?? 0.45) * 100);
-      res.json({ fishOdds, winOccurrence });
+      const fishWinRates = extra.fishWinRates ?? DEFAULT_FISH_WIN_RATES;
+      res.json({ fishOdds, fishWinRates });
     } catch (err) { res.status(500).json({ message: "Internal Server Error" }); }
   });
 
   app.post("/api/games/fishjoy/settings", async (req, res) => {
     if (!req.isAuthenticated() || req.user.role !== "admin") return res.status(403).send("Forbidden");
     try {
-      const { fishOdds } = z.object({ fishOdds: z.array(z.number().min(0.1).max(10000)).length(12) }).parse(req.body);
-      await storage.updateGameExtraSettings("fishjoy", JSON.stringify({ fishOdds }), req.user.id);
-      res.json({ success: true, fishOdds });
+      const { fishOdds, fishWinRates } = z.object({
+        fishOdds: z.array(z.number().min(0.1).max(10000)).length(12),
+        fishWinRates: z.array(z.number().min(0).max(100)).length(12),
+      }).parse(req.body);
+      const existing = await storage.getGameSettings("fishjoy");
+      const existingExtra = (() => { try { return existing?.extraSettings ? JSON.parse(existing.extraSettings) : {}; } catch { return {}; } })();
+      await storage.updateGameExtraSettings("fishjoy", JSON.stringify({ ...existingExtra, fishOdds, fishWinRates }), req.user.id);
+      res.json({ success: true, fishOdds, fishWinRates });
     } catch (err) { res.status(500).json({ message: "Internal Server Error" }); }
   });
 

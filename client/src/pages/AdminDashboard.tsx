@@ -29,15 +29,21 @@ import { MessageCircle } from "lucide-react";
 type GameFormData = z.infer<typeof updateGameSettingsSchema>;
 
 const FISH_JOY_NAMES = ['Tiny Fish','Small Fish','Sea Fish','Stripe Fish','Angel Fish','Puffer Fish','Sword Fish','Bat Fish','Coral Fish','Bull Fish','Shark','Giant Shark'];
-const FISH_JOY_DEFAULT_ODDS = [2, 4, 6, 10, 15, 25, 40, 60, 80, 100, 150, 300];
+const FISH_JOY_DEFAULT_ODDS     = [2, 4, 6, 10, 15, 25, 40, 60, 80, 100, 150, 300];
+const FISH_JOY_DEFAULT_WIN_RATES = [55, 50, 45, 40, 35, 30, 25, 20, 15, 10, 5, 2];
 
 function FishJoyOddsCard() {
   const { toast } = useToast();
-  const [odds, setOdds] = useState<number[]>(FISH_JOY_DEFAULT_ODDS);
-  const { data: settings } = useQuery<{ fishOdds: number[] }>({ queryKey: ["/api/games/fishjoy/settings"] });
+  const [odds,     setOdds]     = useState<number[]>(FISH_JOY_DEFAULT_ODDS);
+  const [winRates, setWinRates] = useState<number[]>(FISH_JOY_DEFAULT_WIN_RATES);
+  const { data: settings } = useQuery<{ fishOdds: number[]; fishWinRates?: number[] }>({ queryKey: ["/api/games/fishjoy/settings"] });
   const loadedRef = useRef(false);
   useEffect(() => {
-    if (settings?.fishOdds && !loadedRef.current) { loadedRef.current = true; setOdds(settings.fishOdds); }
+    if (settings && !loadedRef.current) {
+      loadedRef.current = true;
+      if (settings.fishOdds)     setOdds(settings.fishOdds);
+      if (settings.fishWinRates) setWinRates(settings.fishWinRates);
+    }
   }, [settings]);
 
   const mutation = useMutation({
@@ -45,45 +51,66 @@ function FishJoyOddsCard() {
       const res = await fetch("/api/games/fishjoy/settings", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ fishOdds: odds }),
+        body: JSON.stringify({ fishOdds: odds, fishWinRates: winRates }),
       });
       if (!res.ok) throw new Error("Failed to save");
       return res.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/games/fishjoy/settings"] });
-      toast({ title: "Fish Joy Updated", description: "Fish odds saved." });
+      toast({ title: "Fish Joy Updated", description: "Fish odds and win rates saved." });
     },
   });
 
   return (
     <Card className="glass-card">
       <CardHeader>
-        <CardTitle className="flex items-center gap-2 text-base">🐟 Fish Joy — Fish Odds (×Bet)</CardTitle>
-        <CardDescription>Multiplier applied to the bet amount when each fish type is caught.</CardDescription>
+        <CardTitle className="flex items-center gap-2 text-base">🐟 Fish Joy — Per-Fish Settings</CardTitle>
+        <CardDescription>Set the payout multiplier (×Bet) and win chance (%) independently for each fish type.</CardDescription>
       </CardHeader>
       <CardContent>
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3 mb-4">
           {FISH_JOY_NAMES.map((name, i) => (
-            <div key={i} className="flex flex-col gap-1">
-              <label className="text-xs text-muted-foreground">{name}</label>
-              <Input
-                type="number"
-                min={0.1}
-                step={0.5}
-                value={odds[i]}
-                onChange={e => {
-                  const v = parseFloat(e.target.value) || 1;
-                  setOdds(prev => { const n = [...prev]; n[i] = v; return n; });
-                }}
-                className="bg-white/5 border-white/10 h-8 text-sm"
-                data-testid={`input-fish-odds-${i}`}
-              />
+            <div key={i} className="flex flex-col gap-1.5 border border-white/5 rounded-lg p-2.5 bg-white/2">
+              <span className="text-xs font-semibold text-[#D4AF37]">{name}</span>
+              <div className="flex gap-2 items-center">
+                <div className="flex-1">
+                  <label className="text-[10px] text-muted-foreground uppercase tracking-wide">Odds (×Bet)</label>
+                  <Input
+                    type="number"
+                    min={0.1}
+                    step={0.5}
+                    value={odds[i]}
+                    onChange={e => {
+                      const v = parseFloat(e.target.value) || 1;
+                      setOdds(prev => { const n = [...prev]; n[i] = v; return n; });
+                    }}
+                    className="bg-white/5 border-white/10 h-7 text-sm mt-0.5"
+                    data-testid={`input-fish-odds-${i}`}
+                  />
+                </div>
+                <div className="flex-1">
+                  <label className="text-[10px] text-muted-foreground uppercase tracking-wide">Win Rate (%)</label>
+                  <Input
+                    type="number"
+                    min={0}
+                    max={100}
+                    step={1}
+                    value={winRates[i]}
+                    onChange={e => {
+                      const v = Math.min(100, Math.max(0, parseFloat(e.target.value) || 0));
+                      setWinRates(prev => { const n = [...prev]; n[i] = v; return n; });
+                    }}
+                    className="bg-white/5 border-white/10 h-7 text-sm mt-0.5"
+                    data-testid={`input-fish-winrate-${i}`}
+                  />
+                </div>
+              </div>
             </div>
           ))}
         </div>
         <Button onClick={() => mutation.mutate()} disabled={mutation.isPending} size="sm" data-testid="button-save-fish-odds">
-          {mutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save Fish Odds"}
+          {mutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save Fish Settings"}
         </Button>
       </CardContent>
     </Card>
