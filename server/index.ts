@@ -24,8 +24,10 @@ app.use(
 app.use(express.urlencoded({ extended: false }));
 
 app.use('/games', (req, res, next) => {
-  if (/\.(png|gif|jpg|jpeg|webp|js|css|ogg|mp3|wav|svg|ico|woff2?|ttf)$/i.test(req.path)) {
+  if (/\.(png|gif|jpg|jpeg|webp|ogg|mp3|wav|svg|ico|woff2?|ttf)$/i.test(req.path)) {
     res.setHeader('Cache-Control', 'public, max-age=604800');
+  } else if (/\.(js|css|html)$/i.test(req.path)) {
+    res.setHeader('Cache-Control', 'no-cache, must-revalidate');
   }
   next();
 });
