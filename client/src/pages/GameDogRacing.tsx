@@ -118,7 +118,12 @@ export default function GameDogRacing() {
   }, []);
 
   useEffect(() => {
-    const handler = () => setIsFullscreen(!!document.fullscreenElement);
+    const handler = () => {
+      setIsFullscreen(!!document.fullscreenElement);
+      setTimeout(() => {
+        iframeRef.current?.contentWindow?.postMessage({ type: "resume_game" }, "*");
+      }, 200);
+    };
     document.addEventListener("fullscreenchange", handler);
     return () => document.removeEventListener("fullscreenchange", handler);
   }, []);

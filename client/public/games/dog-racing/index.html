@@ -24,6 +24,12 @@
             var _winOccurrence = 30;
 
             window.addEventListener('message', function(event) {
+                if (event.data && event.data.type === 'resume_game') {
+                    if (typeof s_oMain !== 'undefined' && s_oMain) {
+                        s_oMain.startUpdate();
+                    }
+                    return;
+                }
                 if (event.data && event.data.type === 'init_balance' && !_gameInitialized) {
                     _parentBalance = event.data.balance;
                     if (typeof event.data.winOccurrence === 'number') {
