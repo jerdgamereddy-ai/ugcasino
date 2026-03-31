@@ -112,10 +112,10 @@
         <div style="display:flex;align-items:center;gap:6px">
             <label>Horse:</label>
             <select id="bethorse" onchange="updateOddsHighlight()">
-                <option value="1">Horse 1</option>
-                <option value="2">Horse 2</option>
-                <option value="3">Horse 3</option>
-                <option value="4">Horse 4</option>
+                <option value="1">Black</option>
+                <option value="2">Bay</option>
+                <option value="3">Chestnut</option>
+                <option value="4">Grey</option>
             </select>
         </div>
         <div class="odds-display" id="odds-display"></div>
@@ -160,7 +160,7 @@
 
         function renderOdds() {
             var container = document.getElementById('odds-display');
-            var horseNames = ['Horse 1', 'Horse 2', 'Horse 3', 'Horse 4'];
+            var horseNames = ['Black', 'Bay', 'Chestnut', 'Grey'];
             container.innerHTML = _odds.map(function(o, i) {
                 return '<span class="horse-odd" id="odd-' + (i+1) + '">' + horseNames[i] + ': ' + o.toFixed(2) + 'x</span>';
             }).join('');
