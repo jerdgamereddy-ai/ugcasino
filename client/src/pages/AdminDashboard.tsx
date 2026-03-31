@@ -28,7 +28,10 @@ import { MessageCircle } from "lucide-react";
 
 type GameFormData = z.infer<typeof updateGameSettingsSchema>;
 
-const ACTIVE_GAME_TYPES = ["slots", "roulette", "dice", "hilo", "coinflip", "plinko", "wheel", "fishhunt", "classic-slots", "dog-racing", "horse4", "horse-js"];
+const ACTIVE_GAME_TYPES = ["slots", "roulette", "dice", "hilo", "coinflip", "plinko", "wheel", "fishhunt", "dog-racing", "horse4", "horse-js"];
+
+const HORSE4_NAMES = ["Engineer", "Pin", "Doughnut", "Mayhem", "Last Things", "Chatterbox", "Hypno", "Croquette"];
+const HORSE4_DEFAULT_ODDS = [3.7, 5.5, 2.2, 11.75, 17.25, 8.75, 7.15, 6.15];
 
 function GameSettingCard({ setting }: { setting: GameSetting }) {
   const { toast } = useToast();
@@ -37,9 +40,15 @@ function GameSettingCard({ setting }: { setting: GameSetting }) {
   const defaultMultiplier = setting.gameType === "slots" ? 10 : setting.gameType === "coinflip" ? 1.95 : 2;
   const [multiplierVal, setMultiplierVal] = useState(setting.payoutMultiplier ?? defaultMultiplier);
   const isHorseJs = setting.gameType === "horse-js";
+  const isHorse4 = setting.gameType === "horse4";
+  const isRoulette = setting.gameType === "roulette";
   const extraParsed = (() => { try { return setting.extraSettings ? JSON.parse(setting.extraSettings) : {}; } catch { return {}; } })();
   const [maxLaps, setMaxLaps] = useState<number>(extraParsed.maxLaps ?? 1);
   const [horseOdds, setHorseOdds] = useState<number[]>(extraParsed.odds ?? [2.0, 2.5, 3.0, 3.5]);
+  const [horse4Odds, setHorse4Odds] = useState<number[]>(extraParsed.odds ?? HORSE4_DEFAULT_ODDS);
+  const [numberOdds, setNumberOdds] = useState<number>(extraParsed.numberOdds ?? 35);
+  const [colorOdds, setColorOdds] = useState<number>(extraParsed.colorOdds ?? 1);
+  const [parityOdds, setParityOdds] = useState<number>(extraParsed.parityOdds ?? 1);
 
   const mutation = useMutation({
     mutationFn: async (val: number) => {
@@ -86,6 +95,38 @@ function GameSettingCard({ setting }: { setting: GameSetting }) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [api.games.settings.get.path] });
       toast({ title: "Horse Race Updated", description: "Max laps and horse odds saved." });
+    },
+  });
+
+  const horse4Mutation = useMutation({
+    mutationFn: async () => {
+      const res = await fetch("/api/games/horse4/settings", {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ odds: horse4Odds }),
+      });
+      if (!res.ok) throw new Error("Failed to update horse4 settings");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [api.games.settings.get.path] });
+      toast({ title: "Horse4 Updated", description: "8-horse odds saved." });
+    },
+  });
+
+  const rouletteMutation = useMutation({
+    mutationFn: async () => {
+      const res = await fetch("/api/games/roulette/settings", {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ numberOdds, colorOdds, parityOdds }),
+      });
+      if (!res.ok) throw new Error("Failed to update roulette odds");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [api.games.settings.get.path] });
+      toast({ title: "Roulette Updated", description: "Roulette odds saved." });
     },
   });
 
@@ -145,7 +186,7 @@ function GameSettingCard({ setting }: { setting: GameSetting }) {
         )}
         {isHorseJs && (
           <div className="border-t border-white/10 pt-4 space-y-3">
-            <label className="text-xs text-muted-foreground font-semibold">Horse Race Settings</label>
+            <label className="text-xs text-muted-foreground font-semibold">Quick Horse Race Settings</label>
             <div>
               <label className="text-xs text-muted-foreground">Max Laps</label>
               <Input
@@ -160,7 +201,7 @@ function GameSettingCard({ setting }: { setting: GameSetting }) {
               />
             </div>
             <div className="space-y-2">
-              <label className="text-xs text-muted-foreground">Per-Horse Odds (x)</label>
+              <label className="text-xs text-muted-foreground">Per-Horse Win Odds (x)</label>
               {horseOdds.map((odd, i) => (
                 <div key={i} className="flex items-center gap-2">
                   <span className="text-xs text-muted-foreground w-16">Horse {i + 1}</span>
@@ -191,6 +232,75 @@ function GameSettingCard({ setting }: { setting: GameSetting }) {
               data-testid="button-save-horse-js-settings"
             >
               {horseJsMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save Horse Settings"}
+            </Button>
+          </div>
+        )}
+        {isHorse4 && (
+          <div className="border-t border-white/10 pt-4 space-y-3">
+            <label className="text-xs text-muted-foreground font-semibold">8-Horse Race — Win Odds (x)</label>
+            <div className="space-y-2">
+              {HORSE4_NAMES.map((name, i) => (
+                <div key={i} className="flex items-center gap-2">
+                  <span className="text-xs text-muted-foreground w-24 capitalize">{name}</span>
+                  <Input
+                    type="number"
+                    min={1.01}
+                    max={200}
+                    step={0.05}
+                    value={horse4Odds[i] ?? HORSE4_DEFAULT_ODDS[i]}
+                    onChange={(e) => {
+                      const updated = [...horse4Odds];
+                      updated[i] = Math.max(1.01, parseFloat(e.target.value) || 1.01);
+                      setHorse4Odds(updated);
+                    }}
+                    className="font-mono text-sm text-center bg-white/5 border-white/10"
+                    data-testid={`input-horse4-odds-${i}`}
+                  />
+                  <span className="text-xs text-muted-foreground">x</span>
+                </div>
+              ))}
+            </div>
+            <Button
+              className="w-full"
+              size="sm"
+              variant="secondary"
+              onClick={() => horse4Mutation.mutate()}
+              disabled={horse4Mutation.isPending}
+              data-testid="button-save-horse4-settings"
+            >
+              {horse4Mutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save 8-Horse Odds"}
+            </Button>
+          </div>
+        )}
+        {isRoulette && (
+          <div className="border-t border-white/10 pt-4 space-y-3">
+            <label className="text-xs text-muted-foreground font-semibold">Roulette Payout Odds</label>
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-muted-foreground w-28">Single Number</span>
+                <Input type="number" min={1} max={200} step={1} value={numberOdds} onChange={(e) => setNumberOdds(Math.max(1, parseFloat(e.target.value) || 1))} className="font-mono text-sm text-center bg-white/5 border-white/10" data-testid="input-roulette-number-odds" />
+                <span className="text-xs text-muted-foreground">:1</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-muted-foreground w-28">Red / Black</span>
+                <Input type="number" min={0.1} max={50} step={0.1} value={colorOdds} onChange={(e) => setColorOdds(Math.max(0.1, parseFloat(e.target.value) || 0.1))} className="font-mono text-sm text-center bg-white/5 border-white/10" data-testid="input-roulette-color-odds" />
+                <span className="text-xs text-muted-foreground">:1</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-muted-foreground w-28">Even / Odd</span>
+                <Input type="number" min={0.1} max={50} step={0.1} value={parityOdds} onChange={(e) => setParityOdds(Math.max(0.1, parseFloat(e.target.value) || 0.1))} className="font-mono text-sm text-center bg-white/5 border-white/10" data-testid="input-roulette-parity-odds" />
+                <span className="text-xs text-muted-foreground">:1</span>
+              </div>
+            </div>
+            <Button
+              className="w-full"
+              size="sm"
+              variant="secondary"
+              onClick={() => rouletteMutation.mutate()}
+              disabled={rouletteMutation.isPending}
+              data-testid="button-save-roulette-odds"
+            >
+              {rouletteMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save Roulette Odds"}
             </Button>
           </div>
         )}

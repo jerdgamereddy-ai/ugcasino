@@ -9,8 +9,12 @@ import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
 import { playSound } from "@/lib/sounds";
 import { useFullscreen, FullscreenButton } from "@/components/FullscreenToggle";
+import { useQuery } from "@tanstack/react-query";
+
+type User = { balance: number };
 
 export default function GamePlinko() {
+  const { data: user } = useQuery<User>({ queryKey: ["/api/user"] });
   const [bet, setBet] = useState(500);
   const [isDropping, setIsDropping] = useState(false);
   const [ballPath, setBallPath] = useState<number[]>([]);
@@ -69,7 +73,12 @@ export default function GamePlinko() {
               <ArrowLeft className="w-4 h-4 mr-2" /> Back to Lobby
             </Button>
           </Link>
-          <FullscreenButton isFullscreen={isFullscreen} onToggle={toggle} />
+          <div className="flex items-center gap-4">
+            <span className="text-[#D4AF37] font-bold text-sm" data-testid="text-balance">
+              Balance: {(user?.balance ?? 0).toLocaleString()} UGX
+            </span>
+            <FullscreenButton isFullscreen={isFullscreen} onToggle={toggle} />
+          </div>
         </div>
         
         <div className="text-center mb-8">

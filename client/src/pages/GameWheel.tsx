@@ -9,6 +9,9 @@ import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
 import { playSound } from "@/lib/sounds";
 import { useFullscreen, FullscreenButton } from "@/components/FullscreenToggle";
+import { useQuery } from "@tanstack/react-query";
+
+type User = { balance: number };
 
 const SEGMENTS = [
   { multiplier: 0,   label: "MISS",  color: "#1a1a2e", accent: "#2a2a4e" },
@@ -202,6 +205,7 @@ const ODDS_TABLE = [
 ];
 
 export default function GameWheel() {
+  const { data: user } = useQuery<User>({ queryKey: ["/api/user"] });
   const [bet, setBet] = useState(500);
   const [isSpinning, setIsSpinning] = useState(false);
   const [rotation, setRotation] = useState(0);
@@ -296,7 +300,12 @@ export default function GameWheel() {
               <ArrowLeft className="w-4 h-4 mr-2" /> Back to Lobby
             </Button>
           </Link>
-          <FullscreenButton isFullscreen={isFullscreen} onToggle={toggle} />
+          <div className="flex items-center gap-4">
+            <span className="text-primary font-bold text-sm" data-testid="text-balance">
+              Balance: {(user?.balance ?? 0).toLocaleString()} UGX
+            </span>
+            <FullscreenButton isFullscreen={isFullscreen} onToggle={toggle} />
+          </div>
         </div>
         
         <div className="text-center mb-4">

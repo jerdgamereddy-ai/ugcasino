@@ -96,8 +96,15 @@ export function HiLoGame() {
       </CardHeader>
       <CardContent className="p-8">
         <div className="flex flex-col items-center gap-8">
+          {/* Balance display */}
+          <div className="text-center">
+            <span className="text-[#D4AF37] font-bold text-lg" data-testid="text-balance-hilo">
+              Balance: {(user?.balance ?? 0).toLocaleString()} UGX
+            </span>
+          </div>
+
           {/* Card Display */}
-          <div className="relative w-40 h-56 flex items-center justify-center bg-gradient-to-br from-zinc-800 to-black rounded-3xl border-4 border-primary shadow-[0_0_60px_rgba(212,175,55,0.4)] overflow-hidden">
+          <div className="relative w-56 h-80 flex items-center justify-center bg-gradient-to-br from-zinc-800 to-black rounded-3xl border-4 border-primary shadow-[0_0_80px_rgba(212,175,55,0.5)] overflow-hidden">
             <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_rgba(212,175,55,0.1)_0%,_transparent_70%)]" />
             <AnimatePresence mode="wait">
               <motion.div
@@ -109,11 +116,11 @@ export function HiLoGame() {
                 className="flex flex-col items-center w-full h-full relative"
               >
                 <div className="absolute inset-2 border-2 border-primary/20 rounded-2xl pointer-events-none" />
-                <Club className="w-10 h-10 text-primary drop-shadow-[0_0_10px_rgba(212,175,55,0.5)] absolute top-6 left-6" />
-                <span className="text-8xl font-black font-display text-primary drop-shadow-[0_0_20px_rgba(212,175,55,0.8)] mt-4">
+                <Club className="w-14 h-14 text-primary drop-shadow-[0_0_10px_rgba(212,175,55,0.5)] absolute top-5 left-5" />
+                <span className="text-9xl font-black font-display text-primary drop-shadow-[0_0_25px_rgba(212,175,55,0.9)] mt-4">
                   {cardDisplay(currentCard)}
                 </span>
-                <Club className="w-10 h-10 text-primary drop-shadow-[0_0_10px_rgba(212,175,55,0.5)] absolute bottom-6 right-6 rotate-180" />
+                <Club className="w-14 h-14 text-primary drop-shadow-[0_0_10px_rgba(212,175,55,0.5)] absolute bottom-5 right-5 rotate-180" />
               </motion.div>
             </AnimatePresence>
           </div>

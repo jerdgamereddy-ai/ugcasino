@@ -2,7 +2,7 @@ import { ProtectedLayout } from "@/components/layout/ProtectedLayout";
 import { useUser } from "@/hooks/use-auth";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 import { Coins, Trophy, CreditCard, ChevronRight, Club, Dice5, Dices, Banknote, Sparkles, Zap, Star, RotateCcw, LucideIcon, Crown, Diamond, Fish } from "lucide-react";
 import { useRedeemVoucher } from "@/hooks/use-vouchers";
 import { useState, useEffect, useRef } from "react";
@@ -169,11 +169,19 @@ function LiveStatsBillboard() {
 
 export default function Lobby() {
   const { data: user } = useUser();
+  const [, navigate] = useLocation();
   const [voucherCode, setVoucherCode] = useState("");
   const [withdrawAmount, setWithdrawAmount] = useState("");
   const [managerCode, setManagerCode] = useState("");
   const { mutate: redeem, isPending } = useRedeemVoucher();
   const { toast } = useToast();
+
+  const openGame = (href: string) => {
+    if (document.documentElement.requestFullscreen) {
+      document.documentElement.requestFullscreen().catch(() => {});
+    }
+    navigate(href);
+  };
 
   const handleRedeem = (e: React.FormEvent) => {
     e.preventDefault();
@@ -510,16 +518,6 @@ export default function Lobby() {
               id: "fishhunt"
             },
             {
-              href: "/classic-slots",
-              img: "https://images.unsplash.com/photo-1596838132731-3301c3fd4317?q=80&w=2070",
-              icon: Crown as LucideIcon,
-              tag: "NEW",
-              tagColor: "bg-amber-600",
-              title: "Classic Slots",
-              desc: "5-reel 20-payline classic slot machine with big multipliers!",
-              id: "classic-slots"
-            },
-            {
               href: "/dog-racing",
               img: "https://images.unsplash.com/photo-1587300003388-59208cc962cb?q=80&w=2070",
               icon: Zap as LucideIcon,
@@ -556,7 +554,7 @@ export default function Lobby() {
               whileHover={{ y: -10 }}
               transition={{ type: "spring", stiffness: 300 }}
             >
-              <Link href={game.href}>
+              <div onClick={() => openGame(game.href)} className="cursor-pointer">
                 <div className="group relative h-72 rounded-3xl overflow-hidden cursor-pointer border border-white/10 hover:border-primary/50 transition-all duration-500 shadow-2xl hover:shadow-[0_0_50px_rgba(212,175,55,0.2)]" data-testid={`card-game-${game.id}`}>
                   {/* Image Background with Parallax effect */}
                   <motion.div 
@@ -590,7 +588,7 @@ export default function Lobby() {
                   {/* Decorative overlay for extra "luxury" feel */}
                   <div className="absolute inset-0 border-[0.5px] border-white/5 rounded-3xl pointer-events-none" />
                 </div>
-              </Link>
+              </div>
             </motion.div>
           ))}
         </div>

@@ -6,8 +6,6 @@ import { Button } from "@/components/ui/button";
 import { ArrowLeft, Maximize, Minimize } from "lucide-react";
 import type { User } from "@shared/schema";
 
-const COIN_SCALE = 500;
-
 export default function GameFishJoy() {
   const [, navigate] = useLocation();
   const iframeRef = useRef<HTMLIFrameElement>(null);
@@ -23,8 +21,14 @@ export default function GameFishJoy() {
       const res = await apiRequest("POST", "/api/games/fishjoy/bet", data);
       return res.json();
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["/api/user"] });
+      if (iframeRef.current?.contentWindow) {
+        iframeRef.current.contentWindow.postMessage(
+          { type: "init_balance", balance: data.balance },
+          "*"
+        );
+      }
     },
   });
 
@@ -33,18 +37,23 @@ export default function GameFishJoy() {
       const res = await apiRequest("POST", "/api/games/fishjoy/win", data);
       return res.json();
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["/api/user"] });
+      if (iframeRef.current?.contentWindow) {
+        iframeRef.current.contentWindow.postMessage(
+          { type: "init_balance", balance: data.balance },
+          "*"
+        );
+      }
     },
   });
 
   const sendBalanceToIframe = useCallback(() => {
     if (user && iframeRef.current?.contentWindow && gameReady && !balanceSentRef.current) {
-      const gameCoins = Math.floor(user.balance / COIN_SCALE);
-      iframeRef.current.contentWindow.postMessage({
-        type: "init_balance",
-        balance: gameCoins,
-      }, "*");
+      iframeRef.current.contentWindow.postMessage(
+        { type: "init_balance", balance: user.balance },
+        "*"
+      );
       balanceSentRef.current = true;
     }
   }, [user, gameReady]);
@@ -52,15 +61,17 @@ export default function GameFishJoy() {
   const handleMessage = useCallback((event: MessageEvent) => {
     if (!event.data || !event.data.type) return;
     switch (event.data.type) {
-      case "game_ready":
+      case "ready":
         setGameReady(true);
         break;
-      case "bet_placed":
-        betMutation.mutate({ bet: event.data.bet * COIN_SCALE });
+      case "bet":
+        if (event.data.amount > 0) {
+          betMutation.mutate({ bet: event.data.amount });
+        }
         break;
-      case "win_result":
-        if (event.data.winAmount > 0) {
-          winMutation.mutate({ winAmount: event.data.winAmount * COIN_SCALE });
+      case "win":
+        if (event.data.amount > 0) {
+          winMutation.mutate({ winAmount: event.data.amount });
         }
         break;
       case "game_exit":
@@ -90,6 +101,8 @@ export default function GameFishJoy() {
     document.addEventListener("fullscreenchange", handler);
     return () => document.removeEventListener("fullscreenchange", handler);
   }, []);
+
+  useEffect(() => { if (document.fullscreenElement) setIsFullscreen(true); }, []);
 
   return (
     <div ref={containerRef} className="relative bg-black" style={{ height: "100vh", overflow: "hidden" }}>
@@ -123,7 +136,7 @@ export default function GameFishJoy() {
       )}
       <iframe
         ref={iframeRef}
-        src="/games/fish-joy/index.html"
+        src="/games/fish-new/index.html"
         className="w-full border-0"
         style={{
           height: isFullscreen ? "100vh" : "calc(100vh - 56px)",

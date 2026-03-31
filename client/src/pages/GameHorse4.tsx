@@ -15,7 +15,7 @@ export default function GameHorse4() {
   const iframeLoadedRef = useRef(false);
 
   const { data: user } = useQuery<User>({ queryKey: ["/api/user"] });
-  const { data: gameSettings } = useQuery<{ winOccurrence: number }>({
+  const { data: gameSettings } = useQuery<{ winOccurrence: number; odds?: number[] }>({
     queryKey: ["/api/games/horse4/settings"],
   });
 
@@ -51,7 +51,7 @@ export default function GameHorse4() {
     if (balanceSentRef.current || !iframeLoadedRef.current) return;
     if (!user || !gameSettings || !iframeRef.current?.contentWindow) return;
     iframeRef.current.contentWindow.postMessage(
-      { type: "init_balance", balance: user.balance, winOccurrence: gameSettings.winOccurrence },
+      { type: "init_balance", balance: user.balance, winOccurrence: gameSettings.winOccurrence, odds: gameSettings.odds },
       "*"
     );
     balanceSentRef.current = true;
@@ -123,9 +123,14 @@ export default function GameHorse4() {
     return () => document.removeEventListener("fullscreenchange", handler);
   }, []);
 
+  useEffect(() => {
+    if (document.fullscreenElement) setIsFullscreen(true);
+  }, []);
+
   return (
-    <div ref={containerRef} className="relative min-h-screen bg-gradient-to-b from-black via-gray-900 to-black">
-      <div className="flex items-center justify-between p-3">
+    <div ref={containerRef} className="relative bg-black" style={{ height: "100vh", overflow: "hidden" }}>
+      {!isFullscreen && (
+      <div className="flex items-center justify-between p-3" style={{ height: "56px" }}>
         <Button variant="ghost" size="sm" onClick={() => navigate("/")} className="text-[#D4AF37]" data-testid="button-back-lobby">
           <ArrowLeft className="w-4 h-4 mr-1" />
           Lobby
@@ -135,23 +140,25 @@ export default function GameHorse4() {
             Balance: {(user?.balance ?? 0).toLocaleString()} UGX
           </span>
           <Button variant="ghost" size="icon" onClick={toggleFullscreen} className="text-[#D4AF37]" data-testid="button-fullscreen">
-            {isFullscreen ? <Minimize className="w-5 h-5" /> : <Maximize className="w-5 h-5" />}
+            <Maximize className="w-5 h-5" />
           </Button>
         </div>
       </div>
-      <div className="flex justify-center px-2 pb-4">
-        <div className="w-full max-w-[1600px]">
-          <iframe
-            ref={iframeRef}
-            src="/games/horse4/index.html"
-            className="w-full border-0 rounded-lg"
-            style={{ height: "calc(100vh - 80px)", minHeight: "500px" }}
-            allow="autoplay; fullscreen"
-            onLoad={handleIframeLoad}
-            data-testid="iframe-horse4"
-          />
-        </div>
-      </div>
+      )}
+      {isFullscreen && (
+        <Button variant="ghost" size="icon" onClick={toggleFullscreen} className="text-[#D4AF37] absolute top-2 right-2 z-50" style={{ background: "rgba(0,0,0,0.5)" }} data-testid="button-fullscreen-exit">
+          <Minimize className="w-5 h-5" />
+        </Button>
+      )}
+      <iframe
+        ref={iframeRef}
+        src="/games/horse4/index.html"
+        className="w-full border-0"
+        style={{ height: isFullscreen ? "100vh" : "calc(100vh - 56px)", display: "block" }}
+        allow="autoplay; fullscreen"
+        onLoad={handleIframeLoad}
+        data-testid="iframe-horse4"
+      />
     </div>
   );
 }

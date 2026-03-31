@@ -490,7 +490,7 @@ export async function registerRoutes(
     if (!req.isAuthenticated() || req.user.role === 'user') return res.status(403).send("Forbidden");
     
     let settings = await storage.getAllGameSettings();
-    const gameTypes = ["slots", "roulette", "dice", "hilo", "coinflip", "plinko", "wheel", "fishhunt", "classic-slots", "dog-racing", "horse4", "horse-js"] as const;
+    const gameTypes = ["slots", "roulette", "dice", "hilo", "coinflip", "plinko", "wheel", "fishhunt", "dog-racing", "horse4", "horse-js"] as const;
     const existingTypes = settings.map(s => s.gameType);
     
     for (const type of gameTypes) {
@@ -509,7 +509,7 @@ export async function registerRoutes(
     
     try {
       const { gameType, winChance } = z.object({
-        gameType: z.enum(["slots", "roulette", "dice", "hilo", "coinflip", "plinko", "wheel", "fishhunt", "classic-slots", "dog-racing", "horse4", "horse-js"]),
+        gameType: z.enum(["slots", "roulette", "dice", "hilo", "coinflip", "plinko", "wheel", "fishhunt", "dog-racing", "horse4", "horse-js"]),
         winChance: z.number().min(0).max(100)
       }).parse(req.body);
       
@@ -609,57 +609,6 @@ export async function registerRoutes(
     }
   });
 
-  // === CLASSIC SLOTS GAME ===
-  app.get("/api/games/classic-slots/settings", async (req, res) => {
-    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
-    try {
-      const settings = await storage.getGameSettings("classic-slots");
-      const winChance = settings?.winChance ?? 0.3;
-      res.json({ winOccurrence: Math.round(winChance * 100) });
-    } catch (err) {
-      res.status(500).json({ message: "Internal Server Error" });
-    }
-  });
-
-  app.post("/api/games/classic-slots/bet", async (req, res) => {
-    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
-    try {
-      const { totBet } = z.object({
-        bet: z.number().min(1),
-        totBet: z.number().min(1)
-      }).parse(req.body);
-
-      if (req.user.balance < totBet) return res.status(400).json({ message: "Insufficient balance" });
-
-      await storage.updateUserBalance(req.user.id, -totBet);
-      await storage.createTransaction({ userId: req.user.id, amount: -totBet, type: "bet", description: "Classic Slots spin" });
-
-      const user = await storage.getUser(req.user.id);
-      res.json({ balance: user?.balance ?? 0 });
-    } catch (err) {
-      res.status(500).json({ message: "Internal Server Error" });
-    }
-  });
-
-  app.post("/api/games/classic-slots/win", async (req, res) => {
-    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
-    try {
-      const { winAmount } = z.object({
-        winAmount: z.number().min(0).max(5000000)
-      }).parse(req.body);
-
-      if (winAmount > 0) {
-        await storage.updateUserBalance(req.user.id, winAmount);
-        await storage.createTransaction({ userId: req.user.id, amount: winAmount, type: "win", description: "Classic Slots win" });
-      }
-
-      const updatedUser = await storage.getUser(req.user.id);
-      res.json({ balance: updatedUser?.balance ?? 0 });
-    } catch (err) {
-      res.status(500).json({ message: "Internal Server Error" });
-    }
-  });
-
   // === DOG RACING GAME ===
   app.get("/api/games/dog-racing/settings", async (req, res) => {
     if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
@@ -699,8 +648,21 @@ export async function registerRoutes(
     if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
     try {
       const settings = await storage.getGameSettings("horse4");
-      res.json({ winOccurrence: Math.round((settings?.winChance ?? 0.4) * 100) });
+      const extraParsed = (() => { try { return settings?.extraSettings ? JSON.parse(settings.extraSettings) : {}; } catch { return {}; } })();
+      const defaultOdds = [3.7, 5.5, 2.2, 11.75, 17.25, 8.75, 7.15, 6.15];
+      res.json({ winOccurrence: Math.round((settings?.winChance ?? 0.4) * 100), odds: extraParsed.odds ?? defaultOdds });
     } catch (err) { res.status(500).json({ message: "Internal Server Error" }); }
+  });
+
+  app.post("/api/games/horse4/settings", async (req, res) => {
+    if (!req.isAuthenticated() || req.user.role !== "admin") return res.status(403).send("Forbidden");
+    try {
+      const { odds } = z.object({ odds: z.array(z.number().min(1.01).max(200)).length(8) }).parse(req.body);
+      const existing = await storage.getGameSettings("horse4");
+      const existingExtra = (() => { try { return existing?.extraSettings ? JSON.parse(existing.extraSettings) : {}; } catch { return {}; } })();
+      await storage.updateGameExtraSettings("horse4", JSON.stringify({ ...existingExtra, odds }), req.user.id);
+      res.json({ success: true });
+    } catch (err) { res.status(400).json({ message: "Invalid input" }); }
   });
 
   app.post("/api/games/horse4/bet", async (req, res) => {
@@ -1196,6 +1158,30 @@ export async function registerRoutes(
   });
 
   // === ROULETTE ===
+  app.get("/api/games/roulette/settings", async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    try {
+      const settings = await storage.getGameSettings("roulette");
+      const extraParsed = (() => { try { return settings?.extraSettings ? JSON.parse(settings.extraSettings) : {}; } catch { return {}; } })();
+      res.json({ numberOdds: extraParsed.numberOdds ?? 35, colorOdds: extraParsed.colorOdds ?? 1, parityOdds: extraParsed.parityOdds ?? 1 });
+    } catch (err) { res.status(500).json({ message: "Internal Server Error" }); }
+  });
+
+  app.post("/api/games/roulette/settings", async (req, res) => {
+    if (!req.isAuthenticated() || req.user.role !== "admin") return res.status(403).send("Forbidden");
+    try {
+      const { numberOdds, colorOdds, parityOdds } = z.object({
+        numberOdds: z.number().min(1).max(200),
+        colorOdds: z.number().min(0.1).max(50),
+        parityOdds: z.number().min(0.1).max(50),
+      }).parse(req.body);
+      const existing = await storage.getGameSettings("roulette");
+      const existingExtra = (() => { try { return existing?.extraSettings ? JSON.parse(existing.extraSettings) : {}; } catch { return {}; } })();
+      await storage.updateGameExtraSettings("roulette", JSON.stringify({ ...existingExtra, numberOdds, colorOdds, parityOdds }), req.user.id);
+      res.json({ success: true });
+    } catch (err) { res.status(400).json({ message: "Invalid input" }); }
+  });
+
   app.post(api.games.roulette.spin.path, async (req, res) => {
     if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
 
@@ -1242,11 +1228,17 @@ export async function registerRoutes(
       let won = false;
       let payout = 0;
 
-      if (type === 'number' && number === Number(value)) { won = true; payout = bet * 35; }
-      else if (type === 'color' && color === value) { won = true; payout = bet * 2; }
+      const rouletteSettings = await storage.getGameSettings("roulette");
+      const rouletteExtra = (() => { try { return rouletteSettings?.extraSettings ? JSON.parse(rouletteSettings.extraSettings) : {}; } catch { return {}; } })();
+      const numberOdds = rouletteExtra.numberOdds ?? 35;
+      const colorOdds = rouletteExtra.colorOdds ?? 1;
+      const parityOdds = rouletteExtra.parityOdds ?? 1;
+
+      if (type === 'number' && number === Number(value)) { won = true; payout = bet * (numberOdds + 1); }
+      else if (type === 'color' && color === value) { won = true; payout = bet * (colorOdds + 1); }
       else if (type === 'parity' && number !== 0) {
         const isEven = number % 2 === 0;
-        if ((value === 'even' && isEven) || (value === 'odd' && !isEven)) { won = true; payout = bet * 2; }
+        if ((value === 'even' && isEven) || (value === 'odd' && !isEven)) { won = true; payout = bet * (parityOdds + 1); }
       }
 
       const user = won ? await storage.updateUserBalance(req.user.id, payout) : await storage.getUser(req.user.id);

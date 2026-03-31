@@ -65,6 +65,11 @@
                     if (typeof event.data.winOccurrence === 'number') {
                         _winOccurrence = event.data.winOccurrence;
                     }
+                    if (Array.isArray(event.data.odds) && event.data.odds.length === 8) {
+                        if (typeof HORSE_DATA !== 'undefined') {
+                            HORSE_DATA.odd_win_bet = event.data.odds;
+                        }
+                    }
                     if (document.readyState === 'complete' || document.readyState === 'interactive') {
                         initGame();
                     }

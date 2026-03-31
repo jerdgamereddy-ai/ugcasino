@@ -69,7 +69,10 @@ export default function CoinFlip() {
     <ProtectedLayout>
       <div ref={containerRef} className={isFullscreen ? "bg-background p-4 overflow-auto h-screen" : ""}>
       <div className="max-w-7xl mx-auto space-y-8">
-        <div className="flex items-center justify-end">
+        <div className="flex items-center justify-end gap-4">
+          <span className="text-primary font-bold text-sm" data-testid="text-balance">
+            Balance: {(user?.balance ?? 0).toLocaleString()} UGX
+          </span>
           <FullscreenButton isFullscreen={isFullscreen} onToggle={toggle} />
         </div>
 

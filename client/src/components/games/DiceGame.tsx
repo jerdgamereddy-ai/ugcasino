@@ -86,8 +86,15 @@ export function DiceGame() {
       </CardHeader>
       <CardContent className="p-8">
         <div className="flex flex-col items-center gap-8">
+          {/* Balance display */}
+          <div className="text-center">
+            <span className="text-[#D4AF37] font-bold text-lg" data-testid="text-balance-dice">
+              Balance: {(user?.balance ?? 0).toLocaleString()} UGX
+            </span>
+          </div>
+
           {/* Dice Display */}
-          <div className="relative w-40 h-40 flex items-center justify-center bg-gradient-to-br from-white/10 to-transparent rounded-[2.5rem] border-2 border-primary shadow-[0_0_60px_rgba(212,175,55,0.3)]">
+          <div className="relative w-64 h-64 flex items-center justify-center bg-gradient-to-br from-white/10 to-transparent rounded-[3rem] border-2 border-primary shadow-[0_0_80px_rgba(212,175,55,0.4)]">
             <div className="absolute inset-0 bg-primary/5 blur-xl rounded-full animate-pulse" />
             <AnimatePresence mode="wait">
               <motion.div
@@ -104,7 +111,7 @@ export function DiceGame() {
                 }}
                 className="relative z-10"
               >
-                <ActiveDice className={`w-24 h-24 ${rolling ? 'text-primary animate-bounce' : 'text-primary drop-shadow-[0_0_15px_rgba(212,175,55,0.8)]'}`} />
+                <ActiveDice className={`w-44 h-44 ${rolling ? 'text-primary animate-bounce' : 'text-primary drop-shadow-[0_0_20px_rgba(212,175,55,0.8)]'}`} />
               </motion.div>
             </AnimatePresence>
           </div>

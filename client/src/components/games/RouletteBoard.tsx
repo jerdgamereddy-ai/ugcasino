@@ -2,6 +2,8 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { useSpinRoulette } from "@/hooks/use-games";
 import { useToast } from "@/hooks/use-toast";
+import { useQuery } from "@tanstack/react-query";
+import { useUser } from "@/hooks/use-auth";
 import { motion } from "framer-motion";
 import { Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -11,11 +13,19 @@ import { playSound } from "@/lib/sounds";
 const RED_NUMBERS = [1, 3, 5, 7, 9, 12, 14, 16, 18, 19, 21, 23, 25, 27, 30, 32, 34, 36];
 
 export function RouletteBoard() {
+  const { data: user } = useUser();
   const [selectedBet, setSelectedBet] = useState<{ type: 'number' | 'color' | 'parity', value: number | string } | null>(null);
   const [betAmount, setBetAmount] = useState(500);
   const { mutate: spin, isPending } = useSpinRoulette();
   const { toast } = useToast();
   const [lastResult, setLastResult] = useState<{ number: number; color: string } | null>(null);
+  const { data: rouletteOdds } = useQuery<{ numberOdds: number; colorOdds: number; parityOdds: number }>({
+    queryKey: ["/api/games/roulette/settings"],
+    staleTime: 60000,
+  });
+  const numberOdds = rouletteOdds?.numberOdds ?? 35;
+  const colorOdds = rouletteOdds?.colorOdds ?? 1;
+  const parityOdds = rouletteOdds?.parityOdds ?? 1;
 
   const handleBet = (type: 'number' | 'color' | 'parity', value: number | string) => {
     playSound('bet', 0.3);
@@ -80,6 +90,28 @@ export function RouletteBoard() {
 
   return (
     <div className="flex flex-col gap-8 items-center w-full max-w-4xl mx-auto p-4">
+      {/* Balance display */}
+      <div className="w-full text-center">
+        <span className="text-[#D4AF37] font-bold text-lg" data-testid="text-balance-roulette">
+          Balance: {(user?.balance ?? 0).toLocaleString()} UGX
+        </span>
+      </div>
+
+      {/* Odds Reference Table */}
+      <div className="w-full grid grid-cols-3 gap-3 text-center text-xs">
+        <div className="bg-white/5 border border-white/10 rounded-lg p-2">
+          <div className="text-muted-foreground">Single Number</div>
+          <div className="text-primary font-bold text-base">{numberOdds}:1</div>
+        </div>
+        <div className="bg-red-900/30 border border-red-500/20 rounded-lg p-2">
+          <div className="text-muted-foreground">Red / Black</div>
+          <div className="text-primary font-bold text-base">{colorOdds}:1</div>
+        </div>
+        <div className="bg-white/5 border border-white/10 rounded-lg p-2">
+          <div className="text-muted-foreground">Even / Odd</div>
+          <div className="text-primary font-bold text-base">{parityOdds}:1</div>
+        </div>
+      </div>
       {/* Wheel Representation (Simplified Visual) */}
       <div className="relative w-72 h-72 rounded-full border-[12px] border-primary shadow-[0_0_60px_rgba(212,175,55,0.4)] bg-neutral-900 flex items-center justify-center overflow-hidden">
           <div className="absolute inset-0 bg-[conic-gradient(from_0deg,#1a1a1a_0%,#333_50%,#1a1a1a_100%)] opacity-50" />
@@ -148,30 +180,30 @@ export function RouletteBoard() {
                 <button 
                     onClick={() => handleBet('color', 'red')}
                     data-testid="button-bet-red"
-                    className={cn("bg-red-700 h-12 rounded text-white font-bold hover-elevate", selectedBet?.value === 'red' && "ring-2 ring-yellow-400")}
+                    className={cn("bg-red-700 h-14 rounded text-white font-bold hover-elevate flex flex-col items-center justify-center gap-0.5", selectedBet?.value === 'red' && "ring-2 ring-yellow-400")}
                 >
-                    RED
+                    <span>RED</span><span className="text-[10px] opacity-70">{colorOdds}:1</span>
                 </button>
                 <button 
                     onClick={() => handleBet('color', 'black')}
                     data-testid="button-bet-black"
-                    className={cn("bg-black h-12 rounded text-white font-bold border border-white/10 hover-elevate", selectedBet?.value === 'black' && "ring-2 ring-yellow-400")}
+                    className={cn("bg-black h-14 rounded text-white font-bold border border-white/10 hover-elevate flex flex-col items-center justify-center gap-0.5", selectedBet?.value === 'black' && "ring-2 ring-yellow-400")}
                 >
-                    BLACK
+                    <span>BLACK</span><span className="text-[10px] opacity-70">{colorOdds}:1</span>
                 </button>
                  <button 
                     onClick={() => handleBet('parity', 'even')}
                     data-testid="button-bet-even"
-                    className={cn("bg-transparent border border-white/20 h-12 rounded text-white font-bold hover-elevate", selectedBet?.value === 'even' && "ring-2 ring-yellow-400 bg-white/10")}
+                    className={cn("bg-transparent border border-white/20 h-14 rounded text-white font-bold hover-elevate flex flex-col items-center justify-center gap-0.5", selectedBet?.value === 'even' && "ring-2 ring-yellow-400 bg-white/10")}
                 >
-                    EVEN
+                    <span>EVEN</span><span className="text-[10px] opacity-70">{parityOdds}:1</span>
                 </button>
                 <button 
                     onClick={() => handleBet('parity', 'odd')}
                     data-testid="button-bet-odd"
-                    className={cn("bg-transparent border border-white/20 h-12 rounded text-white font-bold hover-elevate", selectedBet?.value === 'odd' && "ring-2 ring-yellow-400 bg-white/10")}
+                    className={cn("bg-transparent border border-white/20 h-14 rounded text-white font-bold hover-elevate flex flex-col items-center justify-center gap-0.5", selectedBet?.value === 'odd' && "ring-2 ring-yellow-400 bg-white/10")}
                 >
-                    ODD
+                    <span>ODD</span><span className="text-[10px] opacity-70">{parityOdds}:1</span>
                 </button>
             </div>
          </div>

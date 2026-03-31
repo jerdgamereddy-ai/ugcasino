@@ -42,14 +42,15 @@ Preferred communication style: Simple, everyday language.
 - **Game Settings**: per-game win probability configuration (0.0-1.0), payoutMultiplier (double, admin-configurable payout multiplier for coinflip)
 
 ### Game Mechanics
-- **Slots**: 3-reel slot machine with emoji symbols, configurable win chance
-- **Roulette**: European-style with number, color, and parity betting options
-- **Fish Joy**: Arcade cannon-shooting fish game (replaces old Fish Hunt). Players fire at 12 fish types (1-200 coin rewards). 500 UGX per coin scale; shots cost 500-3500 UGX; embedded iframe with postMessage protocol; backend `/api/games/fishjoy/bet` and `/api/games/fishjoy/win`
-- **Classic Slots**: Imported HTML5 canvas 5-reel 3-row 20-payline slot machine embedded via iframe, uses jQuery/CreateJS/Howler, UGX currency with bet steps 100-5000, postMessage handshake for balance sync with parent React page, backend bet/win API endpoints
-- **Greyhound Racing** (`/dog-racing`): Imported greyhound race HTML5 game with postMessage protocol; bet/win backend endpoints at `/api/games/dog-racing/bet` and `/api/games/dog-racing/win`
-- **Horse4 Racing** (`/horse4`): Imported 4-horse racing HTML5 game (CMain/CHorse/CreateJS stack) with postMessage protocol; backend endpoints at `/api/games/horse4/bet` and `/api/games/horse4/win`
+- **Slots**: 3-reel slot machine with emoji symbols, configurable win chance; balance displayed in header
+- **Roulette**: European-style with number, color, and parity betting options; configurable odds per bet type (numberOdds, colorOdds, parityOdds) via admin panel; displays odds reference table; balance in header
+- **Fish Joy** (`/fishhunt`): Canvas-based cannon fish game (`/games/fish-new/`). Players fire at fish swimming across screen. 500 UGX per coin scale; postMessage protocol (`init_balance` → set coins, `bet`/`win` → API calls); backend `/api/games/fishjoy/bet` and `/api/games/fishjoy/win`
+- **Greyhound Racing** (`/dog-racing`): Imported greyhound race HTML5 game with UGX currency, postMessage protocol; bet/win backend endpoints at `/api/games/dog-racing/bet` and `/api/games/dog-racing/win`
+- **Horse4 Racing** (`/horse4`): Imported 8-horse racing HTML5 game (CMain/CHorse/CreateJS stack) with postMessage protocol; admin can configure all 8 horse odds (Engineer, Pin, Doughnut, Mayhem, Last Things, Chatterbox, Hypno, Croquette); custom odds passed in `init_balance` message; backend endpoints at `/api/games/horse4/bet` and `/api/games/horse4/win`; settings at `/api/games/horse4/settings`
 - **Quick Horse Race** (`/horse-racing`): Custom 4-horse race JS game with UGX UI, 500 UGX bet steps, per-horse odds configurable by admin (stored in extraSettings JSON), admin-configurable max laps; backend settings at `/api/games/horse-js/settings`, bet/win at `/api/games/horse-js/bet` and `/api/games/horse-js/win`
-- **House Edge**: Administrators can adjust win probabilities per game type and coinflip payout multiplier through the Game Control panel; horse-js has special panel for per-horse odds and max laps
+- **House Edge**: Administrators can adjust win probabilities per game type and coinflip payout multiplier through the Game Control panel; horse-js has special panel for per-horse odds and max laps; roulette has per-type odds panel
+- **Fullscreen**: Clicking any game card in the Lobby triggers fullscreen mode before navigating; all iframe game pages fill 100vh with collapsible top bar; floating Minimize button overlay in fullscreen
+- **Balance Display**: All game pages show live balance in the top navigation bar in UGX
 
 ### Role-Based Access Control (4-tier hierarchy)
 - **User**: Play games, redeem vouchers, view balance
