@@ -490,7 +490,7 @@ export async function registerRoutes(
     if (!req.isAuthenticated() || req.user.role === 'user') return res.status(403).send("Forbidden");
     
     let settings = await storage.getAllGameSettings();
-    const gameTypes = ["slots", "roulette", "dice", "hilo", "coinflip", "plinko", "wheel", "fishhunt", "dog-racing", "horse4", "horse-js"] as const;
+    const gameTypes = ["classic-slots", "roulette", "dice", "hilo", "coinflip", "plinko", "wheel", "fishhunt", "dog-racing", "horse4", "horse-js"] as const;
     const existingTypes = settings.map(s => s.gameType);
     
     for (const type of gameTypes) {
@@ -509,7 +509,7 @@ export async function registerRoutes(
     
     try {
       const { gameType, winChance } = z.object({
-        gameType: z.enum(["slots", "roulette", "dice", "hilo", "coinflip", "plinko", "wheel", "fishhunt", "dog-racing", "horse4", "horse-js"]),
+        gameType: z.enum(["classic-slots", "roulette", "dice", "hilo", "coinflip", "plinko", "wheel", "fishhunt", "dog-racing", "horse4", "horse-js"]),
         winChance: z.number().min(0).max(100)
       }).parse(req.body);
       
@@ -525,7 +525,7 @@ export async function registerRoutes(
     
     try {
       const { gameType, payoutMultiplier } = z.object({
-        gameType: z.enum(["coinflip", "slots", "dice", "hilo"]),
+        gameType: z.enum(["coinflip", "classic-slots", "dice", "hilo"]),
         payoutMultiplier: z.number().min(1.01).max(100)
       }).parse(req.body);
       
@@ -614,7 +614,21 @@ export async function registerRoutes(
     if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
     try {
       const settings = await storage.getGameSettings("dog-racing");
-      res.json({ winOccurrence: Math.round((settings?.winChance ?? 0.3) * 100) });
+      const extraParsed = (() => { try { return settings?.extraSettings ? JSON.parse(settings.extraSettings) : {}; } catch { return {}; } })();
+      const defaultOdds = [3.7, 5.5, 2.2, 11.75, 17.25, 8.75];
+      res.json({ winOccurrence: Math.round((settings?.winChance ?? 0.3) * 100), odds: extraParsed.odds ?? defaultOdds });
+    } catch (err) { res.status(500).json({ message: "Internal Server Error" }); }
+  });
+
+  app.post("/api/games/dog-racing/settings", async (req, res) => {
+    if (!req.isAuthenticated() || req.user.role !== "admin") return res.status(403).send("Forbidden");
+    try {
+      const { odds } = z.object({ odds: z.array(z.number().min(1.01).max(200)).length(6) }).parse(req.body);
+      const existing = await storage.getGameSettings("dog-racing");
+      const existingExtra = (() => { try { return existing?.extraSettings ? JSON.parse(existing.extraSettings) : {}; } catch { return {}; } })();
+      const newExtra = JSON.stringify({ ...existingExtra, odds });
+      await storage.updateGameExtraSettings("dog-racing", newExtra, req.user.id);
+      res.json({ success: true, odds });
     } catch (err) { res.status(500).json({ message: "Internal Server Error" }); }
   });
 
@@ -1110,6 +1124,41 @@ export async function registerRoutes(
     } catch (err) {
       res.status(500).json({ message: "Internal Server Error" });
     }
+  });
+
+  // === CLASSIC SLOTS ===
+  app.get("/api/games/classic-slots/settings", async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    try {
+      const settings = await storage.getGameSettings("classic-slots");
+      res.json({ winOccurrence: Math.round((settings?.winChance ?? 0.4) * 100) });
+    } catch (err) { res.status(500).json({ message: "Internal Server Error" }); }
+  });
+
+  app.post("/api/games/classic-slots/bet", async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    try {
+      const { bet, totBet } = z.object({ bet: z.number().min(1), totBet: z.number().min(1) }).parse(req.body);
+      const amount = totBet || bet;
+      if (req.user.balance < amount) return res.status(400).json({ message: "Insufficient balance" });
+      await storage.updateUserBalance(req.user.id, -amount);
+      await storage.createTransaction({ userId: req.user.id, amount: -amount, type: "bet", description: "Classic Slots bet" });
+      const user = await storage.getUser(req.user.id);
+      res.json({ balance: user?.balance ?? 0 });
+    } catch (err) { res.status(500).json({ message: "Internal Server Error" }); }
+  });
+
+  app.post("/api/games/classic-slots/win", async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    try {
+      const { winAmount } = z.object({ winAmount: z.number().min(0) }).parse(req.body);
+      if (winAmount > 0) {
+        await storage.updateUserBalance(req.user.id, winAmount);
+        await storage.createTransaction({ userId: req.user.id, amount: winAmount, type: "win", description: `Classic Slots win (+${winAmount})` });
+      }
+      const user = await storage.getUser(req.user.id);
+      res.json({ balance: user?.balance ?? 0 });
+    } catch (err) { res.status(500).json({ message: "Internal Server Error" }); }
   });
 
   // === SLOTS ===

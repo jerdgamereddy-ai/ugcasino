@@ -29,6 +29,11 @@
                     if (typeof event.data.winOccurrence === 'number') {
                         _winOccurrence = event.data.winOccurrence;
                     }
+                    if (Array.isArray(event.data.odds) && event.data.odds.length === 6) {
+                        if (typeof s_oSettingsData !== 'undefined') {
+                            s_oSettingsData.odd_win_bet = event.data.odds;
+                        }
+                    }
                     if (document.readyState === 'complete' || document.readyState === 'interactive') {
                         initGame();
                     }

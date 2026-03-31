@@ -438,14 +438,14 @@ export default function Lobby() {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
           {[
             {
-              href: "/slots",
+              href: "/classic-slots",
               img: "https://images.unsplash.com/photo-1596838132731-3301c3fd4317?q=80&w=2070",
               icon: Coins,
               tag: "Featured",
               tagColor: "bg-primary",
-              title: "Fruit Slots",
-              desc: "Match tropical fruits for ultimate golden treasures.",
-              id: "slots"
+              title: "Classic Slots",
+              desc: "5-reel, 20-payline premium slot machine. Spin to win!",
+              id: "classic-slots"
             },
             {
               href: "/roulette",

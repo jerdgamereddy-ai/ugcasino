@@ -28,24 +28,28 @@ import { MessageCircle } from "lucide-react";
 
 type GameFormData = z.infer<typeof updateGameSettingsSchema>;
 
-const ACTIVE_GAME_TYPES = ["slots", "roulette", "dice", "hilo", "coinflip", "plinko", "wheel", "fishhunt", "dog-racing", "horse4", "horse-js"];
+const ACTIVE_GAME_TYPES = ["classic-slots", "roulette", "dice", "hilo", "coinflip", "plinko", "wheel", "fishhunt", "dog-racing", "horse4", "horse-js"];
 
 const HORSE4_NAMES = ["Engineer", "Pin", "Doughnut", "Mayhem", "Last Things", "Chatterbox", "Hypno", "Croquette"];
 const HORSE4_DEFAULT_ODDS = [3.7, 5.5, 2.2, 11.75, 17.25, 8.75, 7.15, 6.15];
+const DOG_NAMES = ["Psycho", "All Saturdays", "The Norman", "T-Rex", "Nice Tuft", "Baloo"];
+const DOG_DEFAULT_ODDS = [3.7, 5.5, 2.2, 11.75, 17.25, 8.75];
 
 function GameSettingCard({ setting }: { setting: GameSetting }) {
   const { toast } = useToast();
   const [pct, setPct] = useState(Math.round(setting.winChance * 100));
-  const hasMultiplier = ["coinflip", "slots", "dice", "hilo"].includes(setting.gameType);
-  const defaultMultiplier = setting.gameType === "slots" ? 10 : setting.gameType === "coinflip" ? 1.95 : 2;
+  const hasMultiplier = ["coinflip", "classic-slots", "dice", "hilo"].includes(setting.gameType);
+  const defaultMultiplier = setting.gameType === "classic-slots" ? 10 : setting.gameType === "coinflip" ? 1.95 : 2;
   const [multiplierVal, setMultiplierVal] = useState(setting.payoutMultiplier ?? defaultMultiplier);
   const isHorseJs = setting.gameType === "horse-js";
   const isHorse4 = setting.gameType === "horse4";
   const isRoulette = setting.gameType === "roulette";
+  const isDogRacing = setting.gameType === "dog-racing";
   const extraParsed = (() => { try { return setting.extraSettings ? JSON.parse(setting.extraSettings) : {}; } catch { return {}; } })();
   const [maxLaps, setMaxLaps] = useState<number>(extraParsed.maxLaps ?? 1);
   const [horseOdds, setHorseOdds] = useState<number[]>(extraParsed.odds ?? [2.0, 2.5, 3.0, 3.5]);
   const [horse4Odds, setHorse4Odds] = useState<number[]>(extraParsed.odds ?? HORSE4_DEFAULT_ODDS);
+  const [dogOdds, setDogOdds] = useState<number[]>(extraParsed.odds ?? DOG_DEFAULT_ODDS);
   const [numberOdds, setNumberOdds] = useState<number>(extraParsed.numberOdds ?? 35);
   const [colorOdds, setColorOdds] = useState<number>(extraParsed.colorOdds ?? 1);
   const [parityOdds, setParityOdds] = useState<number>(extraParsed.parityOdds ?? 1);
@@ -127,6 +131,22 @@ function GameSettingCard({ setting }: { setting: GameSetting }) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [api.games.settings.get.path] });
       toast({ title: "Roulette Updated", description: "Roulette odds saved." });
+    },
+  });
+
+  const dogRacingMutation = useMutation({
+    mutationFn: async () => {
+      const res = await fetch("/api/games/dog-racing/settings", {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ odds: dogOdds }),
+      });
+      if (!res.ok) throw new Error("Failed to update dog racing settings");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [api.games.settings.get.path] });
+      toast({ title: "Dog Racing Updated", description: "Greyhound win odds saved." });
     },
   });
 
@@ -301,6 +321,43 @@ function GameSettingCard({ setting }: { setting: GameSetting }) {
               data-testid="button-save-roulette-odds"
             >
               {rouletteMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save Roulette Odds"}
+            </Button>
+          </div>
+        )}
+        {isDogRacing && (
+          <div className="border-t border-white/10 pt-4 space-y-3">
+            <label className="text-xs text-muted-foreground font-semibold">Greyhound Race — Win Odds (x)</label>
+            <div className="space-y-2">
+              {DOG_NAMES.map((name, i) => (
+                <div key={i} className="flex items-center gap-2">
+                  <span className="text-xs text-muted-foreground w-28 capitalize">{name}</span>
+                  <Input
+                    type="number"
+                    min={1.01}
+                    max={200}
+                    step={0.05}
+                    value={dogOdds[i] ?? DOG_DEFAULT_ODDS[i]}
+                    onChange={(e) => {
+                      const updated = [...dogOdds];
+                      updated[i] = Math.max(1.01, parseFloat(e.target.value) || 1.01);
+                      setDogOdds(updated);
+                    }}
+                    className="font-mono text-sm text-center bg-white/5 border-white/10"
+                    data-testid={`input-dog-odds-${i}`}
+                  />
+                  <span className="text-xs text-muted-foreground">x</span>
+                </div>
+              ))}
+            </div>
+            <Button
+              className="w-full"
+              size="sm"
+              variant="secondary"
+              onClick={() => dogRacingMutation.mutate()}
+              disabled={dogRacingMutation.isPending}
+              data-testid="button-save-dog-odds"
+            >
+              {dogRacingMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save Greyhound Odds"}
             </Button>
           </div>
         )}

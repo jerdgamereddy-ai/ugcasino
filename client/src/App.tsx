@@ -12,7 +12,7 @@ import Lobby from "@/pages/Lobby";
 import AdminDashboard from "@/pages/AdminDashboard";
 import SuperManagerDashboard from "@/pages/SuperManagerDashboard";
 import ManagerDashboard from "@/pages/ManagerDashboard";
-import GameSlots from "@/pages/GameSlots";
+import GameClassicSlots from "@/pages/GameClassicSlots";
 import GameRoulette from "@/pages/GameRoulette";
 import GameDice from "@/pages/GameDice";
 import GameHiLo from "@/pages/GameHiLo";
@@ -38,7 +38,7 @@ function Router() {
       <Route path="/super-manager" component={SuperManagerDashboard} />
       <Route path="/sm-reports" component={Reports} />
       <Route path="/manager" component={ManagerDashboard} />
-      <Route path="/slots" component={GameSlots} />
+      <Route path="/classic-slots" component={GameClassicSlots} />
       <Route path="/roulette" component={GameRoulette} />
       <Route path="/dice" component={GameDice} />
       <Route path="/hilo" component={GameHiLo} />

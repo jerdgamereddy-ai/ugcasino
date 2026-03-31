@@ -15,7 +15,7 @@ export default function GameDogRacing() {
   const iframeLoadedRef = useRef(false);
 
   const { data: user } = useQuery<User>({ queryKey: ["/api/user"] });
-  const { data: gameSettings } = useQuery<{ winOccurrence: number }>({
+  const { data: gameSettings } = useQuery<{ winOccurrence: number; odds?: number[] }>({
     queryKey: ["/api/games/dog-racing/settings"],
   });
 
@@ -51,7 +51,7 @@ export default function GameDogRacing() {
     if (balanceSentRef.current || !iframeLoadedRef.current) return;
     if (!user || !gameSettings || !iframeRef.current?.contentWindow) return;
     iframeRef.current.contentWindow.postMessage(
-      { type: "init_balance", balance: user.balance, winOccurrence: gameSettings.winOccurrence },
+      { type: "init_balance", balance: user.balance, winOccurrence: gameSettings.winOccurrence, odds: gameSettings.odds },
       "*"
     );
     balanceSentRef.current = true;
