@@ -159,7 +159,7 @@ game.startup = function()
 
 game.initUI = function()
 {
-	this.bg = new Q.Bitmap({id:"bg", image:ns.R.mainbg, transformEnabled:false});
+	this.bg = null;
 	
 	this.fishContainer = new Q.DisplayObjectContainer({id:"fishContainer", width:this.width, height:this.height, eventChildren:false, transformEnabled:false});
 	this.fishContainer.onEvent = function(e)
@@ -177,7 +177,7 @@ game.initUI = function()
 	this.bottom.y = this.height - this.bottom.height + 2;
 	this.bottom.transformEnabled = false;
 	
-	this.stage.addChild(this.bg, this.fishContainer, this.bottom);	
+	this.stage.addChild(this.fishContainer, this.bottom);	
 };
 
 game.initPlayer = function()

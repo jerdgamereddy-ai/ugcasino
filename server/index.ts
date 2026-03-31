@@ -23,6 +23,13 @@ app.use(
 
 app.use(express.urlencoded({ extended: false }));
 
+app.use('/games', (req, res, next) => {
+  if (/\.(png|gif|jpg|jpeg|webp|js|css|ogg|mp3|wav|svg|ico|woff2?|ttf)$/i.test(req.path)) {
+    res.setHeader('Cache-Control', 'public, max-age=604800');
+  }
+  next();
+});
+
 export function log(message: string, source = "express") {
   const formattedTime = new Date().toLocaleTimeString("en-US", {
     hour: "numeric",
