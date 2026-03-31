@@ -27,6 +27,7 @@ import Reports from "@/pages/Reports";
 import GameControl from "@/pages/GameControl";
 import ForgotPassword from "@/pages/ForgotPassword";
 import NotFound from "@/pages/not-found";
+import GlobalMusicPlayer from "@/components/GlobalMusicPlayer";
 
 function Router() {
   return (
@@ -82,6 +83,7 @@ function App() {
             </div>
           </div>
         </SidebarProvider>
+        <GlobalMusicPlayer />
         <Toaster />
       </TooltipProvider>
     </QueryClientProvider>

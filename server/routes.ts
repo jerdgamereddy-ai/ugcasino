@@ -7,6 +7,10 @@ import { z } from "zod";
 import { randomBytes } from "crypto";
 import { hashPassword } from "./auth";
 import { adminPasswordSchema, securityAnswersSchema, securityVerifySchema, ADMIN_SECURITY_QUESTIONS, type User } from "@shared/schema";
+import multer from "multer";
+import path from "path";
+import fs from "fs";
+import { fileURLToPath } from "url";
 
 export async function registerRoutes(
   httpServer: Server,
@@ -1864,6 +1868,83 @@ export async function registerRoutes(
     await storage.markMessagesAsRead(otherUserId, sender.id);
 
     res.json(conversation);
+  });
+
+  // === AUDIO TRACKS ===
+  const AUDIO_UPLOAD_DIR = path.join(process.cwd(), "uploads", "audio");
+  if (!fs.existsSync(AUDIO_UPLOAD_DIR)) fs.mkdirSync(AUDIO_UPLOAD_DIR, { recursive: true });
+
+  const audioStorage = multer.diskStorage({
+    destination: (_req, _file, cb) => cb(null, AUDIO_UPLOAD_DIR),
+    filename: (_req, file, cb) => {
+      const ext = path.extname(file.originalname);
+      cb(null, `audio_${Date.now()}_${Math.random().toString(36).slice(2)}${ext}`);
+    },
+  });
+
+  const audioUpload = multer({
+    storage: audioStorage,
+    limits: { fileSize: 10 * 1024 * 1024 },
+    fileFilter: (_req, file, cb) => {
+      const allowed = ["audio/mpeg", "audio/mp3", "audio/wav", "audio/ogg", "audio/aac", "audio/x-m4a", "audio/mp4", "audio/webm", "audio/flac"];
+      if (allowed.includes(file.mimetype) || file.originalname.match(/\.(mp3|wav|ogg|aac|m4a|flac|webm)$/i)) {
+        cb(null, true);
+      } else {
+        cb(new Error("Only audio files are allowed"));
+      }
+    },
+  });
+
+  app.use("/uploads/audio", (req, res, next) => {
+    res.setHeader("Cache-Control", "public, max-age=86400");
+    next();
+  }, (req, res, next) => {
+    const filePath = path.join(AUDIO_UPLOAD_DIR, path.basename(req.path));
+    if (fs.existsSync(filePath)) res.sendFile(filePath);
+    else res.status(404).send("Not found");
+  });
+
+  app.get("/api/audio", async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    try {
+      const tracks = await storage.getAudioTracks();
+      res.json(tracks);
+    } catch { res.status(500).json({ message: "Internal Server Error" }); }
+  });
+
+  app.post("/api/admin/audio", async (req, res) => {
+    if (!req.isAuthenticated() || req.user.role !== "admin") return res.status(403).send("Forbidden");
+    const count = await storage.countAudioTracks();
+    if (count >= 10) return res.status(400).json({ message: "Maximum of 10 audio tracks allowed. Delete one first." });
+    audioUpload.single("audio")(req, res, async (err) => {
+      if (err) return res.status(400).json({ message: err.message || "Upload failed" });
+      if (!req.file) return res.status(400).json({ message: "No file provided" });
+      try {
+        const track = await storage.createAudioTrack({
+          filename: req.file.filename,
+          originalName: req.file.originalname,
+          mimeType: req.file.mimetype,
+          size: req.file.size,
+          uploadedBy: req.user.id,
+        });
+        res.json(track);
+      } catch {
+        fs.unlink(req.file.path, () => {});
+        res.status(500).json({ message: "Internal Server Error" });
+      }
+    });
+  });
+
+  app.delete("/api/admin/audio/:id", async (req, res) => {
+    if (!req.isAuthenticated() || req.user.role !== "admin") return res.status(403).send("Forbidden");
+    try {
+      const id = parseInt(req.params.id);
+      const track = await storage.deleteAudioTrack(id);
+      if (!track) return res.status(404).json({ message: "Track not found" });
+      const filePath = path.join(AUDIO_UPLOAD_DIR, track.filename);
+      if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+      res.json({ success: true });
+    } catch { res.status(500).json({ message: "Internal Server Error" }); }
   });
 
   return httpServer;

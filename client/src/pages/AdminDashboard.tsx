@@ -9,7 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useState, useRef, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { Shield, Plus, Users, Ticket, Copy, Banknote, CheckCircle, Loader2, Ban, Trash2, ArrowUpCircle, KeyRound, UserCog, Lock, BarChart3, Settings2, ChevronUp, ChevronDown, Megaphone, Calculator, Phone, CircleDot, Crown, Briefcase, Printer } from "lucide-react";
+import { Shield, Plus, Users, Ticket, Copy, Banknote, CheckCircle, Loader2, Ban, Trash2, ArrowUpCircle, KeyRound, UserCog, Lock, BarChart3, Settings2, ChevronUp, ChevronDown, Megaphone, Calculator, Phone, CircleDot, Crown, Briefcase, Printer, Music, Upload, X } from "lucide-react";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -834,6 +834,7 @@ export default function AdminDashboard() {
             <TabsTrigger value="chat" data-testid="tab-chat"><MessageCircle className="w-3 h-3 mr-1" /> Chat</TabsTrigger>
             <TabsTrigger value="security" data-testid="tab-security">Security</TabsTrigger>
             <TabsTrigger value="settings" data-testid="tab-settings">Account</TabsTrigger>
+            <TabsTrigger value="audio" data-testid="tab-audio"><Music className="w-3 h-3 mr-1" /> Music</TabsTrigger>
           </TabsList>
 
           <TabsContent value="users" className="mt-6 space-y-6">
@@ -1269,8 +1270,153 @@ export default function AdminDashboard() {
               </CardContent>
             </Card>
           </TabsContent>
+
+          <TabsContent value="audio" className="mt-6">
+            <AudioManagementTab />
+          </TabsContent>
         </Tabs>
       </div>
     </ProtectedLayout>
+  );
+}
+
+function AudioManagementTab() {
+  const { toast } = useToast();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [uploading, setUploading] = useState(false);
+
+  const { data: tracks = [], isLoading, refetch } = useQuery<any[]>({
+    queryKey: ["/api/audio"],
+  });
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 10 * 1024 * 1024) {
+      toast({ title: "File too large", description: "Maximum file size is 10MB.", variant: "destructive" });
+      return;
+    }
+    if (tracks.length >= 10) {
+      toast({ title: "Limit reached", description: "You can only have 10 audio tracks. Delete one first.", variant: "destructive" });
+      return;
+    }
+    const formData = new FormData();
+    formData.append("audio", file);
+    setUploading(true);
+    try {
+      const res = await fetch("/api/admin/audio", { method: "POST", body: formData });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ message: "Upload failed" }));
+        throw new Error(err.message);
+      }
+      toast({ title: "Track uploaded", description: `${file.name} added to background music.` });
+      refetch();
+    } catch (err: any) {
+      toast({ title: "Upload failed", description: err.message, variant: "destructive" });
+    } finally {
+      setUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  };
+
+  const handleDelete = async (id: number, name: string) => {
+    try {
+      const res = await fetch(`/api/admin/audio/${id}`, { method: "DELETE" });
+      if (!res.ok) throw new Error("Delete failed");
+      toast({ title: "Track removed", description: `${name} deleted.` });
+      refetch();
+    } catch {
+      toast({ title: "Error", description: "Could not delete track.", variant: "destructive" });
+    }
+  };
+
+  const formatSize = (bytes: number) => {
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  };
+
+  return (
+    <Card className="glass-card">
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <Music className="w-5 h-5" /> Background Music ({tracks.length}/10)
+        </CardTitle>
+        <CardDescription>Upload audio files that play randomly as background music across the site. Max 10 files, 10MB each.</CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="flex items-center gap-3">
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="audio/*,.mp3,.wav,.ogg,.aac,.m4a,.flac,.webm"
+            className="hidden"
+            onChange={handleFileChange}
+            data-testid="input-audio-file"
+          />
+          <Button
+            onClick={() => fileInputRef.current?.click()}
+            disabled={uploading || tracks.length >= 10}
+            className="gap-2"
+            data-testid="button-upload-audio"
+          >
+            {uploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
+            {uploading ? "Uploading..." : "Upload Audio File"}
+          </Button>
+          {tracks.length >= 10 && (
+            <span className="text-sm text-amber-400">Maximum 10 tracks reached</span>
+          )}
+        </div>
+
+        {isLoading ? (
+          <div className="flex items-center gap-2 text-muted-foreground">
+            <Loader2 className="w-4 h-4 animate-spin" /> Loading tracks...
+          </div>
+        ) : tracks.length === 0 ? (
+          <div className="text-center py-8 text-muted-foreground">
+            <Music className="w-10 h-10 mx-auto mb-2 opacity-30" />
+            <p>No audio tracks uploaded yet.</p>
+            <p className="text-sm">Upload MP3, WAV, OGG, AAC or other audio files.</p>
+          </div>
+        ) : (
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>#</TableHead>
+                <TableHead>File Name</TableHead>
+                <TableHead>Size</TableHead>
+                <TableHead className="text-right">Action</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {tracks.map((track: any, idx: number) => (
+                <TableRow key={track.id} data-testid={`row-audio-${track.id}`}>
+                  <TableCell className="text-muted-foreground">{idx + 1}</TableCell>
+                  <TableCell>
+                    <div className="flex items-center gap-2">
+                      <Music className="w-4 h-4 text-[#D4AF37]" />
+                      <span className="truncate max-w-[200px]" title={track.originalName}>
+                        {track.originalName}
+                      </span>
+                    </div>
+                  </TableCell>
+                  <TableCell className="text-muted-foreground text-sm">{formatSize(track.size)}</TableCell>
+                  <TableCell className="text-right">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleDelete(track.id, track.originalName)}
+                      className="text-red-400 hover:text-red-300 hover:bg-red-900/20"
+                      data-testid={`button-delete-audio-${track.id}`}
+                    >
+                      <X className="w-4 h-4" />
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        )}
+      </CardContent>
+    </Card>
   );
 }

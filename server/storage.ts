@@ -1,4 +1,4 @@
-import { users, vouchers, transactions, gameSettings, withdrawalRequests, adminSecurityAnswers, broadcasts, broadcastDismissals, messages, type User, type InsertUser, type Voucher, type InsertVoucher, type Transaction, type GameSetting, type WithdrawalRequest, type InsertWithdrawalRequest, type AdminSecurityAnswer, type Broadcast, type BroadcastDismissal, type Message } from "@shared/schema";
+import { users, vouchers, transactions, gameSettings, withdrawalRequests, adminSecurityAnswers, broadcasts, broadcastDismissals, messages, audioTracks, type User, type InsertUser, type Voucher, type InsertVoucher, type Transaction, type GameSetting, type WithdrawalRequest, type InsertWithdrawalRequest, type AdminSecurityAnswer, type Broadcast, type BroadcastDismissal, type Message, type AudioTrack, type InsertAudioTrack } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, sql, and, inArray, gte, lte, between } from "drizzle-orm";
 import session from "express-session";
@@ -75,6 +75,11 @@ export interface IStorage {
 
   getPendingUsersByManager(managerId: number): Promise<User[]>;
   getVouchersByCreator(creatorId: number): Promise<Voucher[]>;
+
+  getAudioTracks(): Promise<AudioTrack[]>;
+  createAudioTrack(data: InsertAudioTrack): Promise<AudioTrack>;
+  deleteAudioTrack(id: number): Promise<AudioTrack | undefined>;
+  countAudioTracks(): Promise<number>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -450,6 +455,25 @@ export class DatabaseStorage implements IStorage {
     return await db.select().from(vouchers)
       .where(eq(vouchers.createdBy, creatorId))
       .orderBy(desc(vouchers.createdAt));
+  }
+
+  async getAudioTracks(): Promise<AudioTrack[]> {
+    return await db.select().from(audioTracks).orderBy(desc(audioTracks.createdAt));
+  }
+
+  async createAudioTrack(data: InsertAudioTrack): Promise<AudioTrack> {
+    const [track] = await db.insert(audioTracks).values(data).returning();
+    return track;
+  }
+
+  async deleteAudioTrack(id: number): Promise<AudioTrack | undefined> {
+    const [track] = await db.delete(audioTracks).where(eq(audioTracks.id, id)).returning();
+    return track;
+  }
+
+  async countAudioTracks(): Promise<number> {
+    const [{ count }] = await db.select({ count: sql<number>`count(*)` }).from(audioTracks);
+    return Number(count);
   }
 }
 

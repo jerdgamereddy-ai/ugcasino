@@ -98,6 +98,19 @@ export const messages = pgTable("messages", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+export const audioTracks = pgTable("audio_tracks", {
+  id: serial("id").primaryKey(),
+  filename: text("filename").notNull(),
+  originalName: text("original_name").notNull(),
+  mimeType: text("mime_type").notNull(),
+  size: integer("size").notNull(),
+  uploadedBy: integer("uploaded_by").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export type AudioTrack = typeof audioTracks.$inferSelect;
+export type InsertAudioTrack = typeof audioTracks.$inferInsert;
+
 // === RELATIONS ===
 
 export const usersRelations = relations(users, ({ one, many }) => ({
