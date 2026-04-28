@@ -25,6 +25,83 @@ export async function registerRoutes(
     next();
   });
 
+  // === HOUSE EDGE & HIGH-BET PROTECTION HELPERS ===
+  // In-memory locked-loss flag for split bet/win games (key: `${userId}:${gameType}`)
+  const lockedLossMap = new Map<string, boolean>();
+  const lockedBetAmountMap = new Map<string, number>();
+  const lossKey = (userId: number, gameType: string) => `${userId}:${gameType}`;
+
+  // Single-call helper: records the bet, then validates the intended win against
+  // house-edge & high-bet protection. Returns the actually-paid win amount.
+  async function processCombinedBetAndWin(
+    gameType: string, userId: number, betAmount: number, intendedWin: number
+  ): Promise<number> {
+    await storage.recordHouseEdgeBet(gameType, betAmount).catch(() => {});
+    if (intendedWin <= 0) return 0;
+    const settings = await storage.getGameSettings(gameType);
+    if (!settings) {
+      await storage.recordHouseEdgePayout(gameType, intendedWin).catch(() => {});
+      return intendedWin;
+    }
+    // High-bet protection
+    if (settings.highBetThreshold > 0 && betAmount >= settings.highBetThreshold) {
+      const totalWagered = await storage.getUserTotalWagered(userId);
+      const required = settings.highBetThreshold * settings.highBetWagerMultiplier;
+      if (totalWagered < required) return 0;
+    }
+    // House edge
+    const targetRTP = 1 - (settings.houseEdgePct ?? 5) / 100;
+    const newTotalBet = settings.totalBet + betAmount;
+    if (newTotalBet > 0 && (settings.totalPaid + intendedWin) / newTotalBet > targetRTP) {
+      return 0;
+    }
+    await storage.recordHouseEdgePayout(gameType, intendedWin).catch(() => {});
+    return intendedWin;
+  }
+
+  // Split-call helpers: bet endpoint records and may flag a forced loss; win endpoint applies it.
+  async function recordBetAndCheckHighBet(gameType: string, userId: number, betAmount: number) {
+    await storage.recordHouseEdgeBet(gameType, betAmount).catch(() => {});
+    lockedBetAmountMap.set(lossKey(userId, gameType), betAmount);
+    const settings = await storage.getGameSettings(gameType);
+    if (!settings) { lockedLossMap.delete(lossKey(userId, gameType)); return; }
+    if (settings.highBetThreshold > 0 && betAmount >= settings.highBetThreshold) {
+      const totalWagered = await storage.getUserTotalWagered(userId);
+      const required = settings.highBetThreshold * settings.highBetWagerMultiplier;
+      if (totalWagered < required) {
+        lockedLossMap.set(lossKey(userId, gameType), true);
+        return;
+      }
+    }
+    lockedLossMap.delete(lossKey(userId, gameType));
+  }
+
+  async function applyHouseEdgeForWin(
+    gameType: string, userId: number, intendedWin: number
+  ): Promise<number> {
+    if (intendedWin <= 0) return 0;
+    const k = lossKey(userId, gameType);
+    if (lockedLossMap.get(k)) {
+      lockedLossMap.delete(k);
+      lockedBetAmountMap.delete(k);
+      return 0;
+    }
+    const settings = await storage.getGameSettings(gameType);
+    if (!settings) {
+      await storage.recordHouseEdgePayout(gameType, intendedWin).catch(() => {});
+      lockedBetAmountMap.delete(k);
+      return intendedWin;
+    }
+    const targetRTP = 1 - (settings.houseEdgePct ?? 5) / 100;
+    if (settings.totalBet > 0 && (settings.totalPaid + intendedWin) / settings.totalBet > targetRTP) {
+      lockedBetAmountMap.delete(k);
+      return 0;
+    }
+    await storage.recordHouseEdgePayout(gameType, intendedWin).catch(() => {});
+    lockedBetAmountMap.delete(k);
+    return intendedWin;
+  }
+
   // === ADMIN USER STATS ===
   app.get("/api/admin/user-stats", async (req, res) => {
     if (!req.isAuthenticated() || req.user.role !== 'admin') return res.status(403).send("Forbidden");
@@ -540,6 +617,87 @@ export async function registerRoutes(
     }
   });
 
+  // === HOUSE EDGE & HIGH-BET PROTECTION (admin) ===
+  app.post("/api/games/settings/house-edge", async (req, res) => {
+    if (!req.isAuthenticated() || req.user.role !== 'admin') return res.status(403).send("Forbidden");
+    try {
+      const { gameType, houseEdgePct, highBetThreshold, highBetWagerMultiplier } = z.object({
+        gameType: z.enum(["slots", "roulette", "dice", "hilo", "coinflip", "plinko", "wheel", "fishhunt", "fishjoy", "classic-slots", "dog-racing", "horse4", "horse-js"] as any),
+        houseEdgePct: z.number().min(0).max(50).optional(),
+        highBetThreshold: z.number().int().min(0).max(100000000).optional(),
+        highBetWagerMultiplier: z.number().min(0).max(1000).optional(),
+      }).parse(req.body);
+      const settings = await storage.updateGameHouseEdge(gameType as any, { houseEdgePct, highBetThreshold, highBetWagerMultiplier }, req.user.id);
+      res.json(settings);
+    } catch (err) {
+      res.status(400).json({ message: "Invalid input" });
+    }
+  });
+
+  app.post("/api/games/settings/reset-stats", async (req, res) => {
+    if (!req.isAuthenticated() || req.user.role !== 'admin') return res.status(403).send("Forbidden");
+    try {
+      const { gameType } = z.object({
+        gameType: z.enum(["slots", "roulette", "dice", "hilo", "coinflip", "plinko", "wheel", "fishhunt", "fishjoy", "classic-slots", "dog-racing", "horse4", "horse-js"] as any),
+      }).parse(req.body);
+      const settings = await storage.resetGameHouseEdgeStats(gameType as any, req.user.id);
+      res.json(settings);
+    } catch (err) {
+      res.status(400).json({ message: "Invalid input" });
+    }
+  });
+
+  // === DIRECT CREDIT USER BALANCE (admin / super_manager / manager) ===
+  app.post("/api/admin/users/:id/credit", async (req, res) => {
+    if (!req.isAuthenticated() || (req.user.role !== 'admin' && req.user.role !== 'super_manager' && req.user.role !== 'manager')) {
+      return res.status(403).send("Forbidden");
+    }
+    try {
+      const userId = parseInt(req.params.id);
+      const parsed = z.object({
+        amount: z.number().int().min(-100000000).max(100000000).refine(v => v !== 0, "Amount cannot be zero"),
+        note: z.string().max(200).optional(),
+        description: z.string().max(200).optional(),
+      }).parse(req.body);
+      const amount: number = parsed.amount;
+      const note = parsed.note ?? parsed.description;
+
+      const targetUser = await storage.getUser(userId);
+      if (!targetUser) return res.status(404).json({ message: "User not found" });
+      if (targetUser.id === req.user.id) return res.status(400).json({ message: "Cannot credit your own account" });
+
+      // Authorization: enforce hierarchy
+      if (req.user.role === 'manager') {
+        if (targetUser.createdBy !== req.user.id) {
+          return res.status(403).json({ message: "You can only credit your own players" });
+        }
+      } else if (req.user.role === 'super_manager') {
+        if (targetUser.createdBy !== req.user.id) {
+          const managers = await storage.getUsersByCreator(req.user.id);
+          const managerIds = managers.map(m => m.id);
+          if (!managerIds.includes(targetUser.createdBy ?? -1)) {
+            return res.status(403).json({ message: "You can only credit users in your network" });
+          }
+        }
+      }
+      // Admin can credit anyone (except self, blocked above)
+
+      // Debits (negative amounts) cannot exceed user balance
+      if (amount < 0 && targetUser.balance + amount < 0) {
+        return res.status(400).json({ message: "User balance is insufficient for this debit" });
+      }
+
+      const updated = await storage.updateUserBalance(userId, amount);
+      const txType = amount > 0 ? "deposit" : "withdrawal";
+      const desc = `Direct ${amount > 0 ? "credit" : "debit"} by ${req.user.username}${note ? `: ${note}` : ""}`;
+      await storage.createTransaction({ userId, amount, type: txType, description: desc });
+
+      res.json({ success: true, balance: updated.balance });
+    } catch (err: any) {
+      res.status(400).json({ message: err?.message || "Invalid input" });
+    }
+  });
+
   // === GAME SETTINGS ENDPOINTS (per-game multiplier) ===
   app.get("/api/games/slots/settings", async (req, res) => {
     if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
@@ -592,7 +750,13 @@ export async function registerRoutes(
       await storage.updateUserBalance(req.user.id, -bet);
       await storage.createTransaction({ userId: req.user.id, amount: -bet, type: "bet", description: "HiLo play" });
 
-      const won = Math.random() < winChance;
+      let won = Math.random() < winChance;
+      const multiplier = settings?.payoutMultiplier ?? 2;
+      let intendedPayout = won ? Math.floor(bet * multiplier) : 0;
+      const allowedPayout = await processCombinedBetAndWin("hilo", req.user.id, bet, intendedPayout);
+      if (allowedPayout === 0) won = false;
+      const payout = allowedPayout;
+
       const nextCard = won 
         ? (prediction === "higher" 
             ? Math.floor(Math.random() * (13 - (lastCard || 7))) + (lastCard || 7) + 1
@@ -600,12 +764,9 @@ export async function registerRoutes(
         : (prediction === "higher"
             ? Math.floor(Math.random() * ((lastCard || 7) - 1)) + 1
             : Math.floor(Math.random() * (13 - (lastCard || 7))) + (lastCard || 7) + 1);
-      
       const card = Math.max(1, Math.min(13, nextCard));
-      const multiplier = settings?.payoutMultiplier ?? 2;
-      const payout = won ? Math.floor(bet * multiplier) : 0;
-      const user = won ? await storage.updateUserBalance(req.user.id, payout) : await storage.getUser(req.user.id);
-      if (won) await storage.createTransaction({ userId: req.user.id, amount: payout, type: "win", description: "HiLo win" });
+      const user = payout > 0 ? await storage.updateUserBalance(req.user.id, payout) : await storage.getUser(req.user.id);
+      if (payout > 0) await storage.createTransaction({ userId: req.user.id, amount: payout, type: "win", description: "HiLo win" });
 
       res.json({ won, payout, balance: user?.balance ?? 0, card });
     } catch (err) {
@@ -643,6 +804,7 @@ export async function registerRoutes(
       if (req.user.balance < totBet) return res.status(400).json({ message: "Insufficient balance" });
       await storage.updateUserBalance(req.user.id, -totBet);
       await storage.createTransaction({ userId: req.user.id, amount: -totBet, type: "bet", description: "Greyhound Racing bet" });
+      await recordBetAndCheckHighBet("dog-racing", req.user.id, totBet);
       const user = await storage.getUser(req.user.id);
       res.json({ balance: user?.balance ?? 0 });
     } catch (err) { res.status(500).json({ message: "Internal Server Error" }); }
@@ -652,12 +814,13 @@ export async function registerRoutes(
     if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
     try {
       const { winAmount } = z.object({ winAmount: z.number().min(0).max(50000000) }).parse(req.body);
-      if (winAmount > 0) {
-        await storage.updateUserBalance(req.user.id, winAmount);
-        await storage.createTransaction({ userId: req.user.id, amount: winAmount, type: "win", description: "Greyhound Racing win" });
+      const finalWin = await applyHouseEdgeForWin("dog-racing", req.user.id, winAmount);
+      if (finalWin > 0) {
+        await storage.updateUserBalance(req.user.id, finalWin);
+        await storage.createTransaction({ userId: req.user.id, amount: finalWin, type: "win", description: "Greyhound Racing win" });
       }
       const user = await storage.getUser(req.user.id);
-      res.json({ balance: user?.balance ?? 0 });
+      res.json({ balance: user?.balance ?? 0, blocked: winAmount > 0 && finalWin === 0 });
     } catch (err) { res.status(500).json({ message: "Internal Server Error" }); }
   });
 
@@ -690,6 +853,7 @@ export async function registerRoutes(
       if (req.user.balance < totBet) return res.status(400).json({ message: "Insufficient balance" });
       await storage.updateUserBalance(req.user.id, -totBet);
       await storage.createTransaction({ userId: req.user.id, amount: -totBet, type: "bet", description: "Horse4 Racing bet" });
+      await recordBetAndCheckHighBet("horse4", req.user.id, totBet);
       const user = await storage.getUser(req.user.id);
       res.json({ balance: user?.balance ?? 0 });
     } catch (err) { res.status(500).json({ message: "Internal Server Error" }); }
@@ -699,12 +863,13 @@ export async function registerRoutes(
     if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
     try {
       const { winAmount } = z.object({ winAmount: z.number().min(0).max(50000000) }).parse(req.body);
-      if (winAmount > 0) {
-        await storage.updateUserBalance(req.user.id, winAmount);
-        await storage.createTransaction({ userId: req.user.id, amount: winAmount, type: "win", description: "Horse4 Racing win" });
+      const finalWin = await applyHouseEdgeForWin("horse4", req.user.id, winAmount);
+      if (finalWin > 0) {
+        await storage.updateUserBalance(req.user.id, finalWin);
+        await storage.createTransaction({ userId: req.user.id, amount: finalWin, type: "win", description: "Horse4 Racing win" });
       }
       const user = await storage.getUser(req.user.id);
-      res.json({ balance: user?.balance ?? 0 });
+      res.json({ balance: user?.balance ?? 0, blocked: winAmount > 0 && finalWin === 0 });
     } catch (err) { res.status(500).json({ message: "Internal Server Error" }); }
   });
 
@@ -744,6 +909,7 @@ export async function registerRoutes(
       if (req.user.balance < totBet) return res.status(400).json({ message: "Insufficient balance" });
       await storage.updateUserBalance(req.user.id, -totBet);
       await storage.createTransaction({ userId: req.user.id, amount: -totBet, type: "bet", description: "Horse Racing bet" });
+      await recordBetAndCheckHighBet("horse-js", req.user.id, totBet);
       const user = await storage.getUser(req.user.id);
       res.json({ balance: user?.balance ?? 0 });
     } catch (err) { res.status(500).json({ message: "Internal Server Error" }); }
@@ -753,12 +919,13 @@ export async function registerRoutes(
     if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
     try {
       const { winAmount } = z.object({ winAmount: z.number().min(0).max(50000000) }).parse(req.body);
-      if (winAmount > 0) {
-        await storage.updateUserBalance(req.user.id, winAmount);
-        await storage.createTransaction({ userId: req.user.id, amount: winAmount, type: "win", description: "Horse Racing win" });
+      const finalWin = await applyHouseEdgeForWin("horse-js", req.user.id, winAmount);
+      if (finalWin > 0) {
+        await storage.updateUserBalance(req.user.id, finalWin);
+        await storage.createTransaction({ userId: req.user.id, amount: finalWin, type: "win", description: "Horse Racing win" });
       }
       const user = await storage.getUser(req.user.id);
-      res.json({ balance: user?.balance ?? 0 });
+      res.json({ balance: user?.balance ?? 0, blocked: winAmount > 0 && finalWin === 0 });
     } catch (err) { res.status(500).json({ message: "Internal Server Error" }); }
   });
 
@@ -779,15 +946,17 @@ export async function registerRoutes(
       await storage.updateUserBalance(req.user.id, -bet);
       await storage.createTransaction({ userId: req.user.id, amount: -bet, type: "bet", description: "Dice roll" });
 
-      const won = Math.random() < winChance;
+      let won = Math.random() < winChance;
+      const multiplier = settings?.payoutMultiplier ?? 2;
+      let intendedPayout = won ? Math.floor(bet * multiplier) : 0;
+      const allowedPayout = await processCombinedBetAndWin("dice", req.user.id, bet, intendedPayout);
+      if (allowedPayout === 0) won = false;
+      const payout = allowedPayout;
       const roll = won 
         ? (choice === "low" ? Math.floor(Math.random() * 3) + 1 : Math.floor(Math.random() * 3) + 4)
         : (choice === "low" ? Math.floor(Math.random() * 3) + 4 : Math.floor(Math.random() * 3) + 1);
-      
-      const multiplier = settings?.payoutMultiplier ?? 2;
-      const payout = won ? Math.floor(bet * multiplier) : 0;
-      const user = won ? await storage.updateUserBalance(req.user.id, payout) : await storage.getUser(req.user.id);
-      if (won) await storage.createTransaction({ userId: req.user.id, amount: payout, type: "win", description: "Dice win" });
+      const user = payout > 0 ? await storage.updateUserBalance(req.user.id, payout) : await storage.getUser(req.user.id);
+      if (payout > 0) await storage.createTransaction({ userId: req.user.id, amount: payout, type: "win", description: "Dice win" });
 
       res.json({ won, payout, balance: user?.balance ?? 0, roll });
     } catch (err) {
@@ -823,11 +992,13 @@ export async function registerRoutes(
       await storage.updateUserBalance(req.user.id, -bet);
       await storage.createTransaction({ userId: req.user.id, amount: -bet, type: "bet", description: "Coin Flip play" });
 
-      const won = Math.random() < winChance;
-      const result = won ? choice : (choice === "heads" ? "tails" : "heads");
-      
+      let won = Math.random() < winChance;
       const multiplier = settings?.payoutMultiplier ?? 1.95;
-      const payout = won ? bet * multiplier : 0;
+      let intendedPayout = won ? Math.floor(bet * multiplier) : 0;
+      const allowedPayout = await processCombinedBetAndWin("coinflip", req.user.id, bet, intendedPayout);
+      if (allowedPayout === 0) won = false;
+      const result = won ? choice : (choice === "heads" ? "tails" : "heads");
+      const payout = allowedPayout;
       const user = won ? await storage.updateUserBalance(req.user.id, Math.floor(payout)) : await storage.getUser(req.user.id);
       if (won) await storage.createTransaction({ userId: req.user.id, amount: Math.floor(payout), type: "win", description: "Coin Flip win" });
 
@@ -849,7 +1020,7 @@ export async function registerRoutes(
       await storage.createTransaction({ userId: req.user.id, amount: -bet, type: "bet", description: "Plinko play" });
       
       const multipliers = [0.2, 0.5, 1.2, 2, 5, 2, 1.2, 0.5, 0.2];
-      const won = Math.random() < winChance;
+      let won = Math.random() < winChance;
       let multiplierIndex;
       if (won) {
         const winIndices = [2, 3, 4, 5, 6];
@@ -858,12 +1029,20 @@ export async function registerRoutes(
         const loseIndices = [0, 1, 7, 8];
         multiplierIndex = loseIndices[Math.floor(Math.random() * loseIndices.length)];
       }
-      
-      const multiplier = multipliers[multiplierIndex];
-      const payout = Math.floor(bet * multiplier);
-      const user = await storage.updateUserBalance(req.user.id, payout);
+      let multiplier = multipliers[multiplierIndex];
+      let intendedPayout = Math.floor(bet * multiplier);
+      const allowedPayout = await processCombinedBetAndWin("plinko", req.user.id, bet, intendedPayout);
+      if (allowedPayout === 0 && intendedPayout > 0) {
+        // Force loss outcome
+        const loseIndices = [0, 1, 7, 8];
+        multiplierIndex = loseIndices[Math.floor(Math.random() * loseIndices.length)];
+        multiplier = multipliers[multiplierIndex];
+        won = false;
+      }
+      const payout = allowedPayout;
+      const user = payout > 0 ? await storage.updateUserBalance(req.user.id, payout) : await storage.getUser(req.user.id);
       if (payout > 0) await storage.createTransaction({ userId: req.user.id, amount: payout, type: "win", description: "Plinko win" });
-      res.json({ won: multiplier > 1, payout, balance: user.balance, multiplier, multiplierIndex });
+      res.json({ won: payout > 0, payout, balance: user?.balance ?? 0, multiplier, multiplierIndex });
     } catch (err) {
       res.status(500).json({ message: "Internal Server Error" });
     }
@@ -929,16 +1108,22 @@ export async function registerRoutes(
         segmentIndex = lossIndices[Math.floor(Math.random() * lossIndices.length)];
       }
 
-      const multiplier = SEGMENTS[segmentIndex].multiplier;
-      const payout = Math.floor(bet * multiplier);
-      const won = multiplier > 0;
-      
+      let multiplier = SEGMENTS[segmentIndex].multiplier;
+      let intendedPayout = Math.floor(bet * multiplier);
+      const allowedPayout = await processCombinedBetAndWin("wheel", req.user.id, bet, intendedPayout);
+      if (allowedPayout === 0 && intendedPayout > 0) {
+        // Force a loss segment
+        const lossIndices = SEGMENTS.map((s, i) => s.multiplier === 0 ? i : -1).filter(i => i >= 0);
+        segmentIndex = lossIndices[Math.floor(Math.random() * lossIndices.length)];
+        multiplier = SEGMENTS[segmentIndex].multiplier;
+      }
+      const payout = allowedPayout;
+      const won = payout > 0;
       if (payout > 0) {
         await storage.updateUserBalance(req.user.id, payout);
         await storage.createTransaction({ userId: req.user.id, amount: payout, type: "win", description: `Wheel win x${multiplier}` });
       }
       const user = await storage.getUser(req.user.id);
-      
       res.json({ won, payout, balance: user?.balance ?? 0, segmentIndex, multiplier });
     } catch (err) {
       res.status(500).json({ message: "Internal Server Error" });
@@ -1083,14 +1268,16 @@ export async function registerRoutes(
 
       const difficulty = catchDifficulty[fishType] || 1.0;
       const adjustedChance = winChance * difficulty;
-      const caught = Math.random() < adjustedChance;
+      let caught = Math.random() < adjustedChance;
 
       await storage.updateUserBalance(req.user.id, -bet);
       await storage.createTransaction({ userId: req.user.id, amount: -bet, type: "bet", description: `Fish Hunt: Shot at ${fishType}` });
 
-      let payout = 0;
-      if (caught) {
-        payout = Math.floor(bet * multiplier);
+      let intendedPayout = caught ? Math.floor(bet * multiplier) : 0;
+      const allowedPayout = await processCombinedBetAndWin("fishhunt", req.user.id, bet, intendedPayout);
+      if (allowedPayout === 0) caught = false;
+      const payout = allowedPayout;
+      if (payout > 0) {
         await storage.updateUserBalance(req.user.id, payout);
         await storage.createTransaction({ userId: req.user.id, amount: payout, type: "win", description: `Fish Hunt: Caught ${fishType} (x${multiplier})` });
       }
@@ -1110,6 +1297,7 @@ export async function registerRoutes(
       if (req.user.balance < bet) return res.status(400).json({ message: "Insufficient balance" });
       await storage.updateUserBalance(req.user.id, -bet);
       await storage.createTransaction({ userId: req.user.id, amount: -bet, type: "bet", description: "Fish Joy: Shot fired" });
+      await recordBetAndCheckHighBet("fishjoy", req.user.id, bet);
       const user = await storage.getUser(req.user.id);
       res.json({ balance: user?.balance ?? 0 });
     } catch (err) {
@@ -1121,10 +1309,13 @@ export async function registerRoutes(
     if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
     try {
       const { winAmount } = z.object({ winAmount: z.number().min(1) }).parse(req.body);
-      await storage.updateUserBalance(req.user.id, winAmount);
-      await storage.createTransaction({ userId: req.user.id, amount: winAmount, type: "win", description: `Fish Joy: Fish caught (+${winAmount})` });
+      const finalWin = await applyHouseEdgeForWin("fishjoy", req.user.id, winAmount);
+      if (finalWin > 0) {
+        await storage.updateUserBalance(req.user.id, finalWin);
+        await storage.createTransaction({ userId: req.user.id, amount: finalWin, type: "win", description: `Fish Joy: Fish caught (+${finalWin})` });
+      }
       const user = await storage.getUser(req.user.id);
-      res.json({ balance: user?.balance ?? 0 });
+      res.json({ balance: user?.balance ?? 0, blocked: finalWin === 0 });
     } catch (err) {
       res.status(500).json({ message: "Internal Server Error" });
     }
@@ -1175,6 +1366,7 @@ export async function registerRoutes(
       if (req.user.balance < amount) return res.status(400).json({ message: "Insufficient balance" });
       await storage.updateUserBalance(req.user.id, -amount);
       await storage.createTransaction({ userId: req.user.id, amount: -amount, type: "bet", description: "Classic Slots bet" });
+      await recordBetAndCheckHighBet("classic-slots", req.user.id, amount);
       const user = await storage.getUser(req.user.id);
       res.json({ balance: user?.balance ?? 0 });
     } catch (err) { res.status(500).json({ message: "Internal Server Error" }); }
@@ -1184,12 +1376,13 @@ export async function registerRoutes(
     if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
     try {
       const { winAmount } = z.object({ winAmount: z.number().min(0) }).parse(req.body);
-      if (winAmount > 0) {
-        await storage.updateUserBalance(req.user.id, winAmount);
-        await storage.createTransaction({ userId: req.user.id, amount: winAmount, type: "win", description: `Classic Slots win (+${winAmount})` });
+      const finalWin = await applyHouseEdgeForWin("classic-slots", req.user.id, winAmount);
+      if (finalWin > 0) {
+        await storage.updateUserBalance(req.user.id, finalWin);
+        await storage.createTransaction({ userId: req.user.id, amount: finalWin, type: "win", description: `Classic Slots win (+${finalWin})` });
       }
       const user = await storage.getUser(req.user.id);
-      res.json({ balance: user?.balance ?? 0 });
+      res.json({ balance: user?.balance ?? 0, blocked: winAmount > 0 && finalWin === 0 });
     } catch (err) { res.status(500).json({ message: "Internal Server Error" }); }
   });
 
@@ -1207,17 +1400,18 @@ export async function registerRoutes(
       await storage.updateUserBalance(req.user.id, -bet);
       await storage.createTransaction({ userId: req.user.id, amount: -bet, type: "bet", description: "Slots spin" });
 
-      const won = Math.random() < winChance;
+      let won = Math.random() < winChance;
       const symbols = ["banana", "berries", "coconut", "mango", "melon", "orange", "pineapple"];
-      
-      let reels: string[];
-      let payout = 0;
-
       const slotsMultiplier = settings?.payoutMultiplier ?? 10;
+      let intendedPayout = won ? Math.floor(bet * slotsMultiplier) : 0;
+      const allowedPayout = await processCombinedBetAndWin("slots", req.user.id, bet, intendedPayout);
+      if (allowedPayout === 0) won = false;
+      const payout = allowedPayout;
+
+      let reels: string[];
       if (won) {
         const winSymbol = symbols[Math.floor(Math.random() * symbols.length)];
         reels = [winSymbol, winSymbol, winSymbol];
-        payout = Math.floor(bet * slotsMultiplier);
       } else {
         reels = [
           symbols[Math.floor(Math.random() * symbols.length)],
@@ -1229,8 +1423,8 @@ export async function registerRoutes(
         }
       }
 
-      const user = won ? await storage.updateUserBalance(req.user.id, payout) : await storage.getUser(req.user.id);
-      if (won) await storage.createTransaction({ userId: req.user.id, amount: payout, type: "win", description: "Slots win" });
+      const user = payout > 0 ? await storage.updateUserBalance(req.user.id, payout) : await storage.getUser(req.user.id);
+      if (payout > 0) await storage.createTransaction({ userId: req.user.id, amount: payout, type: "win", description: "Slots win" });
 
       res.json({ won, payout, balance: user?.balance ?? 0, reels });
     } catch (err) {
@@ -1305,7 +1499,7 @@ export async function registerRoutes(
         number = losingNumbers[Math.floor(Math.random() * losingNumbers.length)];
       }
 
-      const color = colors[number];
+      let color = colors[number];
       let won = false;
       let payout = 0;
 
@@ -1322,8 +1516,28 @@ export async function registerRoutes(
         if ((value === 'even' && isEven) || (value === 'odd' && !isEven)) { won = true; payout = bet * (parityOdds + 1); }
       }
 
-      const user = won ? await storage.updateUserBalance(req.user.id, payout) : await storage.getUser(req.user.id);
-      if (won) await storage.createTransaction({ userId: req.user.id, amount: payout, type: "win", description: "Roulette win" });
+      const allowedPayout = await processCombinedBetAndWin("roulette", req.user.id, bet, payout);
+      if (allowedPayout === 0 && payout > 0) {
+        // House edge or high-bet protection forces a loss: pick a non-winning number
+        const losingNumbers = Object.keys(colors).map(Number).filter(n => {
+          if (type === 'number') return n !== Number(value);
+          if (type === 'color') return colors[n] !== value;
+          if (type === 'parity') {
+            if (n === 0) return true;
+            return value !== (n % 2 === 0 ? 'even' : 'odd');
+          }
+          return true;
+        });
+        if (losingNumbers.length > 0) number = losingNumbers[Math.floor(Math.random() * losingNumbers.length)];
+        color = colors[number];
+        won = false;
+        payout = 0;
+      } else {
+        payout = allowedPayout;
+      }
+
+      const user = payout > 0 ? await storage.updateUserBalance(req.user.id, payout) : await storage.getUser(req.user.id);
+      if (payout > 0) await storage.createTransaction({ userId: req.user.id, amount: payout, type: "win", description: "Roulette win" });
 
       res.json({ won, payout, balance: user?.balance ?? 0, result: { number, color } });
     } catch (err) {
@@ -1921,7 +2135,7 @@ export async function registerRoutes(
   app.post("/api/admin/audio", async (req, res) => {
     if (!req.isAuthenticated() || req.user.role !== "admin") return res.status(403).send("Forbidden");
     const count = await storage.countAudioTracks();
-    if (count >= 10) return res.status(400).json({ message: "Maximum of 10 audio tracks allowed. Delete one first." });
+    if (count >= 20) return res.status(400).json({ message: "Maximum of 20 audio tracks allowed. Delete one first." });
     audioUpload.single("audio")(req, res, async (err) => {
       if (err) return res.status(400).json({ message: err.message || "Upload failed" });
       if (!req.file) return res.status(400).json({ message: "No file provided" });

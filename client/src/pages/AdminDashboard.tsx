@@ -1,4 +1,5 @@
 import { ProtectedLayout } from "@/components/layout/ProtectedLayout";
+import { DirectCreditDialog } from "@/components/DirectCreditDialog";
 import { useUser } from "@/hooks/use-auth";
 import { useCreateVoucher, useVouchers } from "@/hooks/use-vouchers";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -142,6 +143,49 @@ function GameSettingCard({ setting }: { setting: GameSetting }) {
   const [numberOdds, setNumberOdds] = useState<number>(extraParsed.numberOdds ?? 35);
   const [colorOdds, setColorOdds] = useState<number>(extraParsed.colorOdds ?? 1);
   const [parityOdds, setParityOdds] = useState<number>(extraParsed.parityOdds ?? 1);
+  const [houseEdgePct, setHouseEdgePct] = useState<number>((setting as any).houseEdgePct ?? 5);
+  const [highBetThreshold, setHighBetThreshold] = useState<number>((setting as any).highBetThreshold ?? 0);
+  const [highBetMult, setHighBetMult] = useState<number>((setting as any).highBetWagerMultiplier ?? 5);
+  const totalBet = (setting as any).totalBet ?? 0;
+  const totalPaid = (setting as any).totalPaid ?? 0;
+  const actualRtp = totalBet > 0 ? ((totalPaid / totalBet) * 100).toFixed(1) : "—";
+
+  const houseEdgeMutation = useMutation({
+    mutationFn: async () => {
+      const res = await fetch("/api/games/settings/house-edge", {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          gameType: setting.gameType,
+          houseEdgePct,
+          highBetThreshold,
+          highBetWagerMultiplier: highBetMult,
+        }),
+      });
+      if (!res.ok) throw new Error("Failed to update house edge");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [api.games.settings.get.path] });
+      toast({ title: "House Edge Updated", description: `${setting.gameType} house edge set to ${houseEdgePct}%.` });
+    },
+  });
+
+  const resetStatsMutation = useMutation({
+    mutationFn: async () => {
+      const res = await fetch("/api/games/settings/reset-stats", {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ gameType: setting.gameType }),
+      });
+      if (!res.ok) throw new Error("Failed to reset stats");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [api.games.settings.get.path] });
+      toast({ title: "Stats Reset", description: `${setting.gameType} totals cleared.` });
+    },
+  });
 
   const mutation = useMutation({
     mutationFn: async (val: number) => {
@@ -264,6 +308,62 @@ function GameSettingCard({ setting }: { setting: GameSetting }) {
           <Button className="w-full mt-3" size="sm" onClick={() => mutation.mutate(pct)} disabled={mutation.isPending} data-testid={`button-save-${setting.gameType}`}>
             {mutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save"}
           </Button>
+        </div>
+        <div className="border-t border-white/10 pt-4 space-y-3">
+          <label className="text-xs text-muted-foreground font-semibold">House Edge & High-Bet Protection</label>
+          <div>
+            <label className="text-[11px] text-muted-foreground">House Edge % (auto-balance to keep this margin)</label>
+            <Input
+              type="number" min={0} max={99} step={0.5}
+              value={houseEdgePct}
+              onChange={(e) => setHouseEdgePct(Math.min(99, Math.max(0, parseFloat(e.target.value) || 0)))}
+              className="font-mono text-sm text-center bg-white/5 border-white/10 mt-1"
+              data-testid={`input-house-edge-${setting.gameType}`}
+            />
+          </div>
+          <div>
+            <label className="text-[11px] text-muted-foreground">High-Bet Threshold (UGX) — 0 = disabled</label>
+            <Input
+              type="number" min={0} step={1000}
+              value={highBetThreshold}
+              onChange={(e) => setHighBetThreshold(Math.max(0, parseInt(e.target.value) || 0))}
+              className="font-mono text-sm text-center bg-white/5 border-white/10 mt-1"
+              data-testid={`input-high-bet-threshold-${setting.gameType}`}
+            />
+          </div>
+          <div>
+            <label className="text-[11px] text-muted-foreground">Wager Multiplier (player must wager threshold × this much first)</label>
+            <Input
+              type="number" min={1} step={1}
+              value={highBetMult}
+              onChange={(e) => setHighBetMult(Math.max(1, parseInt(e.target.value) || 1))}
+              className="font-mono text-sm text-center bg-white/5 border-white/10 mt-1"
+              data-testid={`input-high-bet-mult-${setting.gameType}`}
+            />
+          </div>
+          <div className="text-[11px] text-muted-foreground bg-black/30 rounded p-2 font-mono space-y-0.5">
+            <div>Total Bet: {totalBet.toLocaleString()} UGX</div>
+            <div>Total Paid: {totalPaid.toLocaleString()} UGX</div>
+            <div>Actual RTP: {actualRtp}% (target: {(100 - houseEdgePct).toFixed(1)}%)</div>
+          </div>
+          <div className="flex gap-2">
+            <Button
+              className="flex-1" size="sm" variant="secondary"
+              onClick={() => houseEdgeMutation.mutate()}
+              disabled={houseEdgeMutation.isPending}
+              data-testid={`button-save-house-edge-${setting.gameType}`}
+            >
+              {houseEdgeMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save"}
+            </Button>
+            <Button
+              size="sm" variant="outline"
+              onClick={() => { if (confirm("Reset bet/paid totals for this game?")) resetStatsMutation.mutate(); }}
+              disabled={resetStatsMutation.isPending}
+              data-testid={`button-reset-stats-${setting.gameType}`}
+            >
+              {resetStatsMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Reset Stats"}
+            </Button>
+          </div>
         </div>
         {hasMultiplier && (
           <div className="border-t border-white/10 pt-4">
@@ -1033,6 +1133,7 @@ export default function AdminDashboard() {
                           </TableCell>
                           <TableCell>
                             <div className="flex gap-1 flex-wrap">
+                              <DirectCreditDialog userId={u.id} username={u.username} currentBalance={u.balance} invalidateKeys={[api.admin.users.path]} />
                               {u.role !== 'super_manager' && (
                                 <Button size="sm" variant="outline" onClick={() => handlePromoteToSuperManager(u.id)} data-testid={`button-promote-${u.id}`}>
                                   <ArrowUpCircle className="w-3 h-3 mr-1" /> Promote
@@ -1323,8 +1424,8 @@ function AudioManagementTab() {
       toast({ title: "File too large", description: "Maximum file size is 10MB.", variant: "destructive" });
       return;
     }
-    if (tracks.length >= 10) {
-      toast({ title: "Limit reached", description: "You can only have 10 audio tracks. Delete one first.", variant: "destructive" });
+    if (tracks.length >= 20) {
+      toast({ title: "Limit reached", description: "You can only have 20 audio tracks. Delete one first.", variant: "destructive" });
       return;
     }
     const formData = new FormData();
@@ -1366,9 +1467,9 @@ function AudioManagementTab() {
     <Card className="glass-card">
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
-          <Music className="w-5 h-5" /> Background Music ({tracks.length}/10)
+          <Music className="w-5 h-5" /> Background Music ({tracks.length}/20)
         </CardTitle>
-        <CardDescription>Upload audio files that play randomly as background music across the site. Max 10 files, 10MB each.</CardDescription>
+        <CardDescription>Upload audio files that play randomly as background music across the site. Max 20 files, 10MB each.</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="flex items-center gap-3">
@@ -1382,15 +1483,15 @@ function AudioManagementTab() {
           />
           <Button
             onClick={() => fileInputRef.current?.click()}
-            disabled={uploading || tracks.length >= 10}
+            disabled={uploading || tracks.length >= 20}
             className="gap-2"
             data-testid="button-upload-audio"
           >
             {uploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
             {uploading ? "Uploading..." : "Upload Audio File"}
           </Button>
-          {tracks.length >= 10 && (
-            <span className="text-sm text-amber-400">Maximum 10 tracks reached</span>
+          {tracks.length >= 20 && (
+            <span className="text-sm text-amber-400">Maximum 20 tracks reached</span>
           )}
         </div>
 

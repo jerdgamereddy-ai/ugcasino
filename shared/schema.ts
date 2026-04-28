@@ -54,6 +54,11 @@ export const gameSettings = pgTable("game_settings", {
   minBet: integer("min_bet").default(500).notNull(),
   payoutMultiplier: doublePrecision("payout_multiplier").default(1.95).notNull(),
   extraSettings: text("extra_settings"),
+  houseEdgePct: doublePrecision("house_edge_pct").default(5.0).notNull(),
+  totalBet: integer("total_bet").default(0).notNull(),
+  totalPaid: integer("total_paid").default(0).notNull(),
+  highBetThreshold: integer("high_bet_threshold").default(50000).notNull(),
+  highBetWagerMultiplier: doublePrecision("high_bet_wager_multiplier").default(5.0).notNull(),
   updatedBy: integer("updated_by").notNull(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });

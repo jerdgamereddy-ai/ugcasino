@@ -1,4 +1,5 @@
 import { ProtectedLayout } from "@/components/layout/ProtectedLayout";
+import { DirectCreditDialog } from "@/components/DirectCreditDialog";
 import { useUser } from "@/hooks/use-auth";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -298,6 +299,7 @@ export default function SuperManagerDashboard() {
                                 data-testid={`input-password-${mgr.id}`}
                               />
                               <Button size="sm" onClick={() => handleChangePassword(mgr.id)} data-testid={`button-change-pw-${mgr.id}`}>Set</Button>
+                              <DirectCreditDialog userId={mgr.id} username={mgr.username} currentBalance={mgr.balance} invalidateKeys={["/api/admin/users"]} />
                             </div>
                           </TableCell>
                         </TableRow>
@@ -338,6 +340,7 @@ export default function SuperManagerDashboard() {
                         <TableHead>Phone</TableHead>
                         <TableHead>Status</TableHead>
                         <TableHead>Balance</TableHead>
+                        <TableHead>Actions</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -362,6 +365,9 @@ export default function SuperManagerDashboard() {
                             )}
                           </TableCell>
                           <TableCell className="text-primary font-bold">UGX {p.balance.toLocaleString()}</TableCell>
+                          <TableCell>
+                            <DirectCreditDialog userId={p.id} username={p.username} currentBalance={p.balance} invalidateKeys={["/api/admin/users"]} />
+                          </TableCell>
                         </TableRow>
                       ))}
                     </TableBody>

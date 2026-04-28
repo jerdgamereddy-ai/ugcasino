@@ -1,4 +1,5 @@
 import { ProtectedLayout } from "@/components/layout/ProtectedLayout";
+import { DirectCreditDialog } from "@/components/DirectCreditDialog";
 import { useUser } from "@/hooks/use-auth";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -372,7 +373,7 @@ export default function ManagerDashboard() {
                         <TableHead>Phone</TableHead>
                         <TableHead>Status</TableHead>
                         <TableHead>Balance</TableHead>
-                        <TableHead>Change Password</TableHead>
+                        <TableHead>Actions</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -398,7 +399,7 @@ export default function ManagerDashboard() {
                           </TableCell>
                           <TableCell className="text-primary font-bold">UGX {u.balance.toLocaleString()}</TableCell>
                           <TableCell>
-                            <div className="flex gap-2 items-center">
+                            <div className="flex gap-2 items-center flex-wrap">
                               <Input
                                 type="password"
                                 placeholder="New password"
@@ -408,6 +409,7 @@ export default function ManagerDashboard() {
                                 data-testid={`input-password-${u.id}`}
                               />
                               <Button size="sm" onClick={() => handleChangePassword(u.id)} data-testid={`button-change-pw-${u.id}`}>Set</Button>
+                              <DirectCreditDialog userId={u.id} username={u.username} currentBalance={u.balance} invalidateKeys={["/api/admin/users"]} />
                             </div>
                           </TableCell>
                         </TableRow>

@@ -47,6 +47,11 @@ export interface IStorage {
   updateGameSettings(gameType: string, winChance: number, updatedBy: number): Promise<GameSetting>;
   updateGamePayoutMultiplier(gameType: string, payoutMultiplier: number, updatedBy: number): Promise<GameSetting>;
   updateGameExtraSettings(gameType: string, extraSettings: string, updatedBy: number): Promise<GameSetting>;
+  updateGameHouseEdge(gameType: string, data: { houseEdgePct?: number; highBetThreshold?: number; highBetWagerMultiplier?: number }, updatedBy: number): Promise<GameSetting>;
+  recordHouseEdgeBet(gameType: string, amount: number): Promise<void>;
+  recordHouseEdgePayout(gameType: string, amount: number): Promise<void>;
+  resetGameHouseEdgeStats(gameType: string, updatedBy: number): Promise<GameSetting>;
+  getUserTotalWagered(userId: number): Promise<number>;
 
   createWithdrawalRequest(req: { userId: number, amount: number, managerCode?: string, managerId?: number }): Promise<WithdrawalRequest>;
   getWithdrawalRequest(id: number): Promise<WithdrawalRequest | undefined>;
@@ -283,6 +288,56 @@ export class DatabaseStorage implements IStorage {
       })
       .returning();
     return updated;
+  }
+
+  async updateGameHouseEdge(gameType: string, data: { houseEdgePct?: number; highBetThreshold?: number; highBetWagerMultiplier?: number }, updatedBy: number): Promise<GameSetting> {
+    const setObj: any = { updatedBy, updatedAt: new Date() };
+    if (data.houseEdgePct !== undefined) setObj.houseEdgePct = data.houseEdgePct;
+    if (data.highBetThreshold !== undefined) setObj.highBetThreshold = data.highBetThreshold;
+    if (data.highBetWagerMultiplier !== undefined) setObj.highBetWagerMultiplier = data.highBetWagerMultiplier;
+    const insertVals: any = { gameType: gameType as any, winChance: 0.3, payoutMultiplier: 2.0, updatedBy };
+    if (data.houseEdgePct !== undefined) insertVals.houseEdgePct = data.houseEdgePct;
+    if (data.highBetThreshold !== undefined) insertVals.highBetThreshold = data.highBetThreshold;
+    if (data.highBetWagerMultiplier !== undefined) insertVals.highBetWagerMultiplier = data.highBetWagerMultiplier;
+    const [updated] = await db.insert(gameSettings)
+      .values(insertVals)
+      .onConflictDoUpdate({ target: gameSettings.gameType, set: setObj })
+      .returning();
+    return updated;
+  }
+
+  async recordHouseEdgeBet(gameType: string, amount: number): Promise<void> {
+    await db.execute(sql`
+      INSERT INTO game_settings (game_type, win_chance, payout_multiplier, total_bet, updated_by)
+      VALUES (${gameType}, 0.3, 2.0, ${amount}, 1)
+      ON CONFLICT (game_type) DO UPDATE SET total_bet = game_settings.total_bet + ${amount}, updated_at = NOW()
+    `);
+  }
+
+  async recordHouseEdgePayout(gameType: string, amount: number): Promise<void> {
+    await db.execute(sql`
+      INSERT INTO game_settings (game_type, win_chance, payout_multiplier, total_paid, updated_by)
+      VALUES (${gameType}, 0.3, 2.0, ${amount}, 1)
+      ON CONFLICT (game_type) DO UPDATE SET total_paid = game_settings.total_paid + ${amount}, updated_at = NOW()
+    `);
+  }
+
+  async resetGameHouseEdgeStats(gameType: string, updatedBy: number): Promise<GameSetting> {
+    const [updated] = await db.insert(gameSettings)
+      .values({ gameType: gameType as any, winChance: 0.3, payoutMultiplier: 2.0, totalBet: 0, totalPaid: 0, updatedBy })
+      .onConflictDoUpdate({
+        target: gameSettings.gameType,
+        set: { totalBet: 0, totalPaid: 0, updatedBy, updatedAt: new Date() }
+      })
+      .returning();
+    return updated;
+  }
+
+  async getUserTotalWagered(userId: number): Promise<number> {
+    const [{ total }] = await db.select({
+      total: sql<number>`COALESCE(SUM(ABS(${transactions.amount})), 0)`
+    }).from(transactions).where(and(eq(transactions.userId, userId), eq(transactions.type, "bet")));
+    return Number(total);
   }
 
   async createWithdrawalRequest(req: { userId: number, amount: number, managerCode?: string, managerId?: number }): Promise<WithdrawalRequest> {

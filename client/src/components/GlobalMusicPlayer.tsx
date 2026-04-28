@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Volume2, VolumeX, Music, ChevronDown, ChevronUp } from "lucide-react";
+import { Volume2, VolumeX, Music, ChevronDown, ChevronUp, SkipBack, SkipForward, Play, Pause } from "lucide-react";
 import type { AudioTrack } from "@shared/schema";
 
 export default function GlobalMusicPlayer() {
@@ -37,7 +37,12 @@ export default function GlobalMusicPlayer() {
     const list   = trackListRef.current;
     if (!audio || idx < 0 || idx >= list.length) return;
     const track = list[idx];
-    audio.src    = `/uploads/audio/${track.filename}`;
+    const url = `/uploads/audio/${track.filename}`;
+    if (audio.src.endsWith(url) || audio.currentSrc.endsWith(url)) {
+      try { audio.currentTime = 0; } catch {}
+    } else {
+      audio.src = url;
+    }
     audio.volume = 0.35;
     audio.muted  = mutedRef.current;
     audio.play()
@@ -49,27 +54,74 @@ export default function GlobalMusicPlayer() {
       .catch(() => setPlaying(false));
   }, []);
 
+  const playNext = useCallback(() => {
+    const list = trackListRef.current;
+    if (list.length === 0) return;
+    if (list.length === 1) { playTrack(0); return; }
+    const next = pickRandom(currentIdxRef.current, list.length);
+    playTrack(next);
+  }, [pickRandom, playTrack]);
+
+  const playPrev = useCallback(() => {
+    const list = trackListRef.current;
+    if (list.length === 0) return;
+    if (list.length === 1) { playTrack(0); return; }
+    const prev = pickRandom(currentIdxRef.current, list.length);
+    playTrack(prev);
+  }, [pickRandom, playTrack]);
+
+  const togglePlayPause = useCallback(() => {
+    const audio = audioRef.current;
+    if (!audio) return;
+    if (playing) {
+      audio.pause();
+      setPlaying(false);
+    } else {
+      if (currentIdxRef.current < 0 && trackListRef.current.length > 0) {
+        playTrack(Math.floor(Math.random() * trackListRef.current.length));
+      } else {
+        audio.play().then(() => setPlaying(true)).catch(() => setPlaying(false));
+      }
+    }
+  }, [playing, playTrack]);
+
   useEffect(() => {
     const el = new Audio();
     el.preload = "auto";
     audioRef.current = el;
 
     const onEnded = () => {
-      const next = pickRandom(currentIdxRef.current, trackListRef.current.length);
+      const list = trackListRef.current;
+      if (list.length === 0) { setPlaying(false); return; }
+      if (list.length === 1) {
+        // Loop single track
+        try { el.currentTime = 0; } catch {}
+        el.play().then(() => setPlaying(true)).catch(() => setPlaying(false));
+        return;
+      }
+      const next = pickRandom(currentIdxRef.current, list.length);
       if (next >= 0) playTrack(next);
       else setPlaying(false);
     };
     const onError = () => {
-      const next = pickRandom(currentIdxRef.current, trackListRef.current.length);
-      if (next >= 0) setTimeout(() => playTrack(next), 1500);
+      const list = trackListRef.current;
+      if (list.length === 0) return;
+      const next = list.length === 1 ? 0 : pickRandom(currentIdxRef.current, list.length);
+      setTimeout(() => playTrack(next), 1500);
     };
+    const onPlay = () => setPlaying(true);
+    const onPause = () => setPlaying(false);
 
     el.addEventListener("ended", onEnded);
     el.addEventListener("error", onError);
+    el.addEventListener("play", onPlay);
+    el.addEventListener("pause", onPause);
 
     return () => {
       el.removeEventListener("ended", onEnded);
       el.removeEventListener("error", onError);
+      el.removeEventListener("play", onPlay);
+      el.removeEventListener("pause", onPause);
       el.pause();
       audioRef.current = null;
     };
@@ -111,14 +163,40 @@ export default function GlobalMusicPlayer() {
     >
       {!collapsed && (
         <div
-          className="bg-black/90 border border-[#D4AF37]/30 rounded-xl px-3 py-2 text-xs text-white/80 max-w-[220px] text-right shadow-lg"
+          className="bg-black/90 border border-[#D4AF37]/30 rounded-xl px-3 py-2 text-xs text-white/80 max-w-[260px] text-right shadow-lg"
           data-testid="music-track-name"
         >
-          <div className="text-[#D4AF37] font-semibold mb-0.5 truncate" title={displayName}>
+          <div className="text-[#D4AF37] font-semibold mb-1 truncate" title={displayName}>
             {displayName}
           </div>
-          <div className="text-white/50 text-[10px]">
-            {playing && !muted ? "▶ Playing" : muted ? "🔇 Muted" : "⏸ Paused"}
+          <div className="text-white/50 text-[10px] mb-2">
+            {playing && !muted ? "▶ Playing" : muted ? "🔇 Muted" : "⏸ Paused"} · {tracks.length} track{tracks.length === 1 ? "" : "s"}
+          </div>
+          <div className="flex items-center justify-end gap-1">
+            <button
+              onClick={playPrev}
+              className="bg-black/60 border border-[#D4AF37]/30 rounded-full p-1.5 text-[#D4AF37] hover:bg-[#D4AF37]/20 transition-colors"
+              data-testid="button-music-prev"
+              title="Previous track"
+            >
+              <SkipBack className="w-3.5 h-3.5" />
+            </button>
+            <button
+              onClick={togglePlayPause}
+              className="bg-black/60 border border-[#D4AF37]/30 rounded-full p-1.5 text-[#D4AF37] hover:bg-[#D4AF37]/20 transition-colors"
+              data-testid="button-music-playpause"
+              title={playing ? "Pause" : "Play"}
+            >
+              {playing ? <Pause className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5" />}
+            </button>
+            <button
+              onClick={playNext}
+              className="bg-black/60 border border-[#D4AF37]/30 rounded-full p-1.5 text-[#D4AF37] hover:bg-[#D4AF37]/20 transition-colors"
+              data-testid="button-music-next"
+              title="Next track"
+            >
+              <SkipForward className="w-3.5 h-3.5" />
+            </button>
           </div>
         </div>
       )}
@@ -128,7 +206,7 @@ export default function GlobalMusicPlayer() {
           onClick={() => setCollapsed(c => !c)}
           className="bg-black/80 border border-[#D4AF37]/30 rounded-full p-1.5 text-[#D4AF37] hover:bg-[#D4AF37]/20 transition-colors"
           data-testid="button-music-expand"
-          title={collapsed ? "Show track info" : "Hide track info"}
+          title={collapsed ? "Show controls" : "Hide controls"}
         >
           {collapsed ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
         </button>
