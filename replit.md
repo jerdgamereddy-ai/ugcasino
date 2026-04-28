@@ -32,7 +32,11 @@ Preferred communication style: Simple, everyday language.
 - **Key Models**: Users (with roles, balance, profit share), Vouchers, Transactions, Game Settings.
 
 ### Core Features
-- **Game Mechanics**: Includes Classic Slots, Roulette, Fish Joy, Greyhound Racing, Horse4 Racing, Quick Horse Race, and Aviator (crash game). Games feature configurable win probabilities, payout multipliers, and use `postMessage` for integration with external HTML5 games.
+- **Game Mechanics**: Includes Classic Slots, Roulette, Fish Joy/Hunt, Greyhound Racing, Horse4 Racing, Quick Horse Race, and Aviator (crash game). Games feature configurable win probabilities, payout multipliers, and use `postMessage` for integration with external HTML5 games.
+    - **Roulette** (`RouletteBoard`): segmented spinning wheel with counter-rotating ball, decelerating tick SFX during the spin, ball-drop bounce on land; spin button gated on both API + animation lifecycle. Timers tracked in refs and cleaned up on unmount.
+    - **Classic Slots iframe wrapper** (`GameClassicSlots`): adds a glowing win-line overlay (CSS only, `pointer-events:none`) on top of the iframe whenever a paying win is settled. Iframe game itself plays its own `reel_stop`/`reels` sounds via Howler.
+    - **Fish Hunt iframe wrapper** (`GameFishJoy`): overlays a light water shimmer + surface caustics layer on top of the iframe via CSS keyframes (`fishhunt-water-shimmer`, `fishhunt-water-caustics` in `index.css`); pointer-events:none preserves click-through.
+    - **React `SlotMachine` + `GameFishHunt`** (currently un-routed but kept polished): staggered reel stops with per-reel tick + flash, glowing win-line bar, ambient bubble loop and water shimmer.
 - **Role-Based Access Control**:
     - **User**: Play games, redeem vouchers, view balance.
     - **Manager**: User permissions + create players, manage player passwords, view player reports.

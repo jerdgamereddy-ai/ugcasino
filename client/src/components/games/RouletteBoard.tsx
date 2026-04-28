@@ -1,10 +1,10 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { useSpinRoulette } from "@/hooks/use-games";
 import { useToast } from "@/hooks/use-toast";
 import { useQuery } from "@tanstack/react-query";
 import { useUser } from "@/hooks/use-auth";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { playSound } from "@/lib/sounds";
@@ -32,9 +32,62 @@ export function RouletteBoard() {
     setSelectedBet({ type, value });
   };
 
+  const [wheelAngle, setWheelAngle] = useState(0);
+  const [ballAngle, setBallAngle] = useState(0);
+  const [ballLanded, setBallLanded] = useState(true);
+  const [isAnimatingSpin, setIsAnimatingSpin] = useState(false);
+  const tickTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const spinTimersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
+
+  const stopTicking = () => {
+    if (tickTimeoutRef.current) {
+      clearTimeout(tickTimeoutRef.current);
+      tickTimeoutRef.current = null;
+    }
+  };
+  const clearSpinTimers = () => {
+    spinTimersRef.current.forEach(t => clearTimeout(t));
+    spinTimersRef.current = [];
+  };
+  const trackTimer = (cb: () => void, ms: number) => {
+    const id = setTimeout(cb, ms);
+    spinTimersRef.current.push(id);
+    return id;
+  };
+
+  // Cleanup all timers on unmount
+  useEffect(() => {
+    return () => {
+      stopTicking();
+      clearSpinTimers();
+    };
+  }, []);
+
   const handleSpin = () => {
-    if (!selectedBet) return;
+    if (!selectedBet || isAnimatingSpin) return;
+    // Cancel any orphaned timers from a prior spin before starting fresh
+    stopTicking();
+    clearSpinTimers();
+
     playSound('spin');
+    setLastResult(null);
+    setBallLanded(false);
+    setIsAnimatingSpin(true);
+
+    // Wheel spins ~5 full revolutions, ball counter-spins faster — both will land via state
+    setWheelAngle(prev => prev + 360 * 5 + Math.random() * 360);
+    setBallAngle(prev => prev - (360 * 8 + Math.random() * 360));
+
+    // Mechanical ticking while wheel is in motion (decelerates via growing gap)
+    let tickGap = 90;
+    const scheduleTick = () => {
+      tickTimeoutRef.current = setTimeout(() => {
+        playSound('tick', 0.18);
+        tickGap = Math.min(320, tickGap + 14);
+        scheduleTick();
+      }, tickGap);
+    };
+    scheduleTick();
 
     spin(
       {
@@ -44,25 +97,37 @@ export function RouletteBoard() {
       },
       {
         onSuccess: (data) => {
-          playSound('reveal');
-          setLastResult(data.result);
-          if (data.won) {
-            playSound('jackpot', 0.5);
-            toast({
-              title: "WINNER!",
-              description: `Result: ${data.result.number} (${data.result.color}). You won UGX ${data.payout.toLocaleString()}`,
-              className: "bg-primary border-primary text-black font-bold",
-            });
-          } else {
-            playSound('lose');
-            toast({
-              title: "Lost",
-              description: `Result: ${data.result.number} (${data.result.color}). Try again!`,
-              variant: "destructive",
-            });
-          }
+          // Let wheel animation play out before revealing
+          trackTimer(() => {
+            stopTicking();
+            playSound('bounce', 0.55); // ball-drop thunk
+            setBallLanded(true);
+            setLastResult(data.result);
+            trackTimer(() => playSound('reveal', 0.4), 180);
+            if (data.won) {
+              trackTimer(() => playSound('jackpot', 0.5), 350);
+              toast({
+                title: "WINNER!",
+                description: `Result: ${data.result.number} (${data.result.color}). You won UGX ${data.payout.toLocaleString()}`,
+                className: "bg-primary border-primary text-black font-bold",
+              });
+            } else {
+              trackTimer(() => playSound('lose', 0.35), 350);
+              toast({
+                title: "Lost",
+                description: `Result: ${data.result.number} (${data.result.color}). Try again!`,
+                variant: "destructive",
+              });
+            }
+            // Free the SPIN button shortly after the reveal cues
+            trackTimer(() => setIsAnimatingSpin(false), 600);
+          }, 2400);
         },
         onError: (err) => {
+            stopTicking();
+            clearSpinTimers();
+            setBallLanded(true);
+            setIsAnimatingSpin(false);
             toast({ title: "Error", description: err.message, variant: "destructive" });
         }
       }
@@ -114,14 +179,34 @@ export function RouletteBoard() {
       </div>
       {/* Wheel Representation (Simplified Visual) */}
       <div className="relative w-72 h-72 rounded-full border-[12px] border-primary shadow-[0_0_60px_rgba(212,175,55,0.4)] bg-neutral-900 flex items-center justify-center overflow-hidden">
-          <div className="absolute inset-0 bg-[conic-gradient(from_0deg,#1a1a1a_0%,#333_50%,#1a1a1a_100%)] opacity-50" />
-          {isPending && (
-             <motion.div 
-                className="absolute inset-0 border-t-8 border-primary rounded-full shadow-[0_0_30px_rgba(212,175,55,0.8)]"
-                animate={{ rotate: 360 }}
-                transition={{ duration: 0.4, ease: "linear", repeat: Infinity }}
-             />
-          )}
+          {/* Wheel face — segmented colors that rotate as one piece (decelerating) */}
+          <motion.div
+            className="absolute inset-0 rounded-full"
+            style={{
+              background: "conic-gradient(from 0deg, #b91c1c 0deg 10deg, #18181b 10deg 20deg, #b91c1c 20deg 30deg, #18181b 30deg 40deg, #b91c1c 40deg 50deg, #18181b 50deg 60deg, #b91c1c 60deg 70deg, #18181b 70deg 80deg, #b91c1c 80deg 90deg, #18181b 90deg 100deg, #16a34a 100deg 110deg, #b91c1c 110deg 120deg, #18181b 120deg 130deg, #b91c1c 130deg 140deg, #18181b 140deg 150deg, #b91c1c 150deg 160deg, #18181b 160deg 170deg, #b91c1c 170deg 180deg, #18181b 180deg 190deg, #b91c1c 190deg 200deg, #18181b 200deg 210deg, #b91c1c 210deg 220deg, #18181b 220deg 230deg, #b91c1c 230deg 240deg, #18181b 240deg 250deg, #b91c1c 250deg 260deg, #18181b 260deg 270deg, #b91c1c 270deg 280deg, #18181b 280deg 290deg, #b91c1c 290deg 300deg, #18181b 300deg 310deg, #b91c1c 310deg 320deg, #18181b 320deg 330deg, #b91c1c 330deg 340deg, #18181b 340deg 350deg, #b91c1c 350deg 360deg)",
+              opacity: 0.55,
+            }}
+            animate={{ rotate: wheelAngle }}
+            transition={{ duration: ballLanded ? 0.3 : 2.6, ease: [0.17, 0.67, 0.3, 1] }}
+          />
+          {/* Static highlight ring */}
+          <div className="absolute inset-2 rounded-full border-2 border-amber-400/30 pointer-events-none" />
+
+          {/* Ball — orbits in opposite direction, decelerates and "lands" */}
+          <motion.div
+            className="absolute inset-0 pointer-events-none"
+            animate={{ rotate: ballAngle }}
+            transition={{ duration: ballLanded ? 0.4 : 2.4, ease: [0.18, 0.82, 0.32, 1] }}
+          >
+            <div
+              className="absolute left-1/2 -translate-x-1/2 w-3 h-3 rounded-full bg-white shadow-[0_0_8px_rgba(255,255,255,0.9),0_0_16px_rgba(255,255,255,0.5)]"
+              style={{ top: ballLanded ? "16px" : "8px", transition: "top 0.3s ease-out" }}
+            />
+          </motion.div>
+
+          {/* Pointer arrow at the top of the wheel */}
+          <div className="absolute top-1 left-1/2 -translate-x-1/2 w-0 h-0 border-l-[6px] border-r-[6px] border-t-[10px] border-l-transparent border-r-transparent border-t-amber-300 z-20 drop-shadow-[0_0_4px_rgba(255,215,0,0.8)]" />
+
           <div className="text-center z-10 bg-black/60 w-40 h-40 rounded-full flex flex-col items-center justify-center border-4 border-white/10 backdrop-blur-md">
               {lastResult ? (
                   <motion.div 
@@ -233,10 +318,10 @@ export function RouletteBoard() {
             size="lg"
             className="min-w-[150px]"
             onClick={handleSpin} 
-            disabled={!selectedBet || isPending}
+            disabled={!selectedBet || isPending || isAnimatingSpin}
             data-testid="button-roulette-spin"
         >
-             {isPending ? <Loader2 className="animate-spin" /> : "SPIN"}
+             {(isPending || isAnimatingSpin) ? <Loader2 className="animate-spin" /> : "SPIN"}
          </Button>
       </div>
     </div>

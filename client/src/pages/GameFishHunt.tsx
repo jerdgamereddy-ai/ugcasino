@@ -305,6 +305,15 @@ function UnderwaterScene({ children }: { children: React.ReactNode }) {
         background: "radial-gradient(ellipse at 30% 20%, rgba(0,100,200,0.15) 0%, transparent 60%), radial-gradient(ellipse at 70% 80%, rgba(0,50,100,0.1) 0%, transparent 50%)",
       }} />
 
+      {/* Light water shimmer — slow horizontal drift, GPU-cheap */}
+      <div className="absolute inset-0 pointer-events-none overflow-hidden opacity-40 mix-blend-screen">
+        <div className="fishhunt-water-shimmer absolute -inset-x-1/4 inset-y-0" />
+      </div>
+      {/* Subtle surface caustics near the top */}
+      <div className="absolute inset-x-0 top-0 h-24 pointer-events-none overflow-hidden opacity-30 mix-blend-screen">
+        <div className="fishhunt-water-caustics absolute -inset-x-1/4 inset-y-0" />
+      </div>
+
       <svg className="absolute bottom-0 left-0 w-full h-32 pointer-events-none" viewBox="0 0 1200 120" preserveAspectRatio="none">
         <path d="M0,120 Q100,80 200,100 Q300,120 400,90 Q500,60 600,85 Q700,110 800,75 Q900,40 1000,80 Q1100,100 1200,70 L1200,120 Z" fill="#0a2a1a" opacity="0.6" />
         <path d="M0,120 Q150,95 300,110 Q450,120 600,100 Q750,80 900,105 Q1050,120 1200,95 L1200,120 Z" fill="#0a3a2a" opacity="0.4" />
@@ -531,7 +540,20 @@ export default function GameFishHunt() {
       );
     }, 50);
 
-    return () => clearInterval(bubbleInterval);
+    // Soft ambient bubble pops every 5–9s (very low volume — atmosphere only)
+    let ambientTimer: ReturnType<typeof setTimeout>;
+    const queueAmbient = () => {
+      ambientTimer = setTimeout(() => {
+        if (!document.hidden) playSound('bubble', 0.07);
+        queueAmbient();
+      }, 5000 + Math.random() * 4000);
+    };
+    queueAmbient();
+
+    return () => {
+      clearInterval(bubbleInterval);
+      clearTimeout(ambientTimer);
+    };
   }, []);
 
   useEffect(() => {

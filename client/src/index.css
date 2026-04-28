@@ -123,6 +123,37 @@
     to   { transform: translate(-50%, -50%) rotate(360deg); }
   }
 
+  @keyframes fishhunt-shimmer {
+    0%   { transform: translate3d(0%, 0, 0); }
+    100% { transform: translate3d(33.33%, 0, 0); }
+  }
+  @keyframes fishhunt-caustics {
+    0%   { transform: translate3d(0%, 0, 0); opacity: 0.55; }
+    50%  { opacity: 0.85; }
+    100% { transform: translate3d(-33.33%, 0, 0); opacity: 0.55; }
+  }
+  .fishhunt-water-shimmer {
+    background-image:
+      radial-gradient(ellipse 220px 80px at 20% 40%, rgba(150,220,255,0.18), transparent 70%),
+      radial-gradient(ellipse 280px 100px at 60% 70%, rgba(120,200,255,0.14), transparent 70%),
+      radial-gradient(ellipse 180px 70px at 85% 30%, rgba(180,230,255,0.16), transparent 70%);
+    animation: fishhunt-shimmer 14s linear infinite;
+    will-change: transform;
+  }
+  .fishhunt-water-caustics {
+    background-image:
+      repeating-linear-gradient(
+        100deg,
+        transparent 0,
+        rgba(180, 230, 255, 0.18) 40px,
+        transparent 80px,
+        rgba(150, 215, 255, 0.12) 120px,
+        transparent 160px
+      );
+    animation: fishhunt-caustics 9s ease-in-out infinite;
+    will-change: transform, opacity;
+  }
+
   .scrollbar-hide {
     -ms-overflow-style: none;
     scrollbar-width: none;

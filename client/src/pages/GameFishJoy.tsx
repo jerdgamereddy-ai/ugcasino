@@ -125,14 +125,25 @@ export default function GameFishJoy() {
           <Minimize className="w-5 h-5" />
         </Button>
       )}
-      <iframe
-        ref={iframeRef}
-        src="/games/fish-new/index.html"
-        className="w-full border-0"
-        style={{ height: isFullscreen ? "100vh" : "calc(100vh - 56px)", display: "block" }}
-        allow="autoplay; fullscreen"
-        data-testid="iframe-fish-joy"
-      />
+      <div className="relative" style={{ height: isFullscreen ? "100vh" : "calc(100vh - 56px)" }}>
+        <iframe
+          ref={iframeRef}
+          src="/games/fish-new/index.html"
+          className="w-full border-0"
+          style={{ height: "100%", display: "block" }}
+          allow="autoplay; fullscreen"
+          data-testid="iframe-fish-joy"
+        />
+        {/* Light water animation overlay — pointer-events:none so clicks reach the game */}
+        <div className="pointer-events-none absolute inset-0 overflow-hidden" data-testid="overlay-fish-water">
+          <div className="absolute inset-0 opacity-30 mix-blend-screen overflow-hidden">
+            <div className="fishhunt-water-shimmer absolute -inset-x-1/4 inset-y-0" />
+          </div>
+          <div className="absolute inset-x-0 top-0 h-32 opacity-25 mix-blend-screen overflow-hidden">
+            <div className="fishhunt-water-caustics absolute -inset-x-1/4 inset-y-0" />
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

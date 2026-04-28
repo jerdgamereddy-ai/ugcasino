@@ -12,7 +12,11 @@ export default function GameClassicSlots() {
   const containerRef = useRef<HTMLDivElement>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [gameReady, setGameReady] = useState(false);
+  const [winLineOn, setWinLineOn] = useState(false);
   const balanceSentRef = useRef(false);
+  const winLineTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const retryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const mountedRef = useRef(true);
 
   const { data: user } = useQuery<User>({
     queryKey: ["/api/user"],
@@ -79,16 +83,24 @@ export default function GameClassicSlots() {
           const maxRetries = 50;
 
           const tryCredit = () => {
+            // Bail out if component has been unmounted
+            if (!mountedRef.current) return;
             if (postBetBalanceRef.current !== null) {
               const winAmount = Math.max(0, iframeMoney - postBetBalanceRef.current);
               if (winAmount > 0) {
                 winMutation.mutate({ winAmount });
+                // Trigger win-line lighting overlay (extra polish on top of iframe paylines)
+                if (winLineTimerRef.current) clearTimeout(winLineTimerRef.current);
+                setWinLineOn(true);
+                winLineTimerRef.current = setTimeout(() => {
+                  if (mountedRef.current) setWinLineOn(false);
+                }, 2600);
               }
               lastBetRef.current = 0;
               postBetBalanceRef.current = null;
             } else if (retries < maxRetries) {
               retries++;
-              setTimeout(tryCredit, 100);
+              retryTimerRef.current = setTimeout(tryCredit, 100);
             } else {
               lastBetRef.current = 0;
               postBetBalanceRef.current = null;
@@ -107,6 +119,22 @@ export default function GameClassicSlots() {
     window.addEventListener("message", handleMessage);
     return () => window.removeEventListener("message", handleMessage);
   }, [handleMessage]);
+
+  // Clear all timers + mark unmounted on teardown
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      if (winLineTimerRef.current) {
+        clearTimeout(winLineTimerRef.current);
+        winLineTimerRef.current = null;
+      }
+      if (retryTimerRef.current) {
+        clearTimeout(retryTimerRef.current);
+        retryTimerRef.current = null;
+      }
+    };
+  }, []);
 
   useEffect(() => {
     sendBalanceToIframe();
@@ -157,7 +185,7 @@ export default function GameClassicSlots() {
       </div>
 
       <div className="flex justify-center px-2 pb-4">
-        <div className="w-full max-w-[1600px]">
+        <div className="relative w-full max-w-[1600px]">
           <iframe
             ref={iframeRef}
             src="/games/classic-slots/index.html"
@@ -166,6 +194,16 @@ export default function GameClassicSlots() {
             allow="autoplay; fullscreen"
             data-testid="iframe-classic-slots"
           />
+          {/* Win-line lighting overlay (sits above iframe; ignores pointer) */}
+          {winLineOn && (
+            <div
+              className="pointer-events-none absolute inset-0 rounded-lg overflow-hidden"
+              data-testid="overlay-slots-winline"
+            >
+              <div className="absolute left-[8%] right-[8%] top-1/2 -translate-y-1/2 h-2 rounded-full bg-gradient-to-r from-transparent via-yellow-300 to-transparent shadow-[0_0_30px_rgba(255,215,0,0.95),0_0_60px_rgba(255,215,0,0.6)] animate-pulse" />
+              <div className="absolute inset-0 ring-4 ring-yellow-300/40 rounded-lg animate-pulse" style={{ boxShadow: "inset 0 0 80px rgba(255,215,0,0.25)" }} />
+            </div>
+          )}
         </div>
       </div>
     </div>
