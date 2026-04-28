@@ -3,7 +3,7 @@ import { useUser } from "@/hooks/use-auth";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Link, useLocation } from "wouter";
-import { Coins, Trophy, CreditCard, ChevronRight, Club, Dice5, Dices, Banknote, Sparkles, Zap, Star, RotateCcw, LucideIcon, Crown, Diamond, Fish } from "lucide-react";
+import { Coins, Trophy, CreditCard, ChevronRight, Club, Dice5, Dices, Banknote, Sparkles, Zap, Star, RotateCcw, LucideIcon, Crown, Diamond, Fish, Plane } from "lucide-react";
 import { useRedeemVoucher } from "@/hooks/use-vouchers";
 import { useState, useEffect, useRef } from "react";
 import { Input } from "@/components/ui/input";
@@ -546,6 +546,16 @@ export default function Lobby() {
               title: "Quick Horse Race",
               desc: "Fast 4-horse race with custom odds and lap settings!",
               id: "horse-racing"
+            },
+            {
+              href: "/aviator",
+              img: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?q=80&w=2070",
+              icon: Plane as LucideIcon,
+              tag: "HOT",
+              tagColor: "bg-rose-600",
+              title: "Aviator",
+              desc: "Watch the multiplier rise — cash out before the plane flies away!",
+              id: "aviator"
             }
           ].map((game, idx) => (
             <motion.div 

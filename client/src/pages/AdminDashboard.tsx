@@ -118,7 +118,7 @@ function FishJoyOddsCard() {
   );
 }
 
-const ACTIVE_GAME_TYPES = ["classic-slots", "roulette", "dice", "hilo", "coinflip", "plinko", "wheel", "fishhunt", "dog-racing", "horse4", "horse-js"];
+const ACTIVE_GAME_TYPES = ["classic-slots", "roulette", "dice", "hilo", "coinflip", "plinko", "wheel", "fishhunt", "dog-racing", "horse4", "horse-js", "aviator"];
 
 const HORSE4_NAMES = ["Engineer", "Pin", "Doughnut", "Mayhem", "Last Things", "Chatterbox", "Hypno", "Croquette"];
 const HORSE4_DEFAULT_ODDS = [3.7, 5.5, 2.2, 11.75, 17.25, 8.75, 7.15, 6.15];

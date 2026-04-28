@@ -1,5 +1,5 @@
 import { Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarGroupLabel, SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarFooter } from "@/components/ui/sidebar"
-import { Home, Dice5, Target, Dices, Settings, FileText, Users, LogOut, Club, Shield, LayoutDashboard, Coins, Zap, RotateCcw, Wallet, BarChart3, UserCog } from "lucide-react"
+import { Home, Dice5, Target, Dices, Settings, FileText, Users, LogOut, Club, Shield, LayoutDashboard, Coins, Zap, RotateCcw, Wallet, BarChart3, UserCog, Plane } from "lucide-react"
 import { Link, useLocation } from "wouter"
 import { useQuery, useMutation } from "@tanstack/react-query"
 import { User } from "@shared/schema"
@@ -31,6 +31,7 @@ export function AppSidebar() {
     { title: "Coin Flip", url: "/coinflip", icon: Coins },
     { title: "Plinko", url: "/plinko", icon: Zap },
     { title: "Wheel", url: "/wheel", icon: RotateCcw },
+    { title: "Aviator", url: "/aviator", icon: Plane },
   ];
 
   const getRoleLabel = (role: string) => {

@@ -439,6 +439,7 @@ export async function registerRoutes(
       if (d.startsWith("classic slots")) return "classic-slots";
       if (d.startsWith("slots")) return "slots";
       if (d.startsWith("roulette")) return "roulette";
+      if (d.startsWith("aviator")) return "aviator";
       return "non-game";
     };
 
@@ -456,6 +457,7 @@ export async function registerRoutes(
       "classic-slots": "Classic Slots",
       "slots": "Slots",
       "roulette": "Roulette",
+      "aviator": "Aviator",
     };
 
     try {
@@ -1403,6 +1405,151 @@ export async function registerRoutes(
 
       const user = await storage.getUser(req.user.id);
       res.json({ caught, payout, multiplier, fishType, balance: user?.balance ?? 0 });
+    } catch (err) {
+      res.status(500).json({ message: "Internal Server Error" });
+    }
+  });
+
+  // === AVIATOR (CRASH GAME) ===
+  // In-memory active rounds; lost on server restart (player has already been debited - same as a crash).
+  type AviatorRound = { userId: number; bet: number; crashPoint: number; startTime: number };
+  const aviatorRounds = new Map<string, AviatorRound>();
+  const AVIATOR_GROWTH = 0.06; // multiplier growth: m(t) = exp(0.06 * seconds_elapsed)
+  const AVIATOR_CRASH_CAP = 1000.0; // safety cap
+
+  function aviatorMultiplierAt(elapsedMs: number): number {
+    const seconds = Math.max(0, elapsedMs / 1000);
+    return Math.exp(AVIATOR_GROWTH * seconds);
+  }
+
+  function generateAviatorCrashPoint(houseEdgePct: number): number {
+    // Provably-fair-style crash distribution.
+    // With probability houseEdgePct/100 the round insta-crashes at 1.00x (the house's cut).
+    // Otherwise the crash point follows a 1/(1-r) distribution with target RTP = 1 - houseEdgePct/100.
+    const e = 2 ** 32;
+    const r = Math.floor(Math.random() * e);
+    if ((r % 100) < Math.max(0, Math.min(99, houseEdgePct))) return 1.00;
+    const cp = Math.floor((100 * e - r) / (e - r)) / 100;
+    return Math.max(1.01, Math.min(AVIATOR_CRASH_CAP, cp));
+  }
+
+  // Periodically purge stale rounds (a player who never cashes out before crash is just a loss; round is dead)
+  setInterval(() => {
+    const now = Date.now();
+    for (const [id, round] of Array.from(aviatorRounds.entries())) {
+      const elapsed = now - round.startTime;
+      const m = aviatorMultiplierAt(elapsed);
+      // 5 seconds of grace after the natural crash, then drop the round
+      if (m >= round.crashPoint && elapsed > (Math.log(round.crashPoint) / AVIATOR_GROWTH) * 1000 + 5000) {
+        aviatorRounds.delete(id);
+      }
+      // Hard expiry after 10 minutes regardless
+      if (elapsed > 10 * 60 * 1000) aviatorRounds.delete(id);
+    }
+  }, 30 * 1000).unref?.();
+
+  app.get("/api/games/aviator/settings", async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    try {
+      let settings = await storage.getGameSettings("aviator");
+      if (!settings) {
+        // Seed with sensible defaults so admin sees the card immediately
+        settings = await storage.updateGameHouseEdge("aviator", { houseEdgePct: 5 }, req.user.id);
+      }
+      const houseEdgePct = settings?.houseEdgePct ?? 5;
+      res.json({ houseEdgePct, growth: AVIATOR_GROWTH, maxMultiplier: AVIATOR_CRASH_CAP });
+    } catch (err) { res.status(500).json({ message: "Internal Server Error" }); }
+  });
+
+  app.post("/api/games/aviator/bet", async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    try {
+      const { bet } = z.object({ bet: z.number().int().min(100) }).parse(req.body);
+      if (req.user.balance < bet) return res.status(400).json({ message: "Insufficient balance" });
+
+      const settings = await storage.getGameSettings("aviator");
+      const houseEdgePct = settings?.houseEdgePct ?? 5;
+
+      await storage.updateUserBalance(req.user.id, -bet);
+      await storage.createTransaction({ userId: req.user.id, amount: -bet, type: "bet", description: `Aviator: bet placed (${bet} UGX)` });
+      await recordBetAndCheckHighBet("aviator", req.user.id, bet);
+
+      // If high-bet anti-laundering flagged this round, the plane crashes instantly.
+      const locked = lockedLossMap.get(lossKey(req.user.id, "aviator"));
+      let crashPoint = locked ? 1.00 : generateAviatorCrashPoint(houseEdgePct);
+      if (locked) {
+        lockedLossMap.delete(lossKey(req.user.id, "aviator"));
+        lockedBetAmountMap.delete(lossKey(req.user.id, "aviator"));
+      }
+
+      const roundId = `${req.user.id}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+      const startTime = Date.now() + 3000; // 3-second pre-flight countdown so the player can see the bet
+      aviatorRounds.set(roundId, { userId: req.user.id, bet, crashPoint, startTime });
+
+      const user = await storage.getUser(req.user.id);
+      res.json({ roundId, startTime, balance: user?.balance ?? 0 });
+    } catch (err) {
+      res.status(500).json({ message: "Internal Server Error" });
+    }
+  });
+
+  app.post("/api/games/aviator/cashout", async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    try {
+      const { roundId } = z.object({ roundId: z.string().min(1) }).parse(req.body);
+      const round = aviatorRounds.get(roundId);
+      if (!round || round.userId !== req.user.id) {
+        return res.status(404).json({ message: "Round not found" });
+      }
+
+      // Atomically remove the round so a duplicate cashout request can't double-pay
+      aviatorRounds.delete(roundId);
+
+      const elapsed = Date.now() - round.startTime;
+      if (elapsed < 0) {
+        // Cash-out attempted before takeoff — disallow.
+        // (Allowing a refund here would be a risk-free no-op exploit:
+        //  bet -> instantly cash out -> refund -> repeat to inflate wager history.)
+        // Re-insert the round so the player can still cash out normally once it starts.
+        aviatorRounds.set(roundId, round);
+        return res.status(400).json({ message: "Cannot cash out before takeoff" });
+      }
+
+      const liveMultiplier = aviatorMultiplierAt(elapsed);
+      if (liveMultiplier >= round.crashPoint) {
+        // Already crashed
+        const user = await storage.getUser(req.user.id);
+        return res.json({ won: false, multiplier: round.crashPoint, payout: 0, crashed: true, balance: user?.balance ?? 0 });
+      }
+
+      const cashoutMultiplier = Math.min(liveMultiplier, round.crashPoint);
+      const payout = Math.floor(round.bet * cashoutMultiplier);
+      await storage.updateUserBalance(req.user.id, payout);
+      await storage.createTransaction({ userId: req.user.id, amount: payout, type: "win", description: `Aviator: cashed out at ${cashoutMultiplier.toFixed(2)}x (+${payout})` });
+      await storage.recordHouseEdgePayout("aviator", payout).catch(() => {});
+
+      const user = await storage.getUser(req.user.id);
+      res.json({ won: true, multiplier: +cashoutMultiplier.toFixed(2), payout, balance: user?.balance ?? 0 });
+    } catch (err) {
+      res.status(500).json({ message: "Internal Server Error" });
+    }
+  });
+
+  // After the plane has crashed, the client can ask the server to reveal the crash point so it can show the result.
+  app.post("/api/games/aviator/reveal", async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    try {
+      const { roundId } = z.object({ roundId: z.string().min(1) }).parse(req.body);
+      const round = aviatorRounds.get(roundId);
+      if (!round || round.userId !== req.user.id) {
+        return res.json({ revealed: false });
+      }
+      const elapsed = Date.now() - round.startTime;
+      const m = aviatorMultiplierAt(elapsed);
+      if (m < round.crashPoint) return res.json({ revealed: false });
+      // Crashed - safe to reveal and clean up
+      aviatorRounds.delete(roundId);
+      res.json({ revealed: true, crashPoint: +round.crashPoint.toFixed(2) });
     } catch (err) {
       res.status(500).json({ message: "Internal Server Error" });
     }

@@ -23,6 +23,7 @@ import GameFishJoy from "@/pages/GameFishJoy";
 import GameDogRacing from "@/pages/GameDogRacing";
 import GameHorse4 from "@/pages/GameHorse4";
 import GameHorseJS from "@/pages/GameHorseJS";
+import GameAviator from "@/pages/GameAviator";
 import Reports from "@/pages/Reports";
 import GameControl from "@/pages/GameControl";
 import ForgotPassword from "@/pages/ForgotPassword";
@@ -50,6 +51,7 @@ function Router() {
       <Route path="/dog-racing" component={GameDogRacing} />
       <Route path="/horse4" component={GameHorse4} />
       <Route path="/horse-racing" component={GameHorseJS} />
+      <Route path="/aviator" component={GameAviator} />
       <Route path="/reports" component={Reports} />
       <Route path="/game-control" component={GameControl} />
       <Route component={NotFound} />
