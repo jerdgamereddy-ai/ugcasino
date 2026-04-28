@@ -10,6 +10,8 @@ interface HorseJsSettings {
   winOccurrence: number;
   maxLaps: number;
   odds: number[];
+  placeOdds?: number[];
+  showOdds?: number[];
 }
 
 export default function GameHorseJS() {
@@ -62,6 +64,8 @@ export default function GameHorseJS() {
         winOccurrence: gameSettings.winOccurrence,
         maxLaps: gameSettings.maxLaps,
         odds: gameSettings.odds,
+        placeOdds: gameSettings.placeOdds,
+        showOdds: gameSettings.showOdds,
       }, "*");
       balanceSentRef.current = true;
     }

@@ -15,7 +15,7 @@ export default function GameHorse4() {
   const iframeLoadedRef = useRef(false);
 
   const { data: user } = useQuery<User>({ queryKey: ["/api/user"] });
-  const { data: gameSettings } = useQuery<{ winOccurrence: number; odds?: number[] }>({
+  const { data: gameSettings } = useQuery<{ winOccurrence: number; odds?: number[]; placeOdds?: number[]; showOdds?: number[] }>({
     queryKey: ["/api/games/horse4/settings"],
   });
 
@@ -51,7 +51,7 @@ export default function GameHorse4() {
     if (balanceSentRef.current || !iframeLoadedRef.current) return;
     if (!user || !gameSettings || !iframeRef.current?.contentWindow) return;
     iframeRef.current.contentWindow.postMessage(
-      { type: "init_balance", balance: user.balance, winOccurrence: gameSettings.winOccurrence, odds: gameSettings.odds },
+      { type: "init_balance", balance: user.balance, winOccurrence: gameSettings.winOccurrence, odds: gameSettings.odds, placeOdds: gameSettings.placeOdds, showOdds: gameSettings.showOdds },
       "*"
     );
     balanceSentRef.current = true;

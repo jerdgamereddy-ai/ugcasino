@@ -417,9 +417,46 @@ export async function registerRoutes(
     const fromParam = req.query.from as string | undefined;
     const toParam = req.query.to as string | undefined;
     const managerIdParam = req.query.managerId as string | undefined;
+    const gameTypeParam = (req.query.gameType as string | undefined)?.toLowerCase();
 
     const from = fromParam ? new Date(fromParam) : undefined;
     const to = toParam ? new Date(toParam) : undefined;
+
+    // Map a transaction description to a game key (or "non-game" for deposits/withdrawals/etc.)
+    const detectGameType = (desc: string | null | undefined): string => {
+      if (!desc) return "non-game";
+      const d = desc.toLowerCase();
+      if (d.startsWith("hilo")) return "hilo";
+      if (d.startsWith("dice")) return "dice";
+      if (d.startsWith("coin flip")) return "coinflip";
+      if (d.startsWith("plinko")) return "plinko";
+      if (d.startsWith("wheel")) return "wheel";
+      if (d.startsWith("greyhound racing")) return "dog-racing";
+      if (d.startsWith("horse4 racing")) return "horse4";
+      if (d.startsWith("horse racing")) return "horse-js";
+      if (d.startsWith("fish hunt")) return "fishhunt";
+      if (d.startsWith("fish joy")) return "fishjoy";
+      if (d.startsWith("classic slots")) return "classic-slots";
+      if (d.startsWith("slots")) return "slots";
+      if (d.startsWith("roulette")) return "roulette";
+      return "non-game";
+    };
+
+    const gameLabels: Record<string, string> = {
+      "hilo": "HiLo",
+      "dice": "Dice",
+      "coinflip": "Coin Flip",
+      "plinko": "Plinko",
+      "wheel": "Wheel of Fortune",
+      "dog-racing": "Greyhound Racing",
+      "horse4": "Horse4 Racing",
+      "horse-js": "Quick Horse Race",
+      "fishhunt": "Fish Hunt",
+      "fishjoy": "Fish Joy",
+      "classic-slots": "Classic Slots",
+      "slots": "Slots",
+      "roulette": "Roulette",
+    };
 
     try {
       let relevantUserIds: number[] = [];
@@ -504,13 +541,22 @@ export async function registerRoutes(
       const approvedWithdrawals = withdrawals.filter((w: any) => w.status === 'approved');
       const totalWithdrawn = approvedWithdrawals.reduce((sum: number, w: any) => sum + w.amount, 0);
 
-      // Compute report metrics
-      const report = txns.reduce((acc, tx) => {
+      // Annotate every transaction with detected gameType (used for breakdown + filtering)
+      const txnsAnnotated = txns.map((tx: any) => ({ ...tx, gameType: detectGameType(tx.description) }));
+
+      // If a specific gameType filter is supplied, narrow transactions to that game.
+      // Deposits/withdrawals are always counted in totals, but bet/win-only metrics
+      // for the filtered game come from this subset.
+      const txnsForMetrics = gameTypeParam && gameTypeParam !== 'all'
+        ? txnsAnnotated.filter((tx: any) => tx.gameType === gameTypeParam || tx.type === 'deposit' || tx.type === 'voucher_redemption' || tx.type === 'withdrawal')
+        : txnsAnnotated;
+
+      // Compute aggregate report metrics
+      const report = txnsForMetrics.reduce((acc: any, tx: any) => {
         const date = tx.createdAt ? new Date(tx.createdAt).toISOString().split('T')[0] : 'unknown';
         if (!acc.dailyStats[date]) {
           acc.dailyStats[date] = { date, bets: 0, wins: 0, deposits: 0, withdrawals: 0 };
         }
-
         if (tx.type === 'deposit' || tx.type === 'voucher_redemption') {
           acc.totalDeposits += tx.amount;
           acc.dailyStats[date].deposits += tx.amount;
@@ -536,10 +582,35 @@ export async function registerRoutes(
         dailyStats: {} as Record<string, { date: string; bets: number; wins: number; deposits: number; withdrawals: number }>,
       });
 
+      // Per-game breakdown: bets, wins, profit, plays, RTP — across ALL transactions (not narrowed)
+      const perGameMap: Record<string, { gameType: string; label: string; bets: number; wins: number; profit: number; plays: number; rtp: number }> = {};
+      for (const tx of txnsAnnotated) {
+        if (tx.type !== 'bet' && tx.type !== 'win') continue;
+        const gt = tx.gameType;
+        if (gt === 'non-game') continue;
+        if (!perGameMap[gt]) {
+          perGameMap[gt] = { gameType: gt, label: gameLabels[gt] || gt, bets: 0, wins: 0, profit: 0, plays: 0, rtp: 0 };
+        }
+        if (tx.type === 'bet') {
+          perGameMap[gt].bets += Math.abs(tx.amount);
+          perGameMap[gt].plays += 1;
+        } else {
+          perGameMap[gt].wins += tx.amount;
+        }
+      }
+      const perGame = Object.values(perGameMap)
+        .map(g => ({ ...g, profit: g.bets - g.wins, rtp: g.bets > 0 ? +(g.wins / g.bets * 100).toFixed(2) : 0 }))
+        .sort((a, b) => b.bets - a.bets);
+
       const totalAccountBalances = allRelevantUsers.reduce((sum: number, u: any) => sum + u.balance, 0);
       const playersCount = allRelevantUsers.filter((u: any) => u.role === 'user').length;
       const managersCount = allRelevantUsers.filter((u: any) => u.role === 'manager').length;
       const profit = report.totalBets - report.totalWins;
+
+      const txnsToReturn = (gameTypeParam && gameTypeParam !== 'all'
+        ? txnsAnnotated.filter((tx: any) => tx.gameType === gameTypeParam)
+        : txnsAnnotated
+      ).slice(0, 200);
 
       res.json({
         totalDeposits: report.totalDeposits,
@@ -550,9 +621,12 @@ export async function registerRoutes(
         profit,
         playersCount,
         managersCount,
-        transactions: txns.slice(0, 200),
+        transactions: txnsToReturn,
         dailyStats: Object.values(report.dailyStats).sort((a: any, b: any) => a.date.localeCompare(b.date)),
         managers: managersList,
+        perGame,
+        gameTypes: Object.entries(gameLabels).map(([value, label]) => ({ value, label })),
+        selectedGameType: gameTypeParam || 'all',
       });
     } catch (err) {
       console.error("Reports error:", err);
@@ -781,19 +855,35 @@ export async function registerRoutes(
       const settings = await storage.getGameSettings("dog-racing");
       const extraParsed = (() => { try { return settings?.extraSettings ? JSON.parse(settings.extraSettings) : {}; } catch { return {}; } })();
       const defaultOdds = [3.7, 5.5, 2.2, 11.75, 17.25, 8.75];
-      res.json({ winOccurrence: Math.round((settings?.winChance ?? 0.3) * 100), odds: extraParsed.odds ?? defaultOdds });
+      const defaultPlace = defaultOdds.map(o => Math.max(1.05, +(o * 0.45).toFixed(2)));
+      const defaultShow = defaultOdds.map(o => Math.max(1.02, +(o * 0.25).toFixed(2)));
+      res.json({
+        winOccurrence: Math.round((settings?.winChance ?? 0.3) * 100),
+        odds: extraParsed.odds ?? defaultOdds,
+        placeOdds: extraParsed.placeOdds ?? defaultPlace,
+        showOdds: extraParsed.showOdds ?? defaultShow,
+      });
     } catch (err) { res.status(500).json({ message: "Internal Server Error" }); }
   });
 
   app.post("/api/games/dog-racing/settings", async (req, res) => {
     if (!req.isAuthenticated() || req.user.role !== "admin") return res.status(403).send("Forbidden");
     try {
-      const { odds } = z.object({ odds: z.array(z.number().min(1.01).max(200)).length(6) }).parse(req.body);
+      const { odds, placeOdds, showOdds } = z.object({
+        odds: z.array(z.number().min(1.01).max(200)).length(6),
+        placeOdds: z.array(z.number().min(1.01).max(200)).length(6).optional(),
+        showOdds: z.array(z.number().min(1.01).max(200)).length(6).optional(),
+      }).parse(req.body);
       const existing = await storage.getGameSettings("dog-racing");
       const existingExtra = (() => { try { return existing?.extraSettings ? JSON.parse(existing.extraSettings) : {}; } catch { return {}; } })();
-      const newExtra = JSON.stringify({ ...existingExtra, odds });
+      const newExtra = JSON.stringify({
+        ...existingExtra,
+        odds,
+        placeOdds: placeOdds ?? existingExtra.placeOdds,
+        showOdds: showOdds ?? existingExtra.showOdds,
+      });
       await storage.updateGameExtraSettings("dog-racing", newExtra, req.user.id);
-      res.json({ success: true, odds });
+      res.json({ success: true, odds, placeOdds, showOdds });
     } catch (err) { res.status(500).json({ message: "Internal Server Error" }); }
   });
 
@@ -831,17 +921,33 @@ export async function registerRoutes(
       const settings = await storage.getGameSettings("horse4");
       const extraParsed = (() => { try { return settings?.extraSettings ? JSON.parse(settings.extraSettings) : {}; } catch { return {}; } })();
       const defaultOdds = [3.7, 5.5, 2.2, 11.75, 17.25, 8.75, 7.15, 6.15];
-      res.json({ winOccurrence: Math.round((settings?.winChance ?? 0.4) * 100), odds: extraParsed.odds ?? defaultOdds });
+      const defaultPlace = defaultOdds.map(o => Math.max(1.05, +(o * 0.45).toFixed(2)));
+      const defaultShow = defaultOdds.map(o => Math.max(1.02, +(o * 0.25).toFixed(2)));
+      res.json({
+        winOccurrence: Math.round((settings?.winChance ?? 0.4) * 100),
+        odds: extraParsed.odds ?? defaultOdds,
+        placeOdds: extraParsed.placeOdds ?? defaultPlace,
+        showOdds: extraParsed.showOdds ?? defaultShow,
+      });
     } catch (err) { res.status(500).json({ message: "Internal Server Error" }); }
   });
 
   app.post("/api/games/horse4/settings", async (req, res) => {
     if (!req.isAuthenticated() || req.user.role !== "admin") return res.status(403).send("Forbidden");
     try {
-      const { odds } = z.object({ odds: z.array(z.number().min(1.01).max(200)).length(8) }).parse(req.body);
+      const { odds, placeOdds, showOdds } = z.object({
+        odds: z.array(z.number().min(1.01).max(200)).length(8),
+        placeOdds: z.array(z.number().min(1.01).max(200)).length(8).optional(),
+        showOdds: z.array(z.number().min(1.01).max(200)).length(8).optional(),
+      }).parse(req.body);
       const existing = await storage.getGameSettings("horse4");
       const existingExtra = (() => { try { return existing?.extraSettings ? JSON.parse(existing.extraSettings) : {}; } catch { return {}; } })();
-      await storage.updateGameExtraSettings("horse4", JSON.stringify({ ...existingExtra, odds }), req.user.id);
+      await storage.updateGameExtraSettings("horse4", JSON.stringify({
+        ...existingExtra,
+        odds,
+        placeOdds: placeOdds ?? existingExtra.placeOdds,
+        showOdds: showOdds ?? existingExtra.showOdds,
+      }), req.user.id);
       res.json({ success: true });
     } catch (err) { res.status(400).json({ message: "Invalid input" }); }
   });
@@ -879,10 +985,15 @@ export async function registerRoutes(
     try {
       const settings = await storage.getGameSettings("horse-js");
       const extra = settings?.extraSettings ? JSON.parse(settings.extraSettings) : {};
+      const defaultOdds = [2.0, 2.5, 3.0, 3.5];
+      const defaultPlace = defaultOdds.map(o => Math.max(1.05, +(o * 0.5).toFixed(2)));
+      const defaultShow = defaultOdds.map(o => Math.max(1.02, +(o * 0.3).toFixed(2)));
       res.json({
         winOccurrence: Math.round((settings?.winChance ?? 0.25) * 100),
         maxLaps: extra.maxLaps ?? 1,
-        odds: extra.odds ?? [2.0, 2.5, 3.0, 3.5],
+        odds: extra.odds ?? defaultOdds,
+        placeOdds: extra.placeOdds ?? defaultPlace,
+        showOdds: extra.showOdds ?? defaultShow,
       });
     } catch (err) { res.status(500).json({ message: "Internal Server Error" }); }
   });
@@ -890,13 +1001,21 @@ export async function registerRoutes(
   app.post("/api/games/horse-js/settings", async (req, res) => {
     if (!req.isAuthenticated() || req.user.role !== "admin") return res.status(403).send("Forbidden");
     try {
-      const { maxLaps, odds } = z.object({
+      const { maxLaps, odds, placeOdds, showOdds } = z.object({
         maxLaps: z.number().int().min(1).max(10),
         odds: z.array(z.number().min(1).max(100)).length(4),
+        placeOdds: z.array(z.number().min(1).max(100)).length(4).optional(),
+        showOdds: z.array(z.number().min(1).max(100)).length(4).optional(),
       }).parse(req.body);
       const existing = await storage.getGameSettings("horse-js");
       const currentExtra = existing?.extraSettings ? JSON.parse(existing.extraSettings) : {};
-      const newExtra = JSON.stringify({ ...currentExtra, maxLaps, odds });
+      const newExtra = JSON.stringify({
+        ...currentExtra,
+        maxLaps,
+        odds,
+        placeOdds: placeOdds ?? currentExtra.placeOdds,
+        showOdds: showOdds ?? currentExtra.showOdds,
+      });
       await storage.updateGameExtraSettings("horse-js", newExtra, req.user.id);
       res.json({ success: true });
     } catch (err) { res.status(500).json({ message: "Internal Server Error" }); }

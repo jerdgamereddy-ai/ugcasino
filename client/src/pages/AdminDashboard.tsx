@@ -137,9 +137,18 @@ function GameSettingCard({ setting }: { setting: GameSetting }) {
   const isDogRacing = setting.gameType === "dog-racing";
   const extraParsed = (() => { try { return setting.extraSettings ? JSON.parse(setting.extraSettings) : {}; } catch { return {}; } })();
   const [maxLaps, setMaxLaps] = useState<number>(extraParsed.maxLaps ?? 1);
-  const [horseOdds, setHorseOdds] = useState<number[]>(extraParsed.odds ?? [2.0, 2.5, 3.0, 3.5]);
+  const defaultPlaceFor = (arr: number[]) => arr.map(o => Math.max(1.05, +(o * 0.45).toFixed(2)));
+  const defaultShowFor = (arr: number[]) => arr.map(o => Math.max(1.02, +(o * 0.25).toFixed(2)));
+  const horseJsDefault = [2.0, 2.5, 3.0, 3.5];
+  const [horseOdds, setHorseOdds] = useState<number[]>(extraParsed.odds ?? horseJsDefault);
+  const [horsePlaceOdds, setHorsePlaceOdds] = useState<number[]>(extraParsed.placeOdds ?? defaultPlaceFor(extraParsed.odds ?? horseJsDefault));
+  const [horseShowOdds, setHorseShowOdds] = useState<number[]>(extraParsed.showOdds ?? defaultShowFor(extraParsed.odds ?? horseJsDefault));
   const [horse4Odds, setHorse4Odds] = useState<number[]>(extraParsed.odds ?? HORSE4_DEFAULT_ODDS);
+  const [horse4PlaceOdds, setHorse4PlaceOdds] = useState<number[]>(extraParsed.placeOdds ?? defaultPlaceFor(extraParsed.odds ?? HORSE4_DEFAULT_ODDS));
+  const [horse4ShowOdds, setHorse4ShowOdds] = useState<number[]>(extraParsed.showOdds ?? defaultShowFor(extraParsed.odds ?? HORSE4_DEFAULT_ODDS));
   const [dogOdds, setDogOdds] = useState<number[]>(extraParsed.odds ?? DOG_DEFAULT_ODDS);
+  const [dogPlaceOdds, setDogPlaceOdds] = useState<number[]>(extraParsed.placeOdds ?? defaultPlaceFor(extraParsed.odds ?? DOG_DEFAULT_ODDS));
+  const [dogShowOdds, setDogShowOdds] = useState<number[]>(extraParsed.showOdds ?? defaultShowFor(extraParsed.odds ?? DOG_DEFAULT_ODDS));
   const [numberOdds, setNumberOdds] = useState<number>(extraParsed.numberOdds ?? 35);
   const [colorOdds, setColorOdds] = useState<number>(extraParsed.colorOdds ?? 1);
   const [parityOdds, setParityOdds] = useState<number>(extraParsed.parityOdds ?? 1);
@@ -224,14 +233,14 @@ function GameSettingCard({ setting }: { setting: GameSetting }) {
       const res = await fetch("/api/games/horse-js/settings", {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ maxLaps, odds: horseOdds }),
+        body: JSON.stringify({ maxLaps, odds: horseOdds, placeOdds: horsePlaceOdds, showOdds: horseShowOdds }),
       });
       if (!res.ok) throw new Error("Failed to update horse-js settings");
       return res.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [api.games.settings.get.path] });
-      toast({ title: "Horse Race Updated", description: "Max laps and horse odds saved." });
+      toast({ title: "Horse Race Updated", description: "Max laps and Win/Place/Show odds saved." });
     },
   });
 
@@ -240,14 +249,14 @@ function GameSettingCard({ setting }: { setting: GameSetting }) {
       const res = await fetch("/api/games/horse4/settings", {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ odds: horse4Odds }),
+        body: JSON.stringify({ odds: horse4Odds, placeOdds: horse4PlaceOdds, showOdds: horse4ShowOdds }),
       });
       if (!res.ok) throw new Error("Failed to update horse4 settings");
       return res.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [api.games.settings.get.path] });
-      toast({ title: "Horse4 Updated", description: "8-horse odds saved." });
+      toast({ title: "Horse4 Updated", description: "8-horse Win/Place/Show odds saved." });
     },
   });
 
@@ -272,14 +281,14 @@ function GameSettingCard({ setting }: { setting: GameSetting }) {
       const res = await fetch("/api/games/dog-racing/settings", {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ odds: dogOdds }),
+        body: JSON.stringify({ odds: dogOdds, placeOdds: dogPlaceOdds, showOdds: dogShowOdds }),
       });
       if (!res.ok) throw new Error("Failed to update dog racing settings");
       return res.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [api.games.settings.get.path] });
-      toast({ title: "Dog Racing Updated", description: "Greyhound win odds saved." });
+      toast({ title: "Dog Racing Updated", description: "Greyhound Win/Place/Show odds saved." });
     },
   });
 
@@ -410,27 +419,30 @@ function GameSettingCard({ setting }: { setting: GameSetting }) {
               />
             </div>
             <div className="space-y-2">
-              <label className="text-xs text-muted-foreground">Per-Horse Win Odds (x)</label>
+              <div className="grid grid-cols-[1fr_repeat(3,minmax(0,1fr))] gap-2 items-center text-[11px] text-muted-foreground">
+                <span>Horse</span>
+                <span className="text-center">Win</span>
+                <span className="text-center">Place</span>
+                <span className="text-center">Show</span>
+              </div>
               {horseOdds.map((odd, i) => (
-                <div key={i} className="flex items-center gap-2">
-                  <span className="text-xs text-muted-foreground w-16">{(['White','Blue','Green','Brown'])[i]}</span>
-                  <Input
-                    type="number"
-                    min={1.01}
-                    max={100}
-                    step={0.1}
-                    value={odd}
-                    onChange={(e) => {
-                      const updated = [...horseOdds];
-                      updated[i] = Math.max(1.01, parseFloat(e.target.value) || 1.01);
-                      setHorseOdds(updated);
-                    }}
-                    className="font-mono text-sm text-center bg-white/5 border-white/10"
-                    data-testid={`input-horse-js-odds-${i}`}
-                  />
-                  <span className="text-xs text-muted-foreground">x</span>
+                <div key={i} className="grid grid-cols-[1fr_repeat(3,minmax(0,1fr))] gap-2 items-center">
+                  <span className="text-xs text-muted-foreground">{(['White','Blue','Green','Brown'])[i]}</span>
+                  <Input type="number" min={1.01} max={100} step={0.1} value={odd}
+                    onChange={(e) => { const u=[...horseOdds]; u[i]=Math.max(1.01, parseFloat(e.target.value)||1.01); setHorseOdds(u); }}
+                    className="font-mono text-xs text-center bg-white/5 border-white/10 h-8"
+                    data-testid={`input-horse-js-odds-${i}`} />
+                  <Input type="number" min={1.01} max={100} step={0.1} value={horsePlaceOdds[i] ?? 1.5}
+                    onChange={(e) => { const u=[...horsePlaceOdds]; u[i]=Math.max(1.01, parseFloat(e.target.value)||1.01); setHorsePlaceOdds(u); }}
+                    className="font-mono text-xs text-center bg-white/5 border-white/10 h-8"
+                    data-testid={`input-horse-js-place-odds-${i}`} />
+                  <Input type="number" min={1.01} max={100} step={0.1} value={horseShowOdds[i] ?? 1.2}
+                    onChange={(e) => { const u=[...horseShowOdds]; u[i]=Math.max(1.01, parseFloat(e.target.value)||1.01); setHorseShowOdds(u); }}
+                    className="font-mono text-xs text-center bg-white/5 border-white/10 h-8"
+                    data-testid={`input-horse-js-show-odds-${i}`} />
                 </div>
               ))}
+              <p className="text-[10px] text-muted-foreground italic">Win=1st only · Place=top 2 · Show=top 3</p>
             </div>
             <Button
               className="w-full"
@@ -446,28 +458,32 @@ function GameSettingCard({ setting }: { setting: GameSetting }) {
         )}
         {isHorse4 && (
           <div className="border-t border-white/10 pt-4 space-y-3">
-            <label className="text-xs text-muted-foreground font-semibold">8-Horse Race — Win Odds (x)</label>
-            <div className="space-y-2">
+            <label className="text-xs text-muted-foreground font-semibold">8-Horse Race — Win / Place / Show Odds (x)</label>
+            <div className="space-y-1">
+              <div className="grid grid-cols-[1fr_repeat(3,minmax(0,1fr))] gap-2 items-center text-[11px] text-muted-foreground">
+                <span>Horse</span>
+                <span className="text-center">Win</span>
+                <span className="text-center">Place</span>
+                <span className="text-center">Show</span>
+              </div>
               {HORSE4_NAMES.map((name, i) => (
-                <div key={i} className="flex items-center gap-2">
-                  <span className="text-xs text-muted-foreground w-24 capitalize">{name}</span>
-                  <Input
-                    type="number"
-                    min={1.01}
-                    max={200}
-                    step={0.05}
-                    value={horse4Odds[i] ?? HORSE4_DEFAULT_ODDS[i]}
-                    onChange={(e) => {
-                      const updated = [...horse4Odds];
-                      updated[i] = Math.max(1.01, parseFloat(e.target.value) || 1.01);
-                      setHorse4Odds(updated);
-                    }}
-                    className="font-mono text-sm text-center bg-white/5 border-white/10"
-                    data-testid={`input-horse4-odds-${i}`}
-                  />
-                  <span className="text-xs text-muted-foreground">x</span>
+                <div key={i} className="grid grid-cols-[1fr_repeat(3,minmax(0,1fr))] gap-2 items-center">
+                  <span className="text-xs text-muted-foreground capitalize truncate">{name}</span>
+                  <Input type="number" min={1.01} max={200} step={0.05} value={horse4Odds[i] ?? HORSE4_DEFAULT_ODDS[i]}
+                    onChange={(e) => { const u=[...horse4Odds]; u[i]=Math.max(1.01, parseFloat(e.target.value)||1.01); setHorse4Odds(u); }}
+                    className="font-mono text-xs text-center bg-white/5 border-white/10 h-8"
+                    data-testid={`input-horse4-odds-${i}`} />
+                  <Input type="number" min={1.01} max={200} step={0.05} value={horse4PlaceOdds[i] ?? 1.5}
+                    onChange={(e) => { const u=[...horse4PlaceOdds]; u[i]=Math.max(1.01, parseFloat(e.target.value)||1.01); setHorse4PlaceOdds(u); }}
+                    className="font-mono text-xs text-center bg-white/5 border-white/10 h-8"
+                    data-testid={`input-horse4-place-odds-${i}`} />
+                  <Input type="number" min={1.01} max={200} step={0.05} value={horse4ShowOdds[i] ?? 1.2}
+                    onChange={(e) => { const u=[...horse4ShowOdds]; u[i]=Math.max(1.01, parseFloat(e.target.value)||1.01); setHorse4ShowOdds(u); }}
+                    className="font-mono text-xs text-center bg-white/5 border-white/10 h-8"
+                    data-testid={`input-horse4-show-odds-${i}`} />
                 </div>
               ))}
+              <p className="text-[10px] text-muted-foreground italic">Win=1st only · Place=top 2 · Show=top 3 (the imported game currently uses Win odds in-game; Place/Show are stored for upcoming side-bet support)</p>
             </div>
             <Button
               className="w-full"
@@ -515,28 +531,32 @@ function GameSettingCard({ setting }: { setting: GameSetting }) {
         )}
         {isDogRacing && (
           <div className="border-t border-white/10 pt-4 space-y-3">
-            <label className="text-xs text-muted-foreground font-semibold">Greyhound Race — Win Odds (x)</label>
-            <div className="space-y-2">
+            <label className="text-xs text-muted-foreground font-semibold">Greyhound Race — Win / Place / Show Odds (x)</label>
+            <div className="space-y-1">
+              <div className="grid grid-cols-[1fr_repeat(3,minmax(0,1fr))] gap-2 items-center text-[11px] text-muted-foreground">
+                <span>Dog</span>
+                <span className="text-center">Win</span>
+                <span className="text-center">Place</span>
+                <span className="text-center">Show</span>
+              </div>
               {DOG_NAMES.map((name, i) => (
-                <div key={i} className="flex items-center gap-2">
-                  <span className="text-xs text-muted-foreground w-28 capitalize">{name}</span>
-                  <Input
-                    type="number"
-                    min={1.01}
-                    max={200}
-                    step={0.05}
-                    value={dogOdds[i] ?? DOG_DEFAULT_ODDS[i]}
-                    onChange={(e) => {
-                      const updated = [...dogOdds];
-                      updated[i] = Math.max(1.01, parseFloat(e.target.value) || 1.01);
-                      setDogOdds(updated);
-                    }}
-                    className="font-mono text-sm text-center bg-white/5 border-white/10"
-                    data-testid={`input-dog-odds-${i}`}
-                  />
-                  <span className="text-xs text-muted-foreground">x</span>
+                <div key={i} className="grid grid-cols-[1fr_repeat(3,minmax(0,1fr))] gap-2 items-center">
+                  <span className="text-xs text-muted-foreground capitalize truncate">{name}</span>
+                  <Input type="number" min={1.01} max={200} step={0.05} value={dogOdds[i] ?? DOG_DEFAULT_ODDS[i]}
+                    onChange={(e) => { const u=[...dogOdds]; u[i]=Math.max(1.01, parseFloat(e.target.value)||1.01); setDogOdds(u); }}
+                    className="font-mono text-xs text-center bg-white/5 border-white/10 h-8"
+                    data-testid={`input-dog-odds-${i}`} />
+                  <Input type="number" min={1.01} max={200} step={0.05} value={dogPlaceOdds[i] ?? 1.5}
+                    onChange={(e) => { const u=[...dogPlaceOdds]; u[i]=Math.max(1.01, parseFloat(e.target.value)||1.01); setDogPlaceOdds(u); }}
+                    className="font-mono text-xs text-center bg-white/5 border-white/10 h-8"
+                    data-testid={`input-dog-place-odds-${i}`} />
+                  <Input type="number" min={1.01} max={200} step={0.05} value={dogShowOdds[i] ?? 1.2}
+                    onChange={(e) => { const u=[...dogShowOdds]; u[i]=Math.max(1.01, parseFloat(e.target.value)||1.01); setDogShowOdds(u); }}
+                    className="font-mono text-xs text-center bg-white/5 border-white/10 h-8"
+                    data-testid={`input-dog-show-odds-${i}`} />
                 </div>
               ))}
+              <p className="text-[10px] text-muted-foreground italic">Win=1st only · Place=top 2 · Show=top 3 (the imported game currently uses Win odds in-game; Place/Show are stored for upcoming side-bet support)</p>
             </div>
             <Button
               className="w-full"

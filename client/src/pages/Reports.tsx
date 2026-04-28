@@ -75,6 +75,9 @@ interface ReportData {
   transactions: any[];
   dailyStats: { date: string; bets: number; wins: number; deposits: number; withdrawals: number }[];
   managers: { id: number; username: string; role: string }[];
+  perGame?: { gameType: string; label: string; bets: number; wins: number; profit: number; plays: number; rtp: number }[];
+  gameTypes?: { value: string; label: string }[];
+  selectedGameType?: string;
 }
 
 const PERIOD_LABELS: Record<PeriodPreset, string> = {
@@ -98,6 +101,7 @@ export default function Reports() {
   const [customFrom, setCustomFrom] = useState("");
   const [customTo, setCustomTo] = useState("");
   const [selectedManager, setSelectedManager] = useState<string>("all");
+  const [selectedGameType, setSelectedGameType] = useState<string>("all");
 
   const queryParams = useMemo(() => {
     const range = getDateRange(period, customFrom, customTo);
@@ -105,8 +109,9 @@ export default function Reports() {
     if (range.from) params.set("from", range.from);
     if (range.to) params.set("to", range.to);
     if (selectedManager && selectedManager !== "all") params.set("managerId", selectedManager);
+    if (selectedGameType && selectedGameType !== "all") params.set("gameType", selectedGameType);
     return params.toString();
-  }, [period, customFrom, customTo, selectedManager]);
+  }, [period, customFrom, customTo, selectedManager, selectedGameType]);
 
   const { data: reports, isLoading, refetch } = useQuery<ReportData>({
     queryKey: ["/api/reports", queryParams],
@@ -280,6 +285,21 @@ export default function Reports() {
                 </div>
               )}
 
+              <div className="space-y-1.5">
+                <label className="text-xs uppercase text-muted-foreground font-semibold">Filter by Game</label>
+                <Select value={selectedGameType} onValueChange={setSelectedGameType}>
+                  <SelectTrigger className="w-[200px]" data-testid="select-game-filter">
+                    <SelectValue placeholder="All Games" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Games</SelectItem>
+                    {(reports?.gameTypes ?? []).map((g) => (
+                      <SelectItem key={g.value} value={g.value}>{g.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
               <Button variant="outline" size="sm" onClick={() => refetch()} data-testid="button-refresh-reports">
                 <RefreshCw className="w-4 h-4 mr-1" /> Refresh
               </Button>
@@ -297,6 +317,11 @@ export default function Reports() {
               {selectedManager !== "all" && reports.managers && (
                 <Badge variant="outline" className="ml-2">
                   {reports.managers.find(m => String(m.id) === selectedManager)?.username || "Filtered"}
+                </Badge>
+              )}
+              {selectedGameType !== "all" && (
+                <Badge variant="outline" className="ml-2">
+                  Game: {reports.gameTypes?.find(g => g.value === selectedGameType)?.label || selectedGameType}
                 </Badge>
               )}
               <span className="ml-auto">{reports.playersCount} players{reports.managersCount > 0 ? `, ${reports.managersCount} managers` : ""}</span>
@@ -389,6 +414,55 @@ export default function Reports() {
                 </CardContent>
               </Card>
             </div>
+
+            {reports.perGame && reports.perGame.length > 0 && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2"><Trophy className="h-5 w-5" /> Per-Game Breakdown</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Game</TableHead>
+                          <TableHead className="text-right">Plays</TableHead>
+                          <TableHead className="text-right">Total Bet</TableHead>
+                          <TableHead className="text-right">Total Won</TableHead>
+                          <TableHead className="text-right">House Profit</TableHead>
+                          <TableHead className="text-right">RTP</TableHead>
+                          <TableHead></TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {reports.perGame.map((g) => (
+                          <TableRow key={g.gameType} data-testid={`row-pergame-${g.gameType}`}>
+                            <TableCell className="font-medium">{g.label}</TableCell>
+                            <TableCell className="text-right font-mono">{g.plays.toLocaleString()}</TableCell>
+                            <TableCell className="text-right font-mono">{g.bets.toLocaleString()}</TableCell>
+                            <TableCell className="text-right font-mono text-yellow-500">{g.wins.toLocaleString()}</TableCell>
+                            <TableCell className={`text-right font-mono font-bold ${g.profit >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                              {g.profit >= 0 ? '+' : '-'} {Math.abs(g.profit).toLocaleString()}
+                            </TableCell>
+                            <TableCell className="text-right font-mono">{g.rtp.toFixed(1)}%</TableCell>
+                            <TableCell className="text-right">
+                              <Button
+                                size="sm"
+                                variant={selectedGameType === g.gameType ? "default" : "ghost"}
+                                onClick={() => setSelectedGameType(selectedGameType === g.gameType ? "all" : g.gameType)}
+                                data-testid={`button-filter-game-${g.gameType}`}
+                              >
+                                {selectedGameType === g.gameType ? "Clear" : "Filter"}
+                              </Button>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
 
             {reports.dailyStats.length > 0 && (
               <Card>

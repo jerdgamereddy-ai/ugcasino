@@ -118,6 +118,14 @@
                 <option value="4">Brown</option>
             </select>
         </div>
+        <div style="display:flex;align-items:center;gap:6px">
+            <label>Bet Type:</label>
+            <select id="bettype" onchange="renderOdds()">
+                <option value="win">Win (1st)</option>
+                <option value="place">Place (1st-2nd)</option>
+                <option value="show">Show (1st-3rd)</option>
+            </select>
+        </div>
         <div class="odds-display" id="odds-display"></div>
         <button id="start-btn2" onclick="startRace()" disabled style="background:linear-gradient(135deg,#c9a227,#f0c040);color:#1a0a00;font-weight:bold;font-size:13px;border:none;border-radius:8px;padding:7px 20px;cursor:pointer">Start Race</button>
     </div>
@@ -127,9 +135,12 @@
         var _gameInitialized = false;
         var _maxLaps = 1;
         var _odds = [2.0, 2.5, 3.0, 3.5];
+        var _placeOdds = [1.4, 1.7, 2.0, 2.3];
+        var _showOdds = [1.15, 1.3, 1.5, 1.7];
         var _raceInProgress = false;
         var _pendingBet = 0;
         var _betHorse = 1;
+        var _betType = 'win';
         var _horse1, _horse2, _horse3, _horse4;
         var results = [];
 
@@ -146,6 +157,8 @@
                 _balance = event.data.balance || 0;
                 if (typeof event.data.maxLaps === 'number') _maxLaps = event.data.maxLaps;
                 if (Array.isArray(event.data.odds)) _odds = event.data.odds;
+                if (Array.isArray(event.data.placeOdds) && event.data.placeOdds.length === _odds.length) _placeOdds = event.data.placeOdds;
+                if (Array.isArray(event.data.showOdds) && event.data.showOdds.length === _odds.length) _showOdds = event.data.showOdds;
                 document.getElementById('lap-count').textContent = _maxLaps;
                 updateUI();
                 renderOdds();
@@ -159,9 +172,12 @@
         }
 
         function renderOdds() {
+            var typeSel = document.getElementById('bettype');
+            _betType = typeSel ? typeSel.value : 'win';
+            var arr = _betType === 'place' ? _placeOdds : (_betType === 'show' ? _showOdds : _odds);
             var container = document.getElementById('odds-display');
             var horseNames = ['White', 'Blue', 'Green', 'Brown'];
-            container.innerHTML = _odds.map(function(o, i) {
+            container.innerHTML = arr.map(function(o, i) {
                 return '<span class="horse-odd" id="odd-' + (i+1) + '">' + horseNames[i] + ': ' + o.toFixed(2) + 'x</span>';
             }).join('');
             updateOddsHighlight();
@@ -195,6 +211,7 @@
             }
 
             _betHorse = parseInt(document.getElementById('bethorse').value);
+            _betType = document.getElementById('bettype').value;
             _pendingBet = amount;
             _balance -= amount;
             updateUI();
@@ -220,22 +237,28 @@
             tds[results.length].className = 'result horse' + horseNumber;
             results.push(horseNumber);
 
-            if (results.length === 1) {
-                var winHorse = horseNumber;
-                var betAmount = _pendingBet;
-                var odd = _odds[_betHorse - 1] || 2.0;
-
-                if (winHorse === _betHorse) {
-                    var payout = Math.floor(betAmount * odd);
+            // Resolve based on bet type once enough horses have finished
+            if (!_pendingBet) return;
+            var positionsRequired = _betType === 'win' ? 1 : (_betType === 'place' ? 2 : 3);
+            if (results.length >= positionsRequired) {
+                var hit = results.slice(0, positionsRequired).indexOf(_betHorse) !== -1;
+                if (hit) {
+                    var oddArr = _betType === 'place' ? _placeOdds : (_betType === 'show' ? _showOdds : _odds);
+                    var odd = oddArr[_betHorse - 1] || 2.0;
+                    var payout = Math.floor(_pendingBet * odd);
                     _balance += payout;
                     updateUI();
                     sendToParent('win_result', { winAmount: payout, balance: _balance });
-                    showResult('You WIN! 🏆', '+' + payout.toLocaleString() + ' UGX (x' + odd.toFixed(2) + ')', true);
-                } else {
+                    var typeLabel = _betType === 'win' ? 'Win' : (_betType === 'place' ? 'Place' : 'Show');
+                    showResult('You WIN! 🏆 (' + typeLabel + ')', '+' + payout.toLocaleString() + ' UGX (x' + odd.toFixed(2) + ')', true);
+                    sendToParent('save_score', { money: _balance });
+                    _pendingBet = 0;
+                } else if (results.length === 4) {
                     sendToParent('win_result', { winAmount: 0, balance: _balance });
-                    showResult('You LOSE 😞', 'Horse ' + winHorse + ' won the race', false);
+                    showResult('You LOSE 😞', 'Your horse did not finish in the top ' + positionsRequired, false);
+                    sendToParent('save_score', { money: _balance });
+                    _pendingBet = 0;
                 }
-                sendToParent('save_score', { money: _balance });
             }
 
             if (results.length === 4) {
