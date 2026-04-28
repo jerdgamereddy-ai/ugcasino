@@ -12,6 +12,8 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Plane, Rocket, Coins, History, Settings as SettingsIcon, Sparkles } from "lucide-react";
 import { playSound } from "@/lib/sounds";
 import { useFullscreen, FullscreenButton } from "@/components/FullscreenToggle";
+import aviatorPlanePng from "@assets/aviator_plane_1777409200000.png";
+import aviatorBgJpeg from "@assets/aviator_bg_1777409200000.jpeg";
 
 const GROWTH = 0.06; // matches server: m(t) = exp(0.06 * seconds_elapsed)
 const BET_PRESETS = [500, 1000, 2000, 5000, 10000, 25000];
@@ -359,19 +361,30 @@ export default function GameAviator() {
             <div className="lg:col-span-2">
               <Card className="glass-card overflow-hidden">
                 <CardContent className="p-0">
-                  <div className="relative w-full h-[420px] md:h-[480px] overflow-hidden bg-gradient-to-b from-[#070b18] via-[#0c1428] to-[#1a2547]">
-                    {/* Star/grid background */}
-                    <div className="absolute inset-0 opacity-30" style={{
-                      backgroundImage: "radial-gradient(circle at 25% 30%, rgba(212,175,55,0.12), transparent 60%), radial-gradient(circle at 80% 70%, rgba(99,102,241,0.12), transparent 50%)"
-                    }} />
-                    <div className="absolute inset-0">
-                      {[...Array(40)].map((_, i) => (
-                        <div
-                          key={i}
-                          className="absolute w-[2px] h-[2px] bg-white/40 rounded-full"
-                          style={{ left: `${(i * 73) % 100}%`, top: `${(i * 37) % 100}%`, opacity: 0.2 + ((i * 7) % 8) / 10 }}
-                        />
-                      ))}
+                  <div className="relative w-full h-[420px] md:h-[480px] overflow-hidden bg-black">
+                    {/* Spribe-style rotating sun-ray background */}
+                    <div className="absolute inset-0 overflow-hidden pointer-events-none">
+                      <div
+                        className="absolute"
+                        style={{
+                          top: "50%",
+                          left: "50%",
+                          width: "180%",
+                          height: "180%",
+                          transform: "translate(-50%, -50%)",
+                          backgroundImage: `url(${aviatorBgJpeg})`,
+                          backgroundSize: "cover",
+                          backgroundPosition: "center",
+                          backgroundRepeat: "no-repeat",
+                          animation: phase === "flying" ? "aviator-spin 8s linear infinite" : "aviator-spin 24s linear infinite",
+                          opacity: phase === "crashed" ? 0.35 : 0.85,
+                          transition: "opacity 0.5s ease",
+                        }}
+                      />
+                      {/* Vignette so the multiplier reads cleanly over the rays */}
+                      <div className="absolute inset-0" style={{
+                        background: "radial-gradient(circle at 50% 50%, rgba(0,0,0,0) 0%, rgba(0,0,0,0.55) 75%, rgba(0,0,0,0.85) 100%)",
+                      }} />
                     </div>
 
                     {/* Trail */}
@@ -393,7 +406,7 @@ export default function GameAviator() {
                       </svg>
                     )}
 
-                    {/* Plane */}
+                    {/* Plane (real Aviator red plane asset) */}
                     <AnimatePresence>
                       {(phase === "waiting" || phase === "flying") && (
                         <motion.div
@@ -405,10 +418,21 @@ export default function GameAviator() {
                           style={{ left: `${planeX}%`, top: `${planeY}%`, transform: "translate(-50%, -50%)" }}
                         >
                           <motion.div
-                            animate={{ rotate: phase === "flying" ? -25 : 0, y: phase === "flying" ? [0, -3, 0] : 0 }}
+                            animate={{ rotate: phase === "flying" ? -18 : 0, y: phase === "flying" ? [0, -3, 0] : 0 }}
                             transition={{ y: { repeat: Infinity, duration: 0.6 } }}
+                            className="origin-center"
                           >
-                            <Plane className="w-12 h-12 text-primary drop-shadow-[0_0_20px_rgba(212,175,55,0.8)]" fill="currentColor" />
+                            <img
+                              src={aviatorPlanePng}
+                              alt=""
+                              aria-hidden="true"
+                              width={500}
+                              height={318}
+                              decoding="async"
+                              draggable={false}
+                              className="w-28 md:w-36 h-auto drop-shadow-[0_0_18px_rgba(220,53,69,0.55)]"
+                              style={{ pointerEvents: "none" }}
+                            />
                           </motion.div>
                         </motion.div>
                       )}

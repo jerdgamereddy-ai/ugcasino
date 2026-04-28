@@ -118,6 +118,11 @@
     animation: marquee-scroll 12s linear infinite;
   }
 
+  @keyframes aviator-spin {
+    from { transform: translate(-50%, -50%) rotate(0deg); }
+    to   { transform: translate(-50%, -50%) rotate(360deg); }
+  }
+
   .scrollbar-hide {
     -ms-overflow-style: none;
     scrollbar-width: none;
