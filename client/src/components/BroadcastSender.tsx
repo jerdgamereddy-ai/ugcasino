@@ -8,7 +8,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { Input } from "@/components/ui/input";
-import { Megaphone, Send, Loader2 } from "lucide-react";
+import { Megaphone, Send, Loader2, Power, Trash2 } from "lucide-react";
+import { apiRequest } from "@/lib/queryClient";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
@@ -70,6 +71,34 @@ export function BroadcastSender({ senderRole }: BroadcastSenderProps) {
     onError: (err: Error) => {
       toast({ title: "Failed", description: err.message, variant: "destructive" });
     },
+  });
+
+  const disableMutation = useMutation({
+    mutationFn: async (id: number) => {
+      const res = await apiRequest("POST", `/api/broadcasts/${id}/disable`);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/broadcasts/sent"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/broadcasts"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/broadcasts/public"] });
+      toast({ title: "Broadcast Disabled", description: "It will no longer scroll for viewers." });
+    },
+    onError: (err: any) => toast({ title: "Failed", description: err.message, variant: "destructive" }),
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (id: number) => {
+      const res = await apiRequest("DELETE", `/api/broadcasts/${id}`);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/broadcasts/sent"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/broadcasts"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/broadcasts/public"] });
+      toast({ title: "Broadcast Deleted" });
+    },
+    onError: (err: any) => toast({ title: "Failed", description: err.message, variant: "destructive" }),
   });
 
   const handleSend = () => {
@@ -263,12 +292,15 @@ export function BroadcastSender({ senderRole }: BroadcastSenderProps) {
                   <TableHead>Target</TableHead>
                   <TableHead>Style</TableHead>
                   <TableHead>Speed</TableHead>
-                  <TableHead>Expires</TableHead>
+                  <TableHead>Status</TableHead>
                   <TableHead>Date</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {sentBroadcasts.map((b) => (
+                {sentBroadcasts.map((b) => {
+                  const isExpired = b.expiresAt ? new Date(b.expiresAt) <= new Date() : false;
+                  return (
                   <TableRow key={b.id} className="border-white/10" data-testid={`row-broadcast-${b.id}`}>
                     <TableCell className="max-w-xs truncate">{b.message}</TableCell>
                     <TableCell>
@@ -280,14 +312,47 @@ export function BroadcastSender({ senderRole }: BroadcastSenderProps) {
                     <TableCell className="text-sm text-muted-foreground">
                       {b.scrollSpeed === 30 ? "Slow" : b.scrollSpeed === 20 ? "Med-Slow" : b.scrollSpeed === 10 ? "Fast" : b.scrollSpeed === 6 ? "V.Fast" : "Normal"}
                     </TableCell>
-                    <TableCell className="text-sm text-muted-foreground">
-                      {b.expiresAt ? (new Date(b.expiresAt) > new Date() ? new Date(b.expiresAt).toLocaleString() : "Expired") : "Never"}
+                    <TableCell className="text-sm">
+                      {isExpired ? (
+                        <Badge variant="outline" className="text-red-400 border-red-500/40">Disabled</Badge>
+                      ) : (
+                        <Badge variant="outline" className="text-green-400 border-green-500/40">Live</Badge>
+                      )}
                     </TableCell>
                     <TableCell className="text-sm text-muted-foreground">
                       {b.createdAt ? new Date(b.createdAt).toLocaleString() : ""}
                     </TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex justify-end gap-1">
+                        {!isExpired && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => disableMutation.mutate(b.id)}
+                            disabled={disableMutation.isPending}
+                            className="h-7 px-2 text-xs"
+                            data-testid={`button-disable-broadcast-${b.id}`}
+                          >
+                            <Power className="w-3 h-3 mr-1" /> Disable
+                          </Button>
+                        )}
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => {
+                            if (confirm("Permanently delete this broadcast?")) deleteMutation.mutate(b.id);
+                          }}
+                          disabled={deleteMutation.isPending}
+                          className="h-7 px-2 text-xs text-red-400 hover:text-red-300 hover:bg-red-500/10"
+                          data-testid={`button-delete-broadcast-${b.id}`}
+                        >
+                          <Trash2 className="w-3 h-3" />
+                        </Button>
+                      </div>
+                    </TableCell>
                   </TableRow>
-                ))}
+                  );
+                })}
               </TableBody>
             </Table>
           )}

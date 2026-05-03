@@ -2316,6 +2316,42 @@ export async function registerRoutes(
     }
   });
 
+  // Disable a broadcast: marks it expired so the marquee stops showing it for
+  // every viewer. Admins can disable any broadcast; managers/super-managers
+  // can only disable their own.
+  app.post("/api/broadcasts/:id/disable", async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    try {
+      const id = parseInt(req.params.id);
+      const broadcast = await storage.getBroadcastById(id);
+      if (!broadcast) return res.status(404).json({ message: "Broadcast not found" });
+      if (req.user.role !== "admin" && broadcast.senderId !== req.user.id) {
+        return res.status(403).json({ message: "You can only disable your own broadcasts" });
+      }
+      const updated = await storage.expireBroadcast(id);
+      res.json(updated);
+    } catch {
+      res.status(500).json({ message: "Failed to disable broadcast" });
+    }
+  });
+
+  // Permanently delete a broadcast. Same authorization as disable.
+  app.delete("/api/broadcasts/:id", async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    try {
+      const id = parseInt(req.params.id);
+      const broadcast = await storage.getBroadcastById(id);
+      if (!broadcast) return res.status(404).json({ message: "Broadcast not found" });
+      if (req.user.role !== "admin" && broadcast.senderId !== req.user.id) {
+        return res.status(403).json({ message: "You can only delete your own broadcasts" });
+      }
+      await storage.deleteBroadcast(id);
+      res.json({ success: true });
+    } catch {
+      res.status(500).json({ message: "Failed to delete broadcast" });
+    }
+  });
+
   // === PROFIT SHARING ROUTES ===
 
   app.post("/api/profit-share/set", async (req, res) => {

@@ -83,6 +83,9 @@ export interface IStorage {
 
   getDisabledGamesForUser(userId: number): Promise<string[]>;
   getEffectiveDisabledGames(userId: number): Promise<string[]>;
+  getBroadcastById(id: number): Promise<Broadcast | undefined>;
+  deleteBroadcast(id: number): Promise<boolean>;
+  expireBroadcast(id: number): Promise<Broadcast | undefined>;
   setGameDisabled(userId: number, gameType: string, disabled: boolean): Promise<void>;
 
   getAudioTracks(): Promise<AudioTrack[]>;
@@ -456,6 +459,23 @@ export class DatabaseStorage implements IStorage {
 
   async getSentBroadcasts(senderId: number): Promise<Broadcast[]> {
     return await db.select().from(broadcasts).where(eq(broadcasts.senderId, senderId)).orderBy(desc(broadcasts.createdAt));
+  }
+
+  async getBroadcastById(id: number): Promise<Broadcast | undefined> {
+    const [b] = await db.select().from(broadcasts).where(eq(broadcasts.id, id));
+    return b;
+  }
+
+  async deleteBroadcast(id: number): Promise<boolean> {
+    await db.delete(broadcastDismissals).where(eq(broadcastDismissals.broadcastId, id));
+    const result = await db.delete(broadcasts).where(eq(broadcasts.id, id)).returning();
+    return result.length > 0;
+  }
+
+  async expireBroadcast(id: number): Promise<Broadcast | undefined> {
+    // Mark as already-expired so the marquee stops showing it but the row stays for history.
+    const [updated] = await db.update(broadcasts).set({ expiresAt: new Date(Date.now() - 1000) }).where(eq(broadcasts.id, id)).returning();
+    return updated;
   }
 
   async getPublicBroadcasts(): Promise<Broadcast[]> {
