@@ -1275,13 +1275,9 @@ export async function registerRoutes(
       const hjSettings = await storage.getGameSettings("horse-js");
       const hjExtra = (() => { try { return hjSettings?.extraSettings ? JSON.parse(hjSettings.extraSettings) : {}; } catch { return {}; } })();
       const hjMaxOdds = Math.max(...((hjExtra.odds as number[]) ?? [2.0, 2.5, 3.0, 3.5]));
-      // Race games are the ONLY games where a player can guarantee a win by
-      // dutching across every runner (especially with only 4 horses) —
-      // hard-block when worst-case payout would breach the bankroll floor.
-      const hjGuard = await checkBankrollFloorForBet(totBet * hjMaxOdds);
-      if (hjGuard.blocked) {
-        return res.status(400).json({ message: "Bet too large — maximum possible payout exceeds the house bankroll. Please lower your bet.", bankrollBlocked: true });
-      }
+      // Quick Horse only allows one horse + one bet type per round, so the
+      // server can always force a loss by picking a different horse to win.
+      // No hard pre-block needed — computeForceLose handles it.
       await storage.updateUserBalance(req.user.id, -totBet);
       await storage.createTransaction({ userId: req.user.id, amount: -totBet, type: "bet", description: "Horse Racing bet" });
       await recordBetAndCheckHighBet("horse-js", req.user.id, totBet);
