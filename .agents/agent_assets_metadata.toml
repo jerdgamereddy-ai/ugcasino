@@ -1,0 +1,26 @@
+uploads = []
+outputs = []
+
+[[generated]]
+id = "dz6FNULKYO7MzkOqfELn5"
+uri = "file://attached_assets/hilo_titanic_king.png"
+type = "image"
+title = "titanic king card"
+
+[[generated]]
+id = "IIeHB2wXnY9v9lOt1Xq-g"
+uri = "file://attached_assets/hilo_titanic_queen.png"
+type = "image"
+title = "titanic queen card"
+
+[[generated]]
+id = "yXD6AePd70nalEXw92SZL"
+uri = "file://attached_assets/hilo_titanic_jack.png"
+type = "image"
+title = "titanic jack card"
+
+[[generated]]
+id = "Qh_B9a_dAbG_eilfPvKLw"
+uri = "file://attached_assets/hilo_titanic_back.png"
+type = "image"
+title = "titanic card back"
