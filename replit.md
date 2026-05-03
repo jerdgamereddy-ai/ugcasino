@@ -59,6 +59,12 @@ Preferred communication style: Simple, everyday language.
 - **PostgreSQL**: Main database.
 - **connect-pg-simple**: For PostgreSQL session storage.
 
+### Customizable Site Background (Admin → "Appearance" tab)
+- New `site_settings` singleton table (id=1, CHECK enforced) holds `bgType` (`default`|`color`|`gradient`|`image`|`animation`) plus the corresponding payload fields. Public `GET /api/site-settings` exposes it (needed even pre-login for the login page) and admin-only `POST /api/admin/site-settings` mutates it.
+- New `background_images` table mirrors the `audio_tracks` pattern: file is written to `uploads/backgrounds/` AND stored as `bytea` so wallpapers survive Replit deploys. `/uploads/backgrounds/:filename` serves disk first, then falls back to the DB blob. Admin endpoints: `GET/POST/DELETE /api/admin/backgrounds`.
+- Client: `client/src/components/SiteBackground.tsx` is mounted once in `App.tsx`; it polls site-settings and applies the result directly to `document.body` (background-color OR background-image OR adds one of the `site-bg-*` animation classes). The main app shell uses `bg-background/80` so a body wallpaper bleeds through.
+- Animated presets (pure CSS keyframes in `index.css`): `site-bg-aurora`, `site-bg-casino-neon`, `site-bg-gold-rush`, `site-bg-starfield`. The Appearance tab also offers 6 gradient presets, a hex color picker, and JPG/PNG/WEBP/GIF/AVIF uploads (15 MB cap).
+
 ### Casino Visual Polish
 - Game tiles in `Lobby.tsx` now carry a `casino-tile` class (slow gold/rose/violet box-shadow pulse) plus a `casino-neon-ring` hover overlay that paints a rotating multicolor conic-gradient marquee around the tile (gold → pink → purple → cyan → emerald). Both keyframes live in `client/src/index.css`.
 - Disabled tiles get a grayscale + brightness-75 treatment plus a `Lock` icon "Out of order" badge so blocked games are visually obvious at a glance.

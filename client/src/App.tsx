@@ -29,6 +29,7 @@ import GameControl from "@/pages/GameControl";
 import ForgotPassword from "@/pages/ForgotPassword";
 import NotFound from "@/pages/not-found";
 import GlobalMusicPlayer from "@/components/GlobalMusicPlayer";
+import SiteBackground from "@/components/SiteBackground";
 
 function Router() {
   return (
@@ -69,7 +70,8 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         <SidebarProvider style={style as React.CSSProperties}>
-          <div className="flex h-screen w-full bg-background">
+          <SiteBackground />
+          <div className="flex h-screen w-full bg-transparent">
             <AppSidebar />
             <div className="flex flex-col flex-1">
               <header className="flex items-center justify-between p-2 border-b">

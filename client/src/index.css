@@ -199,4 +199,42 @@
     animation: casino-neon-spin 6s linear infinite;
     filter: drop-shadow(0 0 12px rgba(255,215,0,0.6));
   }
+
+  /* === Site-wide background animations (admin "Appearance" tab) ===
+     The body gets one of these classes from `useSiteBackground` based on
+     the picked animation key. Keeps them as pure CSS so no JS runtime cost. */
+  @keyframes site-bg-aurora {
+    0%   { background-position: 0% 50%; }
+    50%  { background-position: 100% 50%; }
+    100% { background-position: 0% 50%; }
+  }
+  .site-bg-aurora {
+    background: linear-gradient(120deg, #0a0a18, #2a0a3a, #0a0a40, #1a3a2a, #0a0a18);
+    background-size: 300% 300%;
+    animation: site-bg-aurora 18s ease infinite;
+  }
+  .site-bg-casino-neon {
+    background: linear-gradient(135deg, #18020a, #2a0a18, #050010, #0a1a2a, #18020a);
+    background-size: 400% 400%;
+    animation: site-bg-aurora 22s ease infinite;
+  }
+  .site-bg-gold-rush {
+    background: linear-gradient(135deg, #1a0f00, #3a2400, #5a3a00, #2a1a00, #1a0f00);
+    background-size: 400% 400%;
+    animation: site-bg-aurora 24s ease infinite;
+  }
+  @keyframes site-bg-stars {
+    from { background-position: 0 0, 0 0; }
+    to   { background-position: 1000px 500px, -800px 400px; }
+  }
+  .site-bg-starfield {
+    background-color: #03030a;
+    background-image:
+      radial-gradient(1px 1px at 20% 30%, #ffffff, transparent 60%),
+      radial-gradient(2px 2px at 70% 65%, #ffd700, transparent 60%),
+      radial-gradient(1px 1px at 40% 80%, #a855f7, transparent 60%),
+      radial-gradient(1.5px 1.5px at 85% 25%, #22d3ee, transparent 60%);
+    background-size: 600px 400px, 800px 600px, 500px 500px, 700px 700px;
+    animation: site-bg-stars 60s linear infinite;
+  }
 }

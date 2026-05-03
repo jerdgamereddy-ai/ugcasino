@@ -1,4 +1,4 @@
-import { users, vouchers, transactions, gameSettings, withdrawalRequests, adminSecurityAnswers, broadcasts, broadcastDismissals, messages, audioTracks, userGameDisables, type User, type InsertUser, type Voucher, type InsertVoucher, type Transaction, type GameSetting, type WithdrawalRequest, type InsertWithdrawalRequest, type AdminSecurityAnswer, type Broadcast, type BroadcastDismissal, type Message, type AudioTrack, type InsertAudioTrack, type UserGameDisable } from "@shared/schema";
+import { users, vouchers, transactions, gameSettings, withdrawalRequests, adminSecurityAnswers, broadcasts, broadcastDismissals, messages, audioTracks, userGameDisables, siteSettings, backgroundImages, type User, type InsertUser, type Voucher, type InsertVoucher, type Transaction, type GameSetting, type WithdrawalRequest, type InsertWithdrawalRequest, type AdminSecurityAnswer, type Broadcast, type BroadcastDismissal, type Message, type AudioTrack, type InsertAudioTrack, type UserGameDisable, type SiteSettings, type BackgroundImage } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, sql, and, inArray, gte, lte, between } from "drizzle-orm";
 import session from "express-session";
@@ -91,6 +91,13 @@ export interface IStorage {
   backfillAudioTrackData(id: number, data: Buffer): Promise<void>;
   deleteAudioTrack(id: number): Promise<AudioTrack | undefined>;
   countAudioTracks(): Promise<number>;
+
+  getSiteSettings(): Promise<SiteSettings>;
+  updateSiteSettings(patch: Partial<SiteSettings>, updatedBy: number): Promise<SiteSettings>;
+  getBackgroundImages(): Promise<BackgroundImage[]>;
+  getBackgroundImageByFilename(filename: string): Promise<BackgroundImage | undefined>;
+  createBackgroundImage(data: { filename: string; originalName: string; mimeType: string; size: number; data: Buffer; uploadedBy: number }): Promise<BackgroundImage>;
+  deleteBackgroundImage(id: number): Promise<BackgroundImage | undefined>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -597,6 +604,51 @@ export class DatabaseStorage implements IStorage {
   async countAudioTracks(): Promise<number> {
     const [{ count }] = await db.select({ count: sql<number>`count(*)` }).from(audioTracks);
     return Number(count);
+  }
+
+  async getSiteSettings(): Promise<SiteSettings> {
+    const [row] = await db.select().from(siteSettings).where(eq(siteSettings.id, 1));
+    if (row) return row;
+    const [created] = await db.insert(siteSettings).values({ id: 1, bgType: "default" }).returning();
+    return created;
+  }
+
+  async updateSiteSettings(patch: Partial<SiteSettings>, updatedBy: number): Promise<SiteSettings> {
+    await this.getSiteSettings(); // ensure row exists
+    const { id: _omit, ...rest } = patch as any;
+    const [row] = await db.update(siteSettings)
+      .set({ ...rest, updatedBy, updatedAt: new Date() })
+      .where(eq(siteSettings.id, 1))
+      .returning();
+    return row;
+  }
+
+  async getBackgroundImages(): Promise<BackgroundImage[]> {
+    return await db.select({
+      id: backgroundImages.id,
+      filename: backgroundImages.filename,
+      originalName: backgroundImages.originalName,
+      mimeType: backgroundImages.mimeType,
+      size: backgroundImages.size,
+      data: sql<Buffer | null>`NULL`.as("data"),
+      uploadedBy: backgroundImages.uploadedBy,
+      createdAt: backgroundImages.createdAt,
+    }).from(backgroundImages).orderBy(desc(backgroundImages.createdAt));
+  }
+
+  async getBackgroundImageByFilename(filename: string): Promise<BackgroundImage | undefined> {
+    const [img] = await db.select().from(backgroundImages).where(eq(backgroundImages.filename, filename));
+    return img;
+  }
+
+  async createBackgroundImage(data: { filename: string; originalName: string; mimeType: string; size: number; data: Buffer; uploadedBy: number }): Promise<BackgroundImage> {
+    const [img] = await db.insert(backgroundImages).values(data).returning();
+    return img;
+  }
+
+  async deleteBackgroundImage(id: number): Promise<BackgroundImage | undefined> {
+    const [img] = await db.delete(backgroundImages).where(eq(backgroundImages.id, id)).returning();
+    return img;
   }
 }
 

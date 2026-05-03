@@ -2621,5 +2621,133 @@ export async function registerRoutes(
     } catch { res.status(500).json({ message: "Internal Server Error" }); }
   });
 
+  // === SITE SETTINGS (admin-customizable site background) ===
+  // Public read so the login page can apply the background BEFORE auth.
+  app.get("/api/site-settings", async (_req, res) => {
+    try {
+      const s = await storage.getSiteSettings();
+      res.json(s);
+    } catch {
+      res.json({ id: 1, bgType: "default", bgColor: null, bgGradient: null, bgImageUrl: null, bgAnimation: null });
+    }
+  });
+
+  app.post("/api/admin/site-settings", async (req, res) => {
+    if (!req.isAuthenticated() || req.user.role !== "admin") return res.status(403).send("Forbidden");
+    const allowedTypes = ["default", "color", "gradient", "image", "animation"];
+    const allowedAnimations = ["site-bg-aurora", "site-bg-casino-neon", "site-bg-gold-rush", "site-bg-starfield"];
+    const { bgType, bgColor, bgGradient, bgImageUrl, bgAnimation } = req.body || {};
+    if (bgType && !allowedTypes.includes(bgType)) return res.status(400).json({ message: "Invalid bgType" });
+    if (bgAnimation && !allowedAnimations.includes(bgAnimation)) return res.status(400).json({ message: "Invalid animation preset" });
+    // bgImageUrl must be one of our own /uploads/backgrounds/ paths to prevent
+    // pointing the body at an arbitrary external URL (mixed-content / tracking).
+    if (bgImageUrl && !/^\/uploads\/backgrounds\/[\w.\-]+$/.test(bgImageUrl)) {
+      return res.status(400).json({ message: "Invalid image URL" });
+    }
+    // bgColor must be a hex color (#rgb / #rrggbb / #rrggbbaa).
+    if (bgColor && !/^#[0-9a-fA-F]{3,8}$/.test(bgColor)) {
+      return res.status(400).json({ message: "Invalid color (use hex like #1a2b3c)" });
+    }
+    // bgGradient must look like a CSS gradient — no quotes / parens balance for safety.
+    if (bgGradient && (!/^(linear|radial|conic)-gradient\(/.test(bgGradient) || /["';<>]/.test(bgGradient))) {
+      return res.status(400).json({ message: "Invalid gradient value" });
+    }
+    const patch: any = {};
+    if (bgType !== undefined) patch.bgType = bgType;
+    if (bgColor !== undefined) patch.bgColor = bgColor;
+    if (bgGradient !== undefined) patch.bgGradient = bgGradient;
+    if (bgImageUrl !== undefined) patch.bgImageUrl = bgImageUrl;
+    if (bgAnimation !== undefined) patch.bgAnimation = bgAnimation;
+    try {
+      const updated = await storage.updateSiteSettings(patch, req.user.id);
+      res.json(updated);
+    } catch {
+      res.status(500).json({ message: "Failed to update site settings" });
+    }
+  });
+
+  // Background image library — uploaded once, reused across deploys via bytea.
+  const BG_UPLOAD_DIR = path.join(process.cwd(), "uploads", "backgrounds");
+  if (!fs.existsSync(BG_UPLOAD_DIR)) fs.mkdirSync(BG_UPLOAD_DIR, { recursive: true });
+
+  const bgUpload = multer({
+    storage: multer.diskStorage({
+      destination: (_req, _file, cb) => cb(null, BG_UPLOAD_DIR),
+      filename: (_req, file, cb) => {
+        const ext = path.extname(file.originalname);
+        cb(null, `bg_${Date.now()}_${Math.random().toString(36).slice(2)}${ext}`);
+      },
+    }),
+    limits: { fileSize: 15 * 1024 * 1024 },
+    fileFilter: (_req, file, cb) => {
+      const allowed = ["image/jpeg", "image/png", "image/webp", "image/gif", "image/avif"];
+      if (allowed.includes(file.mimetype) || file.originalname.match(/\.(jpe?g|png|webp|gif|avif)$/i)) {
+        cb(null, true);
+      } else {
+        cb(new Error("Only image files are allowed (jpg, png, webp, gif, avif)"));
+      }
+    },
+  });
+
+  app.use("/uploads/backgrounds", async (req, res) => {
+    res.setHeader("Cache-Control", "public, max-age=86400");
+    const filename = path.basename(req.path);
+    const filePath = path.join(BG_UPLOAD_DIR, filename);
+    if (fs.existsSync(filePath)) return res.sendFile(filePath);
+    try {
+      const img = await storage.getBackgroundImageByFilename(filename);
+      if (!img || !img.data) return res.status(404).send("Not found");
+      res.setHeader("Content-Type", img.mimeType || "image/png");
+      res.setHeader("Content-Length", String(img.data.length));
+      res.send(img.data);
+    } catch {
+      res.status(500).send("Internal Server Error");
+    }
+  });
+
+  app.get("/api/admin/backgrounds", async (req, res) => {
+    if (!req.isAuthenticated() || req.user.role !== "admin") return res.status(403).send("Forbidden");
+    try {
+      const list = await storage.getBackgroundImages();
+      res.json(list);
+    } catch { res.status(500).json({ message: "Internal Server Error" }); }
+  });
+
+  app.post("/api/admin/backgrounds", async (req, res) => {
+    if (!req.isAuthenticated() || req.user.role !== "admin") return res.status(403).send("Forbidden");
+    bgUpload.single("image")(req, res, async (err) => {
+      if (err) return res.status(400).json({ message: err.message || "Upload failed" });
+      if (!req.file) return res.status(400).json({ message: "No file provided" });
+      try {
+        const buffer = await fs.promises.readFile(req.file.path);
+        const img = await storage.createBackgroundImage({
+          filename: req.file.filename,
+          originalName: req.file.originalname,
+          mimeType: req.file.mimetype,
+          size: req.file.size,
+          uploadedBy: req.user!.id,
+          data: buffer,
+        });
+        const { data: _omit, ...rest } = img as any;
+        res.json({ ...rest, url: `/uploads/backgrounds/${img.filename}` });
+      } catch {
+        fs.unlink(req.file.path, () => {});
+        res.status(500).json({ message: "Internal Server Error" });
+      }
+    });
+  });
+
+  app.delete("/api/admin/backgrounds/:id", async (req, res) => {
+    if (!req.isAuthenticated() || req.user.role !== "admin") return res.status(403).send("Forbidden");
+    try {
+      const id = parseInt(req.params.id);
+      const img = await storage.deleteBackgroundImage(id);
+      if (!img) return res.status(404).json({ message: "Image not found" });
+      const filePath = path.join(BG_UPLOAD_DIR, img.filename);
+      if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+      res.json({ success: true });
+    } catch { res.status(500).json({ message: "Internal Server Error" }); }
+  });
+
   return httpServer;
 }

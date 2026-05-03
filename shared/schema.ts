@@ -115,6 +115,34 @@ export const userGameDisables = pgTable("user_game_disables", {
 
 export type UserGameDisable = typeof userGameDisables.$inferSelect;
 
+// Singleton row (id=1) holding site-wide visual configuration the admin can
+// tweak (background color/gradient/image/animation). The DB enforces id=1.
+export const siteSettings = pgTable("site_settings", {
+  id: integer("id").primaryKey().default(1),
+  bgType: text("bg_type", { enum: ["default", "color", "gradient", "image", "animation"] }).default("default").notNull(),
+  bgColor: text("bg_color"),
+  bgGradient: text("bg_gradient"),
+  bgImageUrl: text("bg_image_url"),
+  bgAnimation: text("bg_animation"),
+  updatedBy: integer("updated_by"),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+export type SiteSettings = typeof siteSettings.$inferSelect;
+
+// Background images uploaded by admins. Stored as bytea like audio so they
+// survive Replit deploys (where /uploads is rebuilt from scratch).
+export const backgroundImages = pgTable("background_images", {
+  id: serial("id").primaryKey(),
+  filename: text("filename").notNull().unique(),
+  originalName: text("original_name").notNull(),
+  mimeType: text("mime_type").notNull(),
+  size: integer("size").notNull(),
+  data: customType<{ data: Buffer; notNull: true }>({ dataType: () => "bytea" })("data"),
+  uploadedBy: integer("uploaded_by"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+export type BackgroundImage = typeof backgroundImages.$inferSelect;
+
 // Canonical list of toggleable games. Keep in sync with server route gating
 // and with the lobby tile registry. The `id` here matches the `gameType` used
 // in /api/games/<id>/* endpoints.

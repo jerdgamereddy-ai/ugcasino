@@ -10,7 +10,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useState, useRef, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { Shield, Plus, Users, Ticket, Copy, Banknote, CheckCircle, Loader2, Ban, Trash2, ArrowUpCircle, KeyRound, UserCog, Lock, BarChart3, Settings2, ChevronUp, ChevronDown, Megaphone, Calculator, Phone, CircleDot, Crown, Briefcase, Printer, Music, Upload, X } from "lucide-react";
+import { Shield, Plus, Users, Ticket, Copy, Banknote, CheckCircle, Loader2, Ban, Trash2, ArrowUpCircle, KeyRound, UserCog, Lock, BarChart3, Settings2, ChevronUp, ChevronDown, Megaphone, Calculator, Phone, CircleDot, Crown, Briefcase, Printer, Music, Upload, X, Palette } from "lucide-react";
+import { AppearanceControl } from "@/components/AppearanceControl";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -420,14 +421,14 @@ function GameSettingCard({ setting }: { setting: GameSetting }) {
               />
             </div>
             <div className="space-y-2">
-              <div className="grid grid-cols-[1fr_repeat(3,minmax(0,1fr))] gap-2 items-center text-[11px] text-muted-foreground">
+              <div className="grid grid-cols-[72px_repeat(3,minmax(72px,1fr))] gap-2 items-center text-[11px] text-muted-foreground">
                 <span>Horse</span>
                 <span className="text-center">Win</span>
                 <span className="text-center">Place</span>
                 <span className="text-center">Show</span>
               </div>
               {horseOdds.map((odd, i) => (
-                <div key={i} className="grid grid-cols-[1fr_repeat(3,minmax(0,1fr))] gap-2 items-center">
+                <div key={i} className="grid grid-cols-[72px_repeat(3,minmax(72px,1fr))] gap-2 items-center">
                   <span className="text-xs text-muted-foreground">{(['White','Blue','Green','Brown'])[i]}</span>
                   <Input type="number" min={1.01} max={100} step={0.1} value={odd}
                     onChange={(e) => { const u=[...horseOdds]; u[i]=Math.max(1.01, parseFloat(e.target.value)||1.01); setHorseOdds(u); }}
@@ -461,14 +462,14 @@ function GameSettingCard({ setting }: { setting: GameSetting }) {
           <div className="border-t border-white/10 pt-4 space-y-3">
             <label className="text-xs text-muted-foreground font-semibold">8-Horse Race — Win / Place / Show Odds (x)</label>
             <div className="space-y-1">
-              <div className="grid grid-cols-[1fr_repeat(3,minmax(0,1fr))] gap-2 items-center text-[11px] text-muted-foreground">
+              <div className="grid grid-cols-[72px_repeat(3,minmax(72px,1fr))] gap-2 items-center text-[11px] text-muted-foreground">
                 <span>Horse</span>
                 <span className="text-center">Win</span>
                 <span className="text-center">Place</span>
                 <span className="text-center">Show</span>
               </div>
               {HORSE4_NAMES.map((name, i) => (
-                <div key={i} className="grid grid-cols-[1fr_repeat(3,minmax(0,1fr))] gap-2 items-center">
+                <div key={i} className="grid grid-cols-[72px_repeat(3,minmax(72px,1fr))] gap-2 items-center">
                   <span className="text-xs text-muted-foreground capitalize truncate">{name}</span>
                   <Input type="number" min={1.01} max={200} step={0.05} value={horse4Odds[i] ?? HORSE4_DEFAULT_ODDS[i]}
                     onChange={(e) => { const u=[...horse4Odds]; u[i]=Math.max(1.01, parseFloat(e.target.value)||1.01); setHorse4Odds(u); }}
@@ -534,14 +535,14 @@ function GameSettingCard({ setting }: { setting: GameSetting }) {
           <div className="border-t border-white/10 pt-4 space-y-3">
             <label className="text-xs text-muted-foreground font-semibold">Greyhound Race — Win / Place / Show Odds (x)</label>
             <div className="space-y-1">
-              <div className="grid grid-cols-[1fr_repeat(3,minmax(0,1fr))] gap-2 items-center text-[11px] text-muted-foreground">
+              <div className="grid grid-cols-[72px_repeat(3,minmax(72px,1fr))] gap-2 items-center text-[11px] text-muted-foreground">
                 <span>Dog</span>
                 <span className="text-center">Win</span>
                 <span className="text-center">Place</span>
                 <span className="text-center">Show</span>
               </div>
               {DOG_NAMES.map((name, i) => (
-                <div key={i} className="grid grid-cols-[1fr_repeat(3,minmax(0,1fr))] gap-2 items-center">
+                <div key={i} className="grid grid-cols-[72px_repeat(3,minmax(72px,1fr))] gap-2 items-center">
                   <span className="text-xs text-muted-foreground capitalize truncate">{name}</span>
                   <Input type="number" min={1.01} max={200} step={0.05} value={dogOdds[i] ?? DOG_DEFAULT_ODDS[i]}
                     onChange={(e) => { const u=[...dogOdds]; u[i]=Math.max(1.01, parseFloat(e.target.value)||1.01); setDogOdds(u); }}
@@ -984,6 +985,7 @@ export default function AdminDashboard() {
             <TabsTrigger value="security" data-testid="tab-security">Security</TabsTrigger>
             <TabsTrigger value="settings" data-testid="tab-settings">Account</TabsTrigger>
             <TabsTrigger value="audio" data-testid="tab-audio"><Music className="w-3 h-3 mr-1" /> Music</TabsTrigger>
+            <TabsTrigger value="appearance" data-testid="tab-appearance"><Palette className="w-3 h-3 mr-1" /> Appearance</TabsTrigger>
           </TabsList>
 
           <TabsContent value="users" className="mt-6 space-y-6">
@@ -1335,6 +1337,10 @@ export default function AdminDashboard() {
               </div>
               <GameAccessControl />
             </div>
+          </TabsContent>
+
+          <TabsContent value="appearance" className="mt-6">
+            <AppearanceControl />
           </TabsContent>
 
           <TabsContent value="reports" className="mt-6">
