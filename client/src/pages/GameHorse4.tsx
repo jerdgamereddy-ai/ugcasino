@@ -24,6 +24,23 @@ export default function GameHorse4() {
   const postBetBalanceRef = useRef<number | null>(null);
   const lastBetRef = useRef(0);
   const roundIdRef = useRef<string | null>(null);
+  // Holds the iframe's end-of-race money if `save_score` arrives BEFORE the
+  // /bet response. The bet's onSuccess will drain it. Without this, slow bet
+  // responses (e.g. universal-house-edge DB checks under load) caused wins to
+  // be silently dropped after a 5s polling timeout.
+  const pendingWinIframeMoneyRef = useRef<number | null>(null);
+
+  const settleWin = useCallback((iframeMoney: number) => {
+    if (postBetBalanceRef.current === null || !roundIdRef.current) return;
+    const winAmount = Math.max(0, iframeMoney - postBetBalanceRef.current);
+    if (winAmount > 0) winMutation.mutate({ winAmount, roundId: roundIdRef.current });
+    lastBetRef.current = 0;
+    postBetBalanceRef.current = null;
+    roundIdRef.current = null;
+    pendingWinIframeMoneyRef.current = null;
+  // winMutation defined below; safe to reference via closure on call.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const betMutation = useMutation({
     mutationFn: async (data: { bet: number; totBet: number }) => {
@@ -38,10 +55,15 @@ export default function GameHorse4() {
         "*"
       );
       queryClient.invalidateQueries({ queryKey: ["/api/user"] });
+      // Drain a save_score that arrived while /bet was still in flight.
+      if (pendingWinIframeMoneyRef.current !== null) {
+        settleWin(pendingWinIframeMoneyRef.current);
+      }
     },
     onError: () => {
       lastBetRef.current = 0;
       postBetBalanceRef.current = null;
+      pendingWinIframeMoneyRef.current = null;
     },
   });
 
@@ -98,30 +120,21 @@ export default function GameHorse4() {
       case "save_score":
         if (lastBetRef.current > 0) {
           const iframeMoney = event.data.money;
-          let retries = 0;
-          const tryCredit = () => {
-            if (postBetBalanceRef.current !== null) {
-              const winAmount = Math.max(0, iframeMoney - postBetBalanceRef.current);
-              if (winAmount > 0) winMutation.mutate({ winAmount, roundId: roundIdRef.current });
-              lastBetRef.current = 0;
-              postBetBalanceRef.current = null;
-              roundIdRef.current = null;
-            } else if (retries < 50) {
-              retries++;
-              setTimeout(tryCredit, 100);
-            } else {
-              lastBetRef.current = 0;
-              postBetBalanceRef.current = null;
-            }
-          };
-          tryCredit();
+          if (postBetBalanceRef.current !== null && roundIdRef.current) {
+            // Bet response already back — settle immediately.
+            settleWin(iframeMoney);
+          } else {
+            // /bet still in flight; queue the win so betMutation.onSuccess
+            // can settle it once the response (and roundId) arrive.
+            pendingWinIframeMoneyRef.current = iframeMoney;
+          }
         }
         break;
       case "game_exit":
         navigate("/");
         break;
     }
-  }, [betMutation, winMutation, navigate, trySendBalance]);
+  }, [betMutation, winMutation, navigate, trySendBalance, settleWin]);
 
   useEffect(() => {
     window.addEventListener("message", handleMessage);

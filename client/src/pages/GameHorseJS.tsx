@@ -33,6 +33,19 @@ export default function GameHorseJS() {
   const postBetBalanceRef = useRef<number | null>(null);
   const lastBetRef = useRef(0);
   const roundIdRef = useRef<string | null>(null);
+  // If win_result arrives before /bet responds, stash the winAmount here so
+  // betMutation.onSuccess can settle it (instead of relying on a 5s poll
+  // that occasionally drops wins under DB load).
+  const pendingWinAmountRef = useRef<number | null>(null);
+
+  const settleWin = useCallback((winAmount: number) => {
+    if (!roundIdRef.current) return;
+    if (winAmount > 0) winMutation.mutate({ winAmount, roundId: roundIdRef.current });
+    lastBetRef.current = 0;
+    roundIdRef.current = null;
+    pendingWinAmountRef.current = null;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const betMutation = useMutation({
     mutationFn: async (data: { bet: number; totBet: number }) => {
@@ -47,10 +60,14 @@ export default function GameHorseJS() {
         "*"
       );
       queryClient.invalidateQueries({ queryKey: ["/api/user"] });
+      if (pendingWinAmountRef.current !== null) {
+        settleWin(pendingWinAmountRef.current);
+      }
     },
     onError: () => {
       lastBetRef.current = 0;
       postBetBalanceRef.current = null;
+      pendingWinAmountRef.current = null;
     },
   });
 
@@ -103,27 +120,18 @@ export default function GameHorseJS() {
         break;
       case "win_result":
         if (lastBetRef.current > 0 && event.data.winAmount > 0) {
-          // Wait for bet response (roundId) to arrive before settling the win.
-          // Without this gate the win can race ahead of /bet and be rejected
-          // server-side as "Invalid or expired round".
           const winAmount = event.data.winAmount;
-          let retries = 0;
-          const trySettle = () => {
-            if (roundIdRef.current) {
-              winMutation.mutate({ winAmount, roundId: roundIdRef.current });
-              lastBetRef.current = 0;
-              roundIdRef.current = null;
-            } else if (retries < 50) {
-              retries++;
-              setTimeout(trySettle, 100);
-            } else {
-              lastBetRef.current = 0;
-            }
-          };
-          trySettle();
+          if (roundIdRef.current) {
+            settleWin(winAmount);
+          } else {
+            // /bet still in flight — queue the win for betMutation.onSuccess
+            // so it cannot be lost.
+            pendingWinAmountRef.current = winAmount;
+          }
         } else if (lastBetRef.current > 0) {
           lastBetRef.current = 0;
           roundIdRef.current = null;
+          pendingWinAmountRef.current = null;
         }
         break;
       case "save_score":
@@ -132,7 +140,7 @@ export default function GameHorseJS() {
         navigate("/");
         break;
     }
-  }, [betMutation, winMutation, navigate]);
+  }, [betMutation, winMutation, navigate, settleWin]);
 
   useEffect(() => {
     window.addEventListener("message", handleMessage);
