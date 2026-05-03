@@ -3,7 +3,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Maximize, Minimize } from "lucide-react";
+import { ArrowLeft, Maximize, Minimize, RefreshCw } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import type { User } from "@shared/schema";
 
@@ -32,14 +32,16 @@ export default function GameHorseJS() {
 
   const postBetBalanceRef = useRef<number | null>(null);
   const lastBetRef = useRef(0);
+  const roundIdRef = useRef<string | null>(null);
 
   const betMutation = useMutation({
     mutationFn: async (data: { bet: number; totBet: number }) => {
       const res = await apiRequest("POST", "/api/games/horse-js/bet", data);
       return res.json();
     },
-    onSuccess: (data: { balance: number; forceLose?: boolean }) => {
+    onSuccess: (data: { balance: number; forceLose?: boolean; roundId?: string }) => {
       postBetBalanceRef.current = data.balance;
+      roundIdRef.current = data.roundId ?? null;
       iframeRef.current?.contentWindow?.postMessage(
         { type: "set_force_lose", forceLose: !!data.forceLose },
         "*"
@@ -53,7 +55,7 @@ export default function GameHorseJS() {
   });
 
   const winMutation = useMutation({
-    mutationFn: async (data: { winAmount: number }) => {
+    mutationFn: async (data: { winAmount: number; roundId: string | null }) => {
       const res = await apiRequest("POST", "/api/games/horse-js/win", data);
       return res.json();
     },
@@ -101,10 +103,27 @@ export default function GameHorseJS() {
         break;
       case "win_result":
         if (lastBetRef.current > 0 && event.data.winAmount > 0) {
-          winMutation.mutate({ winAmount: event.data.winAmount });
-          lastBetRef.current = 0;
+          // Wait for bet response (roundId) to arrive before settling the win.
+          // Without this gate the win can race ahead of /bet and be rejected
+          // server-side as "Invalid or expired round".
+          const winAmount = event.data.winAmount;
+          let retries = 0;
+          const trySettle = () => {
+            if (roundIdRef.current) {
+              winMutation.mutate({ winAmount, roundId: roundIdRef.current });
+              lastBetRef.current = 0;
+              roundIdRef.current = null;
+            } else if (retries < 50) {
+              retries++;
+              setTimeout(trySettle, 100);
+            } else {
+              lastBetRef.current = 0;
+            }
+          };
+          trySettle();
         } else if (lastBetRef.current > 0) {
           lastBetRef.current = 0;
+          roundIdRef.current = null;
         }
         break;
       case "save_score":
@@ -139,6 +158,18 @@ export default function GameHorseJS() {
 
   useEffect(() => { if (document.fullscreenElement) setIsFullscreen(true); }, []);
 
+  const handleRefresh = useCallback(async () => {
+    await queryClient.invalidateQueries({ queryKey: ["/api/user"] });
+    const fresh = await queryClient.fetchQuery<User>({ queryKey: ["/api/user"] });
+    if (fresh && iframeRef.current?.contentWindow) {
+      iframeRef.current.contentWindow.postMessage(
+        { type: "sync_balance", balance: fresh.balance },
+        "*"
+      );
+      toast({ title: "Balance refreshed", description: `${fresh.balance.toLocaleString()} UGX` });
+    }
+  }, [toast]);
+
   return (
     <div ref={containerRef} className="relative bg-black" style={{ height: "100vh", overflow: "hidden" }}>
       {!isFullscreen && (
@@ -151,6 +182,9 @@ export default function GameHorseJS() {
             <span className="text-[#D4AF37] font-bold text-sm" data-testid="text-balance">
               Balance: {(user?.balance ?? 0).toLocaleString()} UGX
             </span>
+            <Button variant="ghost" size="icon" onClick={handleRefresh} className="text-[#D4AF37]" data-testid="button-refresh-balance" title="Refresh balance">
+              <RefreshCw className="w-5 h-5" />
+            </Button>
             <Button variant="ghost" size="icon" onClick={toggleFullscreen} className="text-[#D4AF37]" data-testid="button-fullscreen">
               <Maximize className="w-5 h-5" />
             </Button>

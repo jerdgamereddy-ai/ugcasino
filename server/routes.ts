@@ -31,6 +31,20 @@ export async function registerRoutes(
   const lockedBetAmountMap = new Map<string, number>();
   const lossKey = (userId: number, gameType: string) => `${userId}:${gameType}`;
 
+  // Pending rounds for split bet/win games. Each /bet mints a roundId that the
+  // matching /win must present; this prevents settling a win without a bet,
+  // settling the same bet twice, or claiming a payout larger than bet × maxOdds.
+  type PendingRound = { userId: number; gameType: string; betAmount: number; maxOdds: number; createdAt: number };
+  const pendingRoundsMap = new Map<string, PendingRound>();
+  const newRoundId = () => randomBytes(12).toString("hex");
+  // Stale-round purge (10 min TTL).
+  setInterval(() => {
+    const cutoff = Date.now() - 10 * 60 * 1000;
+    for (const [id, r] of Array.from(pendingRoundsMap.entries())) {
+      if (r.createdAt < cutoff) pendingRoundsMap.delete(id);
+    }
+  }, 60 * 1000).unref?.();
+
   // Single-call helper: records the bet, then validates the intended win against
   // house-edge & high-bet protection. Returns the actually-paid win amount.
   async function processCombinedBetAndWin(
@@ -916,23 +930,39 @@ export async function registerRoutes(
       const dogExtra = (() => { try { return dogSettings?.extraSettings ? JSON.parse(dogSettings.extraSettings) : {}; } catch { return {}; } })();
       const dogMaxOdds = Math.max(...((dogExtra.odds as number[]) ?? [3.7, 5.5, 2.2, 11.75, 17.25, 8.75]));
       const forceLose = await computeForceLose("dog-racing", req.user.id, totBet * dogMaxOdds);
+      const roundId = newRoundId();
+      pendingRoundsMap.set(roundId, { userId: req.user.id, gameType: "dog-racing", betAmount: totBet, maxOdds: dogMaxOdds, createdAt: Date.now() });
       const user = await storage.getUser(req.user.id);
-      res.json({ balance: user?.balance ?? 0, forceLose });
+      res.json({ balance: user?.balance ?? 0, forceLose, roundId });
     } catch (err) { res.status(500).json({ message: "Internal Server Error" }); }
   });
 
   app.post("/api/games/dog-racing/win", async (req, res) => {
     if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
     try {
-      const { winAmount } = z.object({ winAmount: z.number().min(0).max(50000000) }).parse(req.body);
-      const finalWin = await applyHouseEdgeForWin("dog-racing", req.user.id, winAmount);
+      const { winAmount, roundId } = z.object({
+        winAmount: z.number().min(0).max(50000000),
+        roundId: z.string().min(1).nullable().optional(),
+      }).parse(req.body);
+      // Server-side validation: a /win MUST reference a /bet from this user
+      // for this game, and cannot exceed bet × maxOdds.
+      const round = roundId ? pendingRoundsMap.get(roundId) : undefined;
+      if (!round || round.userId !== req.user.id || round.gameType !== "dog-racing") {
+        return res.status(400).json({ message: "Invalid or expired round" });
+      }
+      pendingRoundsMap.delete(roundId!);
+      const cappedWin = Math.min(winAmount, Math.floor(round.betAmount * round.maxOdds));
+      const finalWin = await applyHouseEdgeForWin("dog-racing", req.user.id, cappedWin);
       if (finalWin > 0) {
         await storage.updateUserBalance(req.user.id, finalWin);
         await storage.createTransaction({ userId: req.user.id, amount: finalWin, type: "win", description: "Greyhound Racing win" });
       }
       const user = await storage.getUser(req.user.id);
       res.json({ balance: user?.balance ?? 0, blocked: winAmount > 0 && finalWin === 0 });
-    } catch (err) { res.status(500).json({ message: "Internal Server Error" }); }
+    } catch (err) {
+      if (err instanceof z.ZodError) return res.status(400).json({ message: "Invalid request", errors: err.errors });
+      res.status(500).json({ message: "Internal Server Error" });
+    }
   });
 
   // === HORSE4 RACING GAME ===
@@ -985,23 +1015,37 @@ export async function registerRoutes(
       const h4Extra = (() => { try { return h4Settings?.extraSettings ? JSON.parse(h4Settings.extraSettings) : {}; } catch { return {}; } })();
       const h4MaxOdds = Math.max(...((h4Extra.odds as number[]) ?? [3.7, 5.5, 2.2, 11.75, 17.25, 8.75, 7.15, 6.15]));
       const forceLose = await computeForceLose("horse4", req.user.id, totBet * h4MaxOdds);
+      const roundId = newRoundId();
+      pendingRoundsMap.set(roundId, { userId: req.user.id, gameType: "horse4", betAmount: totBet, maxOdds: h4MaxOdds, createdAt: Date.now() });
       const user = await storage.getUser(req.user.id);
-      res.json({ balance: user?.balance ?? 0, forceLose });
+      res.json({ balance: user?.balance ?? 0, forceLose, roundId });
     } catch (err) { res.status(500).json({ message: "Internal Server Error" }); }
   });
 
   app.post("/api/games/horse4/win", async (req, res) => {
     if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
     try {
-      const { winAmount } = z.object({ winAmount: z.number().min(0).max(50000000) }).parse(req.body);
-      const finalWin = await applyHouseEdgeForWin("horse4", req.user.id, winAmount);
+      const { winAmount, roundId } = z.object({
+        winAmount: z.number().min(0).max(50000000),
+        roundId: z.string().min(1).nullable().optional(),
+      }).parse(req.body);
+      const round = roundId ? pendingRoundsMap.get(roundId) : undefined;
+      if (!round || round.userId !== req.user.id || round.gameType !== "horse4") {
+        return res.status(400).json({ message: "Invalid or expired round" });
+      }
+      pendingRoundsMap.delete(roundId!);
+      const cappedWin = Math.min(winAmount, Math.floor(round.betAmount * round.maxOdds));
+      const finalWin = await applyHouseEdgeForWin("horse4", req.user.id, cappedWin);
       if (finalWin > 0) {
         await storage.updateUserBalance(req.user.id, finalWin);
         await storage.createTransaction({ userId: req.user.id, amount: finalWin, type: "win", description: "Horse4 Racing win" });
       }
       const user = await storage.getUser(req.user.id);
       res.json({ balance: user?.balance ?? 0, blocked: winAmount > 0 && finalWin === 0 });
-    } catch (err) { res.status(500).json({ message: "Internal Server Error" }); }
+    } catch (err) {
+      if (err instanceof z.ZodError) return res.status(400).json({ message: "Invalid request", errors: err.errors });
+      res.status(500).json({ message: "Internal Server Error" });
+    }
   });
 
   // === HORSE-JS RACING GAME (simple 4-horse) ===
@@ -1058,23 +1102,37 @@ export async function registerRoutes(
       const hjExtra = (() => { try { return hjSettings?.extraSettings ? JSON.parse(hjSettings.extraSettings) : {}; } catch { return {}; } })();
       const hjMaxOdds = Math.max(...((hjExtra.odds as number[]) ?? [2.0, 2.5, 3.0, 3.5]));
       const forceLose = await computeForceLose("horse-js", req.user.id, totBet * hjMaxOdds);
+      const roundId = newRoundId();
+      pendingRoundsMap.set(roundId, { userId: req.user.id, gameType: "horse-js", betAmount: totBet, maxOdds: hjMaxOdds, createdAt: Date.now() });
       const user = await storage.getUser(req.user.id);
-      res.json({ balance: user?.balance ?? 0, forceLose });
+      res.json({ balance: user?.balance ?? 0, forceLose, roundId });
     } catch (err) { res.status(500).json({ message: "Internal Server Error" }); }
   });
 
   app.post("/api/games/horse-js/win", async (req, res) => {
     if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
     try {
-      const { winAmount } = z.object({ winAmount: z.number().min(0).max(50000000) }).parse(req.body);
-      const finalWin = await applyHouseEdgeForWin("horse-js", req.user.id, winAmount);
+      const { winAmount, roundId } = z.object({
+        winAmount: z.number().min(0).max(50000000),
+        roundId: z.string().min(1).nullable().optional(),
+      }).parse(req.body);
+      const round = roundId ? pendingRoundsMap.get(roundId) : undefined;
+      if (!round || round.userId !== req.user.id || round.gameType !== "horse-js") {
+        return res.status(400).json({ message: "Invalid or expired round" });
+      }
+      pendingRoundsMap.delete(roundId!);
+      const cappedWin = Math.min(winAmount, Math.floor(round.betAmount * round.maxOdds));
+      const finalWin = await applyHouseEdgeForWin("horse-js", req.user.id, cappedWin);
       if (finalWin > 0) {
         await storage.updateUserBalance(req.user.id, finalWin);
         await storage.createTransaction({ userId: req.user.id, amount: finalWin, type: "win", description: "Horse Racing win" });
       }
       const user = await storage.getUser(req.user.id);
       res.json({ balance: user?.balance ?? 0, blocked: winAmount > 0 && finalWin === 0 });
-    } catch (err) { res.status(500).json({ message: "Internal Server Error" }); }
+    } catch (err) {
+      if (err instanceof z.ZodError) return res.status(400).json({ message: "Invalid request", errors: err.errors });
+      res.status(500).json({ message: "Internal Server Error" });
+    }
   });
 
   // === DICE GAME ===
@@ -1550,13 +1608,23 @@ export async function registerRoutes(
       }
 
       const cashoutMultiplier = Math.min(liveMultiplier, round.crashPoint);
-      const payout = Math.floor(round.bet * cashoutMultiplier);
-      await storage.updateUserBalance(req.user.id, payout);
-      await storage.createTransaction({ userId: req.user.id, amount: payout, type: "win", description: `Aviator: cashed out at ${cashoutMultiplier.toFixed(2)}x (+${payout})` });
-      await storage.recordHouseEdgePayout("aviator", payout).catch(() => {});
+      const intendedPayout = Math.floor(round.bet * cashoutMultiplier);
+      // Apply RTP ceiling so a hot streak can't push (totalPaid / totalBet) past target RTP.
+      // applyHouseEdgeForWin handles the recordHouseEdgePayout call internally.
+      const payout = await applyHouseEdgeForWin("aviator", req.user.id, intendedPayout);
+      if (payout > 0) {
+        await storage.updateUserBalance(req.user.id, payout);
+        await storage.createTransaction({ userId: req.user.id, amount: payout, type: "win", description: `Aviator: cashed out at ${cashoutMultiplier.toFixed(2)}x (+${payout})` });
+      }
 
       const user = await storage.getUser(req.user.id);
-      res.json({ won: true, multiplier: +cashoutMultiplier.toFixed(2), payout, balance: user?.balance ?? 0 });
+      res.json({
+        won: payout > 0,
+        multiplier: +cashoutMultiplier.toFixed(2),
+        payout,
+        blocked: intendedPayout > 0 && payout === 0,
+        balance: user?.balance ?? 0,
+      });
     } catch (err) {
       res.status(500).json({ message: "Internal Server Error" });
     }
