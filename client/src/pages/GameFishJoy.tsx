@@ -5,9 +5,11 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, Maximize, Minimize } from "lucide-react";
 import type { User } from "@shared/schema";
+import { useToast } from "@/hooks/use-toast";
 
 export default function GameFishJoy() {
   const [, navigate] = useLocation();
+  const { toast } = useToast();
   const iframeRef    = useRef<HTMLIFrameElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -29,6 +31,21 @@ export default function GameFishJoy() {
       iframeRef.current?.contentWindow?.postMessage(
         { type: "init_balance", balance: data.balance }, "*"
       );
+    },
+    onError: async (err: Error) => {
+      const bankrollBlocked = /bankroll/i.test(err.message);
+      await queryClient.invalidateQueries({ queryKey: ["/api/user"] });
+      const fresh = await queryClient.fetchQuery<User>({ queryKey: ["/api/user"] });
+      if (fresh) {
+        iframeRef.current?.contentWindow?.postMessage({ type: "init_balance", balance: fresh.balance }, "*");
+      }
+      toast({
+        title: bankrollBlocked ? "Shot too large" : "Shot failed",
+        description: bankrollBlocked
+          ? "Maximum possible payout exceeds the house bankroll. Please lower your bet and try again."
+          : "Your shot could not be placed. Please try again.",
+        variant: "destructive",
+      });
     },
   });
 
