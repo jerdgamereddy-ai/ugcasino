@@ -82,7 +82,9 @@ export interface IStorage {
   getVouchersByCreator(creatorId: number): Promise<Voucher[]>;
 
   getAudioTracks(): Promise<AudioTrack[]>;
+  getAudioTrackByFilename(filename: string): Promise<AudioTrack | undefined>;
   createAudioTrack(data: InsertAudioTrack): Promise<AudioTrack>;
+  backfillAudioTrackData(id: number, data: Buffer): Promise<void>;
   deleteAudioTrack(id: number): Promise<AudioTrack | undefined>;
   countAudioTracks(): Promise<number>;
 }
@@ -513,12 +515,31 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getAudioTracks(): Promise<AudioTrack[]> {
-    return await db.select().from(audioTracks).orderBy(desc(audioTracks.createdAt));
+    // Exclude binary `data` from list responses to keep payload small.
+    return await db.select({
+      id: audioTracks.id,
+      filename: audioTracks.filename,
+      originalName: audioTracks.originalName,
+      mimeType: audioTracks.mimeType,
+      size: audioTracks.size,
+      uploadedBy: audioTracks.uploadedBy,
+      data: sql<Buffer | null>`NULL`.as("data"),
+      createdAt: audioTracks.createdAt,
+    }).from(audioTracks).orderBy(desc(audioTracks.createdAt));
+  }
+
+  async getAudioTrackByFilename(filename: string): Promise<AudioTrack | undefined> {
+    const [track] = await db.select().from(audioTracks).where(eq(audioTracks.filename, filename));
+    return track;
   }
 
   async createAudioTrack(data: InsertAudioTrack): Promise<AudioTrack> {
     const [track] = await db.insert(audioTracks).values(data).returning();
     return track;
+  }
+
+  async backfillAudioTrackData(id: number, data: Buffer): Promise<void> {
+    await db.update(audioTracks).set({ data }).where(eq(audioTracks.id, id));
   }
 
   async deleteAudioTrack(id: number): Promise<AudioTrack | undefined> {

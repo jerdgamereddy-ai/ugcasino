@@ -1,4 +1,4 @@
-import { pgTable, text, serial, integer, boolean, timestamp, varchar, doublePrecision } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, boolean, timestamp, varchar, doublePrecision, customType } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 import { relations } from "drizzle-orm";
@@ -110,6 +110,11 @@ export const audioTracks = pgTable("audio_tracks", {
   mimeType: text("mime_type").notNull(),
   size: integer("size").notNull(),
   uploadedBy: integer("uploaded_by").notNull(),
+  // Binary content stored in DB so audio survives deployments (filesystem
+  // uploads are wiped on each deploy build). Nullable for legacy rows.
+  data: customType<{ data: Buffer; notNull: false; default: false }>({
+    dataType() { return "bytea"; },
+  })("data"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 

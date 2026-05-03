@@ -2476,13 +2476,26 @@ export async function registerRoutes(
     },
   });
 
-  app.use("/uploads/audio", (req, res, next) => {
+  app.use("/uploads/audio", async (req, res) => {
     res.setHeader("Cache-Control", "public, max-age=86400");
-    next();
-  }, (req, res, next) => {
-    const filePath = path.join(AUDIO_UPLOAD_DIR, path.basename(req.path));
-    if (fs.existsSync(filePath)) res.sendFile(filePath);
-    else res.status(404).send("Not found");
+    const filename = path.basename(req.path);
+    const filePath = path.join(AUDIO_UPLOAD_DIR, filename);
+    // Prefer filesystem (fast, supports range requests) but fall back to the
+    // DB-stored binary so deployed environments (where /uploads is wiped on
+    // each build) can still serve audio.
+    if (fs.existsSync(filePath)) {
+      res.sendFile(filePath);
+      return;
+    }
+    try {
+      const track = await storage.getAudioTrackByFilename(filename);
+      if (!track || !track.data) return res.status(404).send("Not found");
+      res.setHeader("Content-Type", track.mimeType || "audio/mpeg");
+      res.setHeader("Content-Length", String(track.data.length));
+      res.send(track.data);
+    } catch {
+      res.status(500).send("Internal Server Error");
+    }
   });
 
   app.get("/api/audio", async (req, res) => {
@@ -2501,14 +2514,21 @@ export async function registerRoutes(
       if (err) return res.status(400).json({ message: err.message || "Upload failed" });
       if (!req.file) return res.status(400).json({ message: "No file provided" });
       try {
+        // Read the uploaded file into memory so we can also persist it in the
+        // database. This is what allows audio to survive Replit deployments,
+        // where /uploads is rebuilt fresh on each deploy.
+        const buffer = await fs.promises.readFile(req.file.path);
         const track = await storage.createAudioTrack({
           filename: req.file.filename,
           originalName: req.file.originalname,
           mimeType: req.file.mimetype,
           size: req.file.size,
           uploadedBy: req.user.id,
+          data: buffer,
         });
-        res.json(track);
+        // Don't ship the binary back to the admin client.
+        const { data: _omit, ...rest } = track as any;
+        res.json(rest);
       } catch {
         fs.unlink(req.file.path, () => {});
         res.status(500).json({ message: "Internal Server Error" });

@@ -58,17 +58,19 @@ export default function GlobalMusicPlayer() {
     const list = trackListRef.current;
     if (list.length === 0) return;
     if (list.length === 1) { playTrack(0); return; }
-    const next = pickRandom(currentIdxRef.current, list.length);
+    const cur = currentIdxRef.current;
+    const next = cur < 0 ? 0 : (cur + 1) % list.length;
     playTrack(next);
-  }, [pickRandom, playTrack]);
+  }, [playTrack]);
 
   const playPrev = useCallback(() => {
     const list = trackListRef.current;
     if (list.length === 0) return;
     if (list.length === 1) { playTrack(0); return; }
-    const prev = pickRandom(currentIdxRef.current, list.length);
+    const cur = currentIdxRef.current;
+    const prev = cur <= 0 ? list.length - 1 : cur - 1;
     playTrack(prev);
-  }, [pickRandom, playTrack]);
+  }, [playTrack]);
 
   const togglePlayPause = useCallback(() => {
     const audio = audioRef.current;
@@ -85,6 +87,11 @@ export default function GlobalMusicPlayer() {
     }
   }, [playing, playTrack]);
 
+  // Track consecutive playback failures so we don't end up in an infinite
+  // pause/play retry loop when audio files 404 (e.g. broken deploy).
+  const errorCountRef = useRef(0);
+  const MAX_PLAY_ERRORS = 3;
+
   useEffect(() => {
     const el = new Audio();
     el.preload = "auto";
@@ -93,22 +100,33 @@ export default function GlobalMusicPlayer() {
     const onEnded = () => {
       const list = trackListRef.current;
       if (list.length === 0) { setPlaying(false); return; }
+      errorCountRef.current = 0;
       if (list.length === 1) {
         // Loop single track
         try { el.currentTime = 0; } catch {}
         el.play().then(() => setPlaying(true)).catch(() => setPlaying(false));
         return;
       }
-      const next = pickRandom(currentIdxRef.current, list.length);
-      if (next >= 0) playTrack(next);
-      else setPlaying(false);
+      const cur = currentIdxRef.current;
+      const next = cur < 0 ? 0 : (cur + 1) % list.length;
+      playTrack(next);
     };
     const onError = () => {
       const list = trackListRef.current;
       if (list.length === 0) return;
-      const next = list.length === 1 ? 0 : pickRandom(currentIdxRef.current, list.length);
+      errorCountRef.current += 1;
+      // After MAX_PLAY_ERRORS consecutive failures, give up so we don't churn
+      // the play/pause UI in a deploy that's missing its audio files.
+      if (errorCountRef.current >= MAX_PLAY_ERRORS) {
+        setPlaying(false);
+        return;
+      }
+      // Try the *next* track on error rather than re-trying the broken one.
+      const cur = currentIdxRef.current;
+      const next = list.length === 1 ? 0 : (cur < 0 ? 0 : (cur + 1) % list.length);
       setTimeout(() => playTrack(next), 1500);
     };
+    const onPlaying = () => { errorCountRef.current = 0; };
     const onPlay = () => setPlaying(true);
     const onPause = () => setPlaying(false);
 
@@ -116,16 +134,18 @@ export default function GlobalMusicPlayer() {
     el.addEventListener("error", onError);
     el.addEventListener("play", onPlay);
     el.addEventListener("pause", onPause);
+    el.addEventListener("playing", onPlaying);
 
     return () => {
       el.removeEventListener("ended", onEnded);
       el.removeEventListener("error", onError);
       el.removeEventListener("play", onPlay);
       el.removeEventListener("pause", onPause);
+      el.removeEventListener("playing", onPlaying);
       el.pause();
       audioRef.current = null;
     };
-  }, [pickRandom, playTrack]);
+  }, [playTrack]);
 
   useEffect(() => {
     if (!started && tracks.length > 0) {

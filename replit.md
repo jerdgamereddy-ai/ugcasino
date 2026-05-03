@@ -58,6 +58,12 @@ Preferred communication style: Simple, everyday language.
 - **PostgreSQL**: Main database.
 - **connect-pg-simple**: For PostgreSQL session storage.
 
+### Background Music Player (`GlobalMusicPlayer`)
+- Audio binaries are stored as `bytea` in `audio_tracks.data` so the music survives Replit deploys (the `/uploads` folder is rebuilt on each deploy and would otherwise lose all tracks).
+- `/uploads/audio/:filename` serves the file from disk first (fast path) and falls back to the DB blob otherwise. Upload writes to both disk and DB.
+- Player has a 3-strike consecutive-error cap on the `error` event so a missing/404 audio file no longer ping-pongs the play/pause UI in an infinite retry loop. The `playing` event resets the counter on successful playback.
+- Prev/Next buttons are sequential (`(idx ± 1) mod len`), not random.
+
 ### Frontend Libraries
 - **@tanstack/react-query**: Server state management.
 - **framer-motion**: Animations.
