@@ -219,7 +219,7 @@ export default function CoinFlip() {
               <Button
                 disabled={isFlipping}
                 onClick={() => play("heads")}
-                className="h-20 text-xl font-bold uppercase tracking-widest bg-zinc-800 hover:bg-zinc-700 border border-white/10"
+                className="h-20 text-2xl font-black uppercase tracking-widest text-black bg-gradient-to-b from-yellow-300 via-amber-400 to-yellow-600 hover:from-yellow-200 hover:via-amber-300 hover:to-yellow-500 border-2 border-yellow-200 shadow-[0_0_30px_rgba(212,175,55,0.7)] hover:shadow-[0_0_40px_rgba(212,175,55,0.95)] transition-all"
                 data-testid="button-heads"
               >
                 Heads
@@ -227,7 +227,7 @@ export default function CoinFlip() {
               <Button
                 disabled={isFlipping}
                 onClick={() => play("tails")}
-                className="h-20 text-xl font-bold uppercase tracking-widest bg-zinc-800 hover:bg-zinc-700 border border-white/10"
+                className="h-20 text-2xl font-black uppercase tracking-widest text-white bg-gradient-to-b from-rose-500 via-red-600 to-rose-800 hover:from-rose-400 hover:via-red-500 hover:to-rose-700 border-2 border-rose-300 shadow-[0_0_30px_rgba(244,63,94,0.7)] hover:shadow-[0_0_40px_rgba(244,63,94,0.95)] transition-all"
                 data-testid="button-tails"
               >
                 Tails
