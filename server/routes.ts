@@ -69,6 +69,21 @@ export async function registerRoutes(
     return false;
   }
 
+  // Pre-bet bankroll guard: if the universal house edge is enabled with a
+  // minimum-bankroll floor, refuse a bet whose maximum possible payout would
+  // drop the combined house bankroll below that floor. This stops the player
+  // from seeing a "win" animation that the server would later have to void.
+  async function checkBankrollFloorForBet(maxPotentialWin: number): Promise<{ blocked: boolean; bankroll?: number; floor?: number }> {
+    let u;
+    try { u = await storage.getUniversalHouseEdge(); } catch { return { blocked: false }; }
+    if (!u.enabled || u.minHouseBalance <= 0) return { blocked: false };
+    const bankroll = await storage.getHouseBankroll().catch(() => 0);
+    if (bankroll - maxPotentialWin < u.minHouseBalance) {
+      return { blocked: true, bankroll, floor: u.minHouseBalance };
+    }
+    return { blocked: false };
+  }
+
   async function recordBet(gameType: string, betAmount: number) {
     if (betAmount <= 0) return;
     await storage.recordHouseEdgeBet(gameType, betAmount).catch(() => {});
@@ -1063,12 +1078,16 @@ export async function registerRoutes(
     try {
       const { totBet } = z.object({ bet: z.number().min(1), totBet: z.number().min(1) }).parse(req.body);
       if (req.user.balance < totBet) return res.status(400).json({ message: "Insufficient balance" });
+      const dogSettingsPre = await storage.getGameSettings("dog-racing");
+      const dogExtraPre = (() => { try { return dogSettingsPre?.extraSettings ? JSON.parse(dogSettingsPre.extraSettings) : {}; } catch { return {}; } })();
+      const dogMaxOdds = Math.max(...((dogExtraPre.odds as number[]) ?? [3.7, 5.5, 2.2, 11.75, 17.25, 8.75]));
+      const dogGuard = await checkBankrollFloorForBet(totBet * dogMaxOdds);
+      if (dogGuard.blocked) {
+        return res.status(400).json({ message: "Bet too large — maximum possible payout exceeds the house bankroll. Please lower your bet.", bankrollBlocked: true });
+      }
       await storage.updateUserBalance(req.user.id, -totBet);
       await storage.createTransaction({ userId: req.user.id, amount: -totBet, type: "bet", description: "Greyhound Racing bet" });
       await recordBetAndCheckHighBet("dog-racing", req.user.id, totBet);
-      const dogSettings = await storage.getGameSettings("dog-racing");
-      const dogExtra = (() => { try { return dogSettings?.extraSettings ? JSON.parse(dogSettings.extraSettings) : {}; } catch { return {}; } })();
-      const dogMaxOdds = Math.max(...((dogExtra.odds as number[]) ?? [3.7, 5.5, 2.2, 11.75, 17.25, 8.75]));
       const forceLose = await computeForceLose("dog-racing", req.user.id, totBet * dogMaxOdds);
       const roundId = newRoundId();
       pendingRoundsMap.set(roundId, { userId: req.user.id, gameType: "dog-racing", betAmount: totBet, maxOdds: dogMaxOdds, createdAt: Date.now() });
@@ -1150,12 +1169,16 @@ export async function registerRoutes(
     try {
       const { totBet } = z.object({ bet: z.number().min(1), totBet: z.number().min(1) }).parse(req.body);
       if (req.user.balance < totBet) return res.status(400).json({ message: "Insufficient balance" });
-      await storage.updateUserBalance(req.user.id, -totBet);
-      await storage.createTransaction({ userId: req.user.id, amount: -totBet, type: "bet", description: "Horse4 Racing bet" });
-      await recordBetAndCheckHighBet("horse4", req.user.id, totBet);
       const h4Settings = await storage.getGameSettings("horse4");
       const h4Extra = (() => { try { return h4Settings?.extraSettings ? JSON.parse(h4Settings.extraSettings) : {}; } catch { return {}; } })();
       const h4MaxOdds = Math.max(...((h4Extra.odds as number[]) ?? [3.7, 5.5, 2.2, 11.75, 17.25, 8.75, 7.15, 6.15]));
+      const h4Guard = await checkBankrollFloorForBet(totBet * h4MaxOdds);
+      if (h4Guard.blocked) {
+        return res.status(400).json({ message: "Bet too large — maximum possible payout exceeds the house bankroll. Please lower your bet.", bankrollBlocked: true });
+      }
+      await storage.updateUserBalance(req.user.id, -totBet);
+      await storage.createTransaction({ userId: req.user.id, amount: -totBet, type: "bet", description: "Horse4 Racing bet" });
+      await recordBetAndCheckHighBet("horse4", req.user.id, totBet);
       const forceLose = await computeForceLose("horse4", req.user.id, totBet * h4MaxOdds);
       const roundId = newRoundId();
       pendingRoundsMap.set(roundId, { userId: req.user.id, gameType: "horse4", betAmount: totBet, maxOdds: h4MaxOdds, createdAt: Date.now() });
@@ -1239,12 +1262,16 @@ export async function registerRoutes(
     try {
       const { totBet } = z.object({ bet: z.number().min(500), totBet: z.number().min(500) }).parse(req.body);
       if (req.user.balance < totBet) return res.status(400).json({ message: "Insufficient balance" });
-      await storage.updateUserBalance(req.user.id, -totBet);
-      await storage.createTransaction({ userId: req.user.id, amount: -totBet, type: "bet", description: "Horse Racing bet" });
-      await recordBetAndCheckHighBet("horse-js", req.user.id, totBet);
       const hjSettings = await storage.getGameSettings("horse-js");
       const hjExtra = (() => { try { return hjSettings?.extraSettings ? JSON.parse(hjSettings.extraSettings) : {}; } catch { return {}; } })();
       const hjMaxOdds = Math.max(...((hjExtra.odds as number[]) ?? [2.0, 2.5, 3.0, 3.5]));
+      const hjGuard = await checkBankrollFloorForBet(totBet * hjMaxOdds);
+      if (hjGuard.blocked) {
+        return res.status(400).json({ message: "Bet too large — maximum possible payout exceeds the house bankroll. Please lower your bet.", bankrollBlocked: true });
+      }
+      await storage.updateUserBalance(req.user.id, -totBet);
+      await storage.createTransaction({ userId: req.user.id, amount: -totBet, type: "bet", description: "Horse Racing bet" });
+      await recordBetAndCheckHighBet("horse-js", req.user.id, totBet);
       const forceLose = await computeForceLose("horse-js", req.user.id, totBet * hjMaxOdds);
       const roundId = newRoundId();
       pendingRoundsMap.set(roundId, { userId: req.user.id, gameType: "horse-js", betAmount: totBet, maxOdds: hjMaxOdds, createdAt: Date.now() });

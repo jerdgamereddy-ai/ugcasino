@@ -64,10 +64,23 @@ export default function GameHorseJS() {
         settleWin(pendingWinAmountRef.current);
       }
     },
-    onError: () => {
+    onError: async (err: Error) => {
       lastBetRef.current = 0;
       postBetBalanceRef.current = null;
       pendingWinAmountRef.current = null;
+      const bankrollBlocked = /bankroll/i.test(err.message);
+      await queryClient.invalidateQueries({ queryKey: ["/api/user"] });
+      const fresh = await queryClient.fetchQuery<User>({ queryKey: ["/api/user"] });
+      if (fresh) {
+        iframeRef.current?.contentWindow?.postMessage({ type: "sync_balance", balance: fresh.balance }, "*");
+      }
+      toast({
+        title: bankrollBlocked ? "Bet too large" : "Bet failed",
+        description: bankrollBlocked
+          ? "Maximum possible payout exceeds the house bankroll. Please lower your bet and try again."
+          : "Your bet could not be placed. Please try again.",
+        variant: "destructive",
+      });
     },
   });
 
