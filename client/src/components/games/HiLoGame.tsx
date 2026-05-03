@@ -9,6 +9,10 @@ import { useToast } from "@/hooks/use-toast";
 import { motion, AnimatePresence } from "framer-motion";
 import { ChevronUp, ChevronDown } from "lucide-react";
 import { playSound } from "@/lib/sounds";
+import titanicKing from "@assets/hilo_titanic_king.png";
+import titanicQueen from "@assets/hilo_titanic_queen.png";
+import titanicJack from "@assets/hilo_titanic_jack.png";
+import titanicBack from "@assets/hilo_titanic_back.png";
 
 type Suit = "spades" | "hearts" | "diamonds" | "clubs";
 
@@ -56,18 +60,16 @@ function PlayingCard({ rank, suit, faceDown }: { rank: number | null; suit: Suit
 
   if (faceDown || rank === null) {
     return (
-      <div className="w-56 h-80 rounded-2xl shadow-2xl bg-gradient-to-br from-blue-900 via-blue-700 to-blue-950 border-4 border-white/90 relative overflow-hidden" data-testid="card-back">
-        <div
-          className="absolute inset-2 rounded-xl border-2 border-yellow-400/60"
-          style={{
-            backgroundImage:
-              "repeating-linear-gradient(45deg, rgba(255,215,0,0.18) 0 8px, transparent 8px 16px), repeating-linear-gradient(-45deg, rgba(255,215,0,0.18) 0 8px, transparent 8px 16px)",
-          }}
+      <div className="w-56 h-80 rounded-2xl shadow-2xl bg-gradient-to-br from-blue-950 via-blue-900 to-black border-4 border-yellow-500/80 relative overflow-hidden" data-testid="card-back">
+        <img
+          src={titanicBack}
+          alt="Titanic"
+          className="absolute inset-0 w-full h-full object-cover"
+          draggable={false}
         />
-        <div className="absolute inset-0 flex items-center justify-center">
-          <div className="w-24 h-24 rounded-full bg-yellow-400/20 border-4 border-yellow-300/80 flex items-center justify-center text-yellow-300 text-5xl font-display font-bold shadow-[0_0_30px_rgba(255,215,0,0.4)]">
-            UG
-          </div>
+        <div className="absolute inset-2 rounded-xl border-2 border-yellow-400/60 pointer-events-none" />
+        <div className="absolute bottom-3 left-0 right-0 text-center">
+          <span className="text-yellow-300 text-xs font-display tracking-[0.3em] uppercase drop-shadow-[0_2px_4px_rgba(0,0,0,0.9)]">Titanic</span>
         </div>
       </div>
     );
@@ -100,11 +102,17 @@ function PlayingCard({ rank, suit, faceDown }: { rank: number | null; suit: Suit
           <span className="text-[8rem] leading-none drop-shadow-md">{glyph}</span>
         </div>
       ) : isFaceCard ? (
-        <div className="absolute inset-8 rounded-xl border-2 border-current/30 flex flex-col items-center justify-center bg-gradient-to-b from-yellow-50 to-yellow-100">
-          <div className={`text-7xl font-display font-bold ${colorClass}`}>{label}</div>
-          <div className="text-4xl mt-1">{glyph}</div>
-          <div className="text-[10px] uppercase tracking-widest mt-2 opacity-60">
-            {label === "K" ? "King" : label === "Q" ? "Queen" : "Jack"}
+        <div className="absolute inset-6 rounded-xl border-2 border-yellow-700/40 overflow-hidden bg-zinc-900">
+          <img
+            src={label === "K" ? titanicKing : label === "Q" ? titanicQueen : titanicJack}
+            alt={label === "K" ? "King" : label === "Q" ? "Queen" : "Jack"}
+            className="absolute inset-0 w-full h-full object-cover"
+            draggable={false}
+          />
+          <div className="absolute inset-x-0 bottom-0 h-10 bg-gradient-to-t from-black/85 to-transparent flex items-end justify-center pb-1.5">
+            <span className="text-yellow-300 text-[11px] uppercase tracking-[0.3em] font-display drop-shadow-[0_1px_2px_rgba(0,0,0,1)]">
+              {label === "K" ? "King" : label === "Q" ? "Queen" : "Jack"}
+            </span>
           </div>
         </div>
       ) : (

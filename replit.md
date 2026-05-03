@@ -15,7 +15,7 @@ Preferred communication style: Simple, everyday language.
 - **UI Components**: Utilizes shadcn/ui built on Radix UI for accessible and customizable components.
 - **Animations**: Framer Motion for dynamic and engaging user interface interactions.
 - **Layout**: Features a clear sidebar navigation and protected routes to manage access.
-- **Visual Polish**: Includes casino-themed visual effects like glowing win-lines, water shimmer overlays, custom 3D dice, and visually rich card graphics for games.
+- **Visual Polish**: Includes casino-themed visual effects like glowing win-lines, water shimmer overlays, custom 3D dice, visually rich card graphics for games, a real 3D coin flip (perspective + preserve-3d with two backface-hidden faces), Titanic-themed Hi-Lo card faces and back, and a spinning propeller overlaid on the Aviator plane's nose.
 - **Customizable Site Background**: Admins can set site-wide backgrounds including colors, gradients, images, and CSS animations (e.g., aurora, casino-neon, gold-rush, starfield).
 
 ### Technical Implementations

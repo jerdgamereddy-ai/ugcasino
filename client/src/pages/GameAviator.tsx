@@ -420,7 +420,7 @@ export default function GameAviator() {
                           <motion.div
                             animate={{ rotate: phase === "flying" ? -18 : 0, y: phase === "flying" ? [0, -3, 0] : 0 }}
                             transition={{ y: { repeat: Infinity, duration: 0.6 } }}
-                            className="origin-center"
+                            className="origin-center relative"
                           >
                             <img
                               src={aviatorPlanePng}
@@ -433,6 +433,73 @@ export default function GameAviator() {
                               className="w-28 md:w-36 h-auto drop-shadow-[0_0_18px_rgba(220,53,69,0.55)]"
                               style={{ pointerEvents: "none" }}
                             />
+                            {/* Spinning propeller overlaid on the plane's nose */}
+                            <div
+                              className="absolute pointer-events-none"
+                              style={{
+                                left: "6%",
+                                top: "50%",
+                                transform: "translate(-50%, -50%)",
+                              }}
+                              data-testid="aviator-propeller"
+                            >
+                              {/* Soft motion-blur disc */}
+                              <div
+                                className="rounded-full"
+                                style={{
+                                  width: "28px",
+                                  height: "28px",
+                                  background:
+                                    "radial-gradient(circle, rgba(255,255,255,0.55) 0%, rgba(255,255,255,0.18) 45%, rgba(255,255,255,0) 70%)",
+                                  filter: "blur(1px)",
+                                }}
+                              />
+                              {/* Spinning blades */}
+                              <div
+                                className="absolute inset-0 flex items-center justify-center"
+                                style={{
+                                  animation:
+                                    phase === "flying"
+                                      ? "aviator-prop 0.08s linear infinite"
+                                      : "aviator-prop 0.4s linear infinite",
+                                }}
+                              >
+                                <div
+                                  style={{
+                                    width: "26px",
+                                    height: "3px",
+                                    background:
+                                      "linear-gradient(90deg, rgba(40,40,40,0.95), rgba(220,220,220,0.95), rgba(40,40,40,0.95))",
+                                    borderRadius: "2px",
+                                    boxShadow: "0 0 4px rgba(0,0,0,0.6)",
+                                    position: "absolute",
+                                  }}
+                                />
+                                <div
+                                  style={{
+                                    width: "26px",
+                                    height: "3px",
+                                    background:
+                                      "linear-gradient(90deg, rgba(40,40,40,0.95), rgba(220,220,220,0.95), rgba(40,40,40,0.95))",
+                                    borderRadius: "2px",
+                                    boxShadow: "0 0 4px rgba(0,0,0,0.6)",
+                                    position: "absolute",
+                                    transform: "rotate(90deg)",
+                                  }}
+                                />
+                                {/* Hub */}
+                                <div
+                                  className="absolute rounded-full"
+                                  style={{
+                                    width: "6px",
+                                    height: "6px",
+                                    background:
+                                      "radial-gradient(circle, #fff 0%, #d4af37 60%, #6b4f00 100%)",
+                                    boxShadow: "0 0 4px rgba(255,215,0,0.8)",
+                                  }}
+                                />
+                              </div>
+                            </div>
                           </motion.div>
                         </motion.div>
                       )}

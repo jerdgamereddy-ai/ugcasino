@@ -123,6 +123,16 @@
     to   { transform: translate(-50%, -50%) rotate(360deg); }
   }
 
+  @keyframes aviator-prop {
+    from { transform: rotate(0deg); }
+    to   { transform: rotate(360deg); }
+  }
+
+  @keyframes coin-flip-3d {
+    0%   { transform: rotateY(0deg) rotateX(0deg); }
+    100% { transform: rotateY(1800deg) rotateX(360deg); }
+  }
+
   @keyframes fishhunt-shimmer {
     0%   { transform: translate3d(0%, 0, 0); }
     100% { transform: translate3d(33.33%, 0, 0); }
