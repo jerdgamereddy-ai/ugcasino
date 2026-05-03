@@ -178,12 +178,12 @@ export default function GlobalMusicPlayer() {
 
   return (
     <div
-      className="fixed bottom-4 right-4 z-[9999] flex flex-col items-end gap-1"
+      className="fixed bottom-4 left-4 z-[9999] flex flex-col items-start gap-1"
       data-testid="global-music-player"
     >
       {!collapsed && (
         <div
-          className="bg-black/90 border border-[#D4AF37]/30 rounded-xl px-3 py-2 text-xs text-white/80 max-w-[260px] text-right shadow-lg"
+          className="bg-black/90 border border-[#D4AF37]/30 rounded-xl px-3 py-2 text-xs text-white/80 max-w-[260px] text-left shadow-lg"
           data-testid="music-track-name"
         >
           <div className="text-[#D4AF37] font-semibold mb-1 truncate" title={displayName}>
