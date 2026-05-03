@@ -317,7 +317,28 @@ function GameSettingCard({ setting }: { setting: GameSetting }) {
   const isHorse4 = setting.gameType === "horse4";
   const isRoulette = setting.gameType === "roulette";
   const isDogRacing = setting.gameType === "dog-racing";
+  const isPlinko = setting.gameType === "plinko";
+  const isWheel = setting.gameType === "wheel";
+  const PLINKO_DEFAULTS = [0.2, 0.5, 1.2, 2, 5, 2, 1.2, 0.5, 0.2];
+  const WHEEL_DEFAULTS = [0, 0.5, 0, 1, 0, 1.5, 0, 2, 0, 0.5, 0, 3, 0, 1, 5, 10];
   const extraParsed = (() => { try { return setting.extraSettings ? JSON.parse(setting.extraSettings) : {}; } catch { return {}; } })();
+  const [plinkoMults, setPlinkoMults] = useState<number[]>(
+    Array.isArray(extraParsed.multipliers) && extraParsed.multipliers.length === 9 ? extraParsed.multipliers : PLINKO_DEFAULTS
+  );
+  const [wheelMults, setWheelMults] = useState<number[]>(
+    Array.isArray(extraParsed.multipliers) && extraParsed.multipliers.length === 16 ? extraParsed.multipliers : WHEEL_DEFAULTS
+  );
+  // Re-sync from server payload whenever extraSettings changes (e.g. after a refetch
+  // or after the admin saves on a different tab) so the inputs don't show stale values.
+  useEffect(() => {
+    if (isPlinko && Array.isArray(extraParsed.multipliers) && extraParsed.multipliers.length === 9) {
+      setPlinkoMults(extraParsed.multipliers);
+    }
+    if (isWheel && Array.isArray(extraParsed.multipliers) && extraParsed.multipliers.length === 16) {
+      setWheelMults(extraParsed.multipliers);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [setting.extraSettings]);
   const [maxLaps, setMaxLaps] = useState<number>(extraParsed.maxLaps ?? 1);
   const defaultPlaceFor = (arr: number[]) => arr.map(o => Math.max(1.05, +(o * 0.45).toFixed(2)));
   const defaultShowFor = (arr: number[]) => arr.map(o => Math.max(1.02, +(o * 0.25).toFixed(2)));
@@ -455,6 +476,38 @@ function GameSettingCard({ setting }: { setting: GameSetting }) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [api.games.settings.get.path] });
       toast({ title: "Roulette Updated", description: "Roulette odds saved." });
+    },
+  });
+
+  const plinkoMutation = useMutation({
+    mutationFn: async () => {
+      const res = await fetch("/api/games/plinko/settings", {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ multipliers: plinkoMults }),
+      });
+      if (!res.ok) throw new Error("Failed to update plinko multipliers");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [api.games.settings.get.path] });
+      queryClient.invalidateQueries({ queryKey: ["/api/games/plinko/settings"] });
+      toast({ title: "Plinko Updated", description: "Slot multipliers saved." });
+    },
+  });
+
+  const wheelMutation = useMutation({
+    mutationFn: async () => {
+      const res = await fetch("/api/games/wheel/settings", {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ multipliers: wheelMults }),
+      });
+      if (!res.ok) throw new Error("Failed to update wheel multipliers");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [api.games.settings.get.path] });
+      queryClient.invalidateQueries({ queryKey: ["/api/games/wheel/settings"] });
+      toast({ title: "Wheel Updated", description: "Segment multipliers saved." });
     },
   });
 
@@ -708,6 +761,43 @@ function GameSettingCard({ setting }: { setting: GameSetting }) {
               data-testid="button-save-roulette-odds"
             >
               {rouletteMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save Roulette Odds"}
+            </Button>
+          </div>
+        )}
+        {isPlinko && (
+          <div className="border-t border-white/10 pt-4 space-y-3">
+            <label className="text-xs text-muted-foreground font-semibold">Plinko Slot Multipliers (9 slots, left → right)</label>
+            <div className="grid grid-cols-9 gap-1">
+              {plinkoMults.map((m, i) => (
+                <Input key={i} type="number" min={0} max={1000} step={0.1} value={m}
+                  onChange={(e) => { const u=[...plinkoMults]; u[i]=Math.max(0, parseFloat(e.target.value)||0); setPlinkoMults(u); }}
+                  className="font-mono text-xs text-center bg-white/5 border-white/10 h-9 px-1"
+                  data-testid={`input-plinko-mult-${i}`} />
+              ))}
+            </div>
+            <p className="text-[10px] text-muted-foreground italic">Outer slots = miss / low. Center slots = win. Set 0 for instant loss on that slot.</p>
+            <Button className="w-full" size="sm" variant="secondary" onClick={() => plinkoMutation.mutate()} disabled={plinkoMutation.isPending} data-testid="button-save-plinko-mults">
+              {plinkoMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save Plinko Multipliers"}
+            </Button>
+          </div>
+        )}
+        {isWheel && (
+          <div className="border-t border-white/10 pt-4 space-y-3">
+            <label className="text-xs text-muted-foreground font-semibold">Wheel Segment Multipliers (16 segments, clockwise from top)</label>
+            <div className="grid grid-cols-8 gap-1">
+              {wheelMults.map((m, i) => (
+                <div key={i} className="flex flex-col items-center gap-1">
+                  <span className="text-[9px] text-muted-foreground font-mono">#{i+1}</span>
+                  <Input type="number" min={0} max={1000} step={0.5} value={m}
+                    onChange={(e) => { const u=[...wheelMults]; u[i]=Math.max(0, parseFloat(e.target.value)||0); setWheelMults(u); }}
+                    className="font-mono text-xs text-center bg-white/5 border-white/10 h-9 px-1"
+                    data-testid={`input-wheel-mult-${i}`} />
+                </div>
+              ))}
+            </div>
+            <p className="text-[10px] text-muted-foreground italic">Set 0 for a MISS segment. The wheel UI auto-colors segments by payout tier.</p>
+            <Button className="w-full" size="sm" variant="secondary" onClick={() => wheelMutation.mutate()} disabled={wheelMutation.isPending} data-testid="button-save-wheel-mults">
+              {wheelMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save Wheel Multipliers"}
             </Button>
           </div>
         )}

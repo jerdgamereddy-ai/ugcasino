@@ -13,29 +13,33 @@ import { useQuery } from "@tanstack/react-query";
 
 type User = { balance: number };
 
-const SEGMENTS = [
-  { multiplier: 0,   label: "MISS",  color: "#1a1a2e", accent: "#2a2a4e" },
-  { multiplier: 0.5, label: "x0.5",  color: "#6b2fa0", accent: "#8b4fc0" },
-  { multiplier: 0,   label: "MISS",  color: "#1e1e38", accent: "#2e2e58" },
-  { multiplier: 1,   label: "x1",    color: "#1565c0", accent: "#2196f3" },
-  { multiplier: 0,   label: "MISS",  color: "#1a1a2e", accent: "#2a2a4e" },
-  { multiplier: 1.5, label: "x1.5",  color: "#00838f", accent: "#00acc1" },
-  { multiplier: 0,   label: "MISS",  color: "#1e1e38", accent: "#2e2e58" },
-  { multiplier: 2,   label: "x2",    color: "#2e7d32", accent: "#43a047" },
-  { multiplier: 0,   label: "MISS",  color: "#1a1a2e", accent: "#2a2a4e" },
-  { multiplier: 0.5, label: "x0.5",  color: "#6b2fa0", accent: "#8b4fc0" },
-  { multiplier: 0,   label: "MISS",  color: "#1e1e38", accent: "#2e2e58" },
-  { multiplier: 3,   label: "x3",    color: "#e65100", accent: "#ff6d00" },
-  { multiplier: 0,   label: "MISS",  color: "#1a1a2e", accent: "#2a2a4e" },
-  { multiplier: 1,   label: "x1",    color: "#1565c0", accent: "#2196f3" },
-  { multiplier: 5,   label: "x5",    color: "#c62828", accent: "#ef5350" },
-  { multiplier: 10,  label: "x10",   color: "#B8860B", accent: "#FFD700" },
-];
+// Color palette ordered by payout tier so any admin-defined multiplier set
+// gets a sensible visual treatment. 0 → muted indigo (MISS); higher payouts
+// climb through purple → blue → teal → green → orange → red → gold.
+const COLOR_FOR_MULTIPLIER = (m: number): { color: string; accent: string } => {
+  if (m <= 0)    return { color: "#1a1a2e", accent: "#2a2a4e" }; // MISS
+  if (m <= 0.5)  return { color: "#6b2fa0", accent: "#8b4fc0" };
+  if (m <= 1)    return { color: "#1565c0", accent: "#2196f3" };
+  if (m <= 1.5)  return { color: "#00838f", accent: "#00acc1" };
+  if (m <= 2)    return { color: "#2e7d32", accent: "#43a047" };
+  if (m <= 3)    return { color: "#e65100", accent: "#ff6d00" };
+  if (m <= 5)    return { color: "#c62828", accent: "#ef5350" };
+  return            { color: "#B8860B", accent: "#FFD700" };
+};
 
-const TOTAL_SEGMENTS = SEGMENTS.length;
+const DEFAULT_WHEEL_MULTIPLIERS = [0, 0.5, 0, 1, 0, 1.5, 0, 2, 0, 0.5, 0, 3, 0, 1, 5, 10];
+
+const TOTAL_SEGMENTS = 16;
 const SEGMENT_ANGLE = 360 / TOTAL_SEGMENTS;
+type Segment = { multiplier: number; label: string; color: string; accent: string };
+const buildSegments = (mults: number[]): Segment[] => mults.map(m => ({
+  multiplier: m,
+  label: m <= 0 ? "MISS" : `x${m}`,
+  ...COLOR_FOR_MULTIPLIER(m),
+}));
 
-function WheelSVG({ size }: { size: number }) {
+function WheelSVG({ size, segments }: { size: number; segments: Segment[] }) {
+  const SEGMENTS = segments;
   const center = size / 2;
   const radius = size / 2 - 6;
   const innerRadius = radius * 0.15;
@@ -206,6 +210,12 @@ const ODDS_TABLE = [
 
 export default function GameWheel() {
   const { data: user } = useQuery<User>({ queryKey: ["/api/user"] });
+  const { data: wheelSettings } = useQuery<{ multipliers: number[] }>({ queryKey: ["/api/games/wheel/settings"] });
+  const segments = buildSegments(
+    Array.isArray(wheelSettings?.multipliers) && wheelSettings!.multipliers.length === 16
+      ? wheelSettings!.multipliers
+      : DEFAULT_WHEEL_MULTIPLIERS
+  );
   const [bet, setBet] = useState(500);
   const [isSpinning, setIsSpinning] = useState(false);
   const [rotation, setRotation] = useState(0);
@@ -354,7 +364,7 @@ export default function GameWheel() {
                   }}
                   data-testid="wheel-spinner"
                 >
-                  <WheelSVG size={380} />
+                  <WheelSVG size={380} segments={segments} />
                 </motion.div>
 
                 <div

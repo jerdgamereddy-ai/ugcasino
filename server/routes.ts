@@ -1279,6 +1279,24 @@ export async function registerRoutes(
   });
 
   // === PLINKO GAME ===
+  const PLINKO_DEFAULT_MULTIPLIERS = [0.2, 0.5, 1.2, 2, 5, 2, 1.2, 0.5, 0.2];
+  app.get("/api/games/plinko/settings", async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    const s = await storage.getGameSettings("plinko");
+    const extra = (() => { try { return s?.extraSettings ? JSON.parse(s.extraSettings) : {}; } catch { return {}; } })();
+    res.json({ multipliers: extra.multipliers ?? PLINKO_DEFAULT_MULTIPLIERS });
+  });
+  app.post("/api/games/plinko/settings", async (req, res) => {
+    if (!req.isAuthenticated() || req.user.role !== "admin") return res.status(403).send("Forbidden");
+    try {
+      const { multipliers } = z.object({ multipliers: z.array(z.number().min(0).max(1000)).length(9) }).parse(req.body);
+      const existing = await storage.getGameSettings("plinko");
+      const existingExtra = (() => { try { return existing?.extraSettings ? JSON.parse(existing.extraSettings) : {}; } catch { return {}; } })();
+      await storage.updateGameExtraSettings("plinko", JSON.stringify({ ...existingExtra, multipliers }), req.user.id);
+      res.json({ success: true });
+    } catch { res.status(400).json({ message: "Invalid input" }); }
+  });
+
   app.post("/api/games/plinko/play", async (req, res) => {
     if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
     if (await gateGame(req, res, "plinko")) return;
@@ -1287,27 +1305,36 @@ export async function registerRoutes(
       if (req.user.balance < bet) return res.status(400).json({ message: "Insufficient balance" });
       const settings = await storage.getGameSettings("plinko");
       const winChance = settings?.winChance ?? 0.48;
+      const extraParsed = (() => { try { return settings?.extraSettings ? JSON.parse(settings.extraSettings) : {}; } catch { return {}; } })();
       await storage.updateUserBalance(req.user.id, -bet);
       await storage.createTransaction({ userId: req.user.id, amount: -bet, type: "bet", description: "Plinko play" });
       
-      const multipliers = [0.2, 0.5, 1.2, 2, 5, 2, 1.2, 0.5, 0.2];
+      const multipliers: number[] = (Array.isArray(extraParsed.multipliers) && extraParsed.multipliers.length === 9) ? extraParsed.multipliers : PLINKO_DEFAULT_MULTIPLIERS;
+      // Derive win/loss slots from the actual multiplier array so admin edits
+      // (e.g. zeroing out a center slot) don't desync the win/lose decision.
+      // A "win slot" is any slot with multiplier >= 1 (player at least breaks even).
+      const winIndicesAll = multipliers.map((m, i) => m >= 1 ? i : -1).filter(i => i >= 0);
+      const loseIndicesAll = multipliers.map((m, i) => m < 1 ? i : -1).filter(i => i >= 0);
       let won = Math.random() < winChance;
-      let multiplierIndex;
-      if (won) {
-        const winIndices = [2, 3, 4, 5, 6];
-        multiplierIndex = winIndices[Math.floor(Math.random() * winIndices.length)];
+      let multiplierIndex: number;
+      if (won && winIndicesAll.length > 0) {
+        multiplierIndex = winIndicesAll[Math.floor(Math.random() * winIndicesAll.length)];
+      } else if (loseIndicesAll.length > 0) {
+        won = false;
+        multiplierIndex = loseIndicesAll[Math.floor(Math.random() * loseIndicesAll.length)];
       } else {
-        const loseIndices = [0, 1, 7, 8];
-        multiplierIndex = loseIndices[Math.floor(Math.random() * loseIndices.length)];
+        // All slots are wins — fallback: pick any slot.
+        multiplierIndex = Math.floor(Math.random() * multipliers.length);
       }
       let multiplier = multipliers[multiplierIndex];
       let intendedPayout = Math.floor(bet * multiplier);
       const allowedPayout = await processCombinedBetAndWin("plinko", req.user.id, bet, intendedPayout);
       if (allowedPayout === 0 && intendedPayout > 0) {
-        // Force loss outcome
-        const loseIndices = [0, 1, 7, 8];
-        multiplierIndex = loseIndices[Math.floor(Math.random() * loseIndices.length)];
-        multiplier = multipliers[multiplierIndex];
+        // Force loss outcome — pick any slot whose multiplier is < 1.
+        if (loseIndicesAll.length > 0) {
+          multiplierIndex = loseIndicesAll[Math.floor(Math.random() * loseIndicesAll.length)];
+          multiplier = multipliers[multiplierIndex];
+        }
         won = false;
       }
       const payout = allowedPayout;
@@ -1320,6 +1347,24 @@ export async function registerRoutes(
   });
 
   // === WHEEL GAME ===
+  const WHEEL_DEFAULT_MULTIPLIERS = [0, 0.5, 0, 1, 0, 1.5, 0, 2, 0, 0.5, 0, 3, 0, 1, 5, 10];
+  app.get("/api/games/wheel/settings", async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    const s = await storage.getGameSettings("wheel");
+    const extra = (() => { try { return s?.extraSettings ? JSON.parse(s.extraSettings) : {}; } catch { return {}; } })();
+    res.json({ multipliers: extra.multipliers ?? WHEEL_DEFAULT_MULTIPLIERS });
+  });
+  app.post("/api/games/wheel/settings", async (req, res) => {
+    if (!req.isAuthenticated() || req.user.role !== "admin") return res.status(403).send("Forbidden");
+    try {
+      const { multipliers } = z.object({ multipliers: z.array(z.number().min(0).max(1000)).length(16) }).parse(req.body);
+      const existing = await storage.getGameSettings("wheel");
+      const existingExtra = (() => { try { return existing?.extraSettings ? JSON.parse(existing.extraSettings) : {}; } catch { return {}; } })();
+      await storage.updateGameExtraSettings("wheel", JSON.stringify({ ...existingExtra, multipliers }), req.user.id);
+      res.json({ success: true });
+    } catch { res.status(400).json({ message: "Invalid input" }); }
+  });
+
   app.post("/api/games/wheel/play", async (req, res) => {
     if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
     if (await gateGame(req, res, "wheel")) return;
@@ -1329,28 +1374,13 @@ export async function registerRoutes(
       
       const settings = await storage.getGameSettings("wheel");
       const winChance = settings?.winChance ?? 0.48;
+      const extraParsed = (() => { try { return settings?.extraSettings ? JSON.parse(settings.extraSettings) : {}; } catch { return {}; } })();
       
       await storage.updateUserBalance(req.user.id, -bet);
       await storage.createTransaction({ userId: req.user.id, amount: -bet, type: "bet", description: "Wheel spin" });
 
-      const SEGMENTS = [
-        { multiplier: 0 },    // 0
-        { multiplier: 0.5 },  // 1
-        { multiplier: 0 },    // 2
-        { multiplier: 1 },    // 3
-        { multiplier: 0 },    // 4
-        { multiplier: 1.5 },  // 5
-        { multiplier: 0 },    // 6
-        { multiplier: 2 },    // 7
-        { multiplier: 0 },    // 8
-        { multiplier: 0.5 },  // 9
-        { multiplier: 0 },    // 10
-        { multiplier: 3 },    // 11
-        { multiplier: 0 },    // 12
-        { multiplier: 1 },    // 13
-        { multiplier: 5 },    // 14
-        { multiplier: 10 },   // 15
-      ];
+      const wheelMults: number[] = (Array.isArray(extraParsed.multipliers) && extraParsed.multipliers.length === 16) ? extraParsed.multipliers : WHEEL_DEFAULT_MULTIPLIERS;
+      const SEGMENTS = wheelMults.map(m => ({ multiplier: m }));
 
       const houseRoll = Math.random();
       const isWinSpin = houseRoll < winChance;

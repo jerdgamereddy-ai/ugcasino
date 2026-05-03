@@ -13,8 +13,14 @@ import { useQuery } from "@tanstack/react-query";
 
 type User = { balance: number };
 
+const DEFAULT_PLINKO_MULTIPLIERS = [0.2, 0.5, 1.2, 2, 5, 2, 1.2, 0.5, 0.2];
+
 export default function GamePlinko() {
   const { data: user } = useQuery<User>({ queryKey: ["/api/user"] });
+  const { data: plinkoSettings } = useQuery<{ multipliers: number[] }>({ queryKey: ["/api/games/plinko/settings"] });
+  const slotMults: number[] = (Array.isArray(plinkoSettings?.multipliers) && plinkoSettings!.multipliers.length === 9)
+    ? plinkoSettings!.multipliers
+    : DEFAULT_PLINKO_MULTIPLIERS;
   const [bet, setBet] = useState(500);
   const [isDropping, setIsDropping] = useState(false);
   const [ballPath, setBallPath] = useState<number[]>([]);
@@ -119,7 +125,14 @@ export default function GamePlinko() {
               {Array.from({ length: 9 }).map((_, row) => (
                 <div key={row} className="flex justify-center gap-4">
                   {Array.from({ length: row + 3 }).map((_, i) => (
-                    <div key={i} className="w-2 h-2 rounded-full bg-white/20 shadow-[0_0_5px_rgba(255,255,255,0.2)]" />
+                    <div
+                      key={i}
+                      className="w-2.5 h-2.5 rounded-full plinko-peg"
+                      style={{
+                        background: "radial-gradient(circle at 30% 30%, #ffffff 0%, #d4d4d8 45%, #71717a 100%)",
+                        boxShadow: "0 0 6px rgba(255,255,255,0.55), inset -1px -1px 2px rgba(0,0,0,0.5), inset 1px 1px 1px rgba(255,255,255,0.7)",
+                      }}
+                    />
                   ))}
                 </div>
               ))}
@@ -130,14 +143,24 @@ export default function GamePlinko() {
                     initial={{ top: "0%", left: "50%" }}
                     animate={{ top: "90%", left: `${45 + (Math.random() * 10)}%` }}
                     transition={{ duration: 2, ease: "easeOut" }}
-                    className="absolute w-4 h-4 bg-primary rounded-full shadow-[0_0_15px_rgba(212,175,55,1)] z-20"
-                  />
+                    className="absolute w-5 h-5 rounded-full z-20 plinko-ball"
+                    style={{
+                      background: "radial-gradient(circle at 30% 25%, #fff8dc 0%, #ffe066 25%, #ffb300 60%, #c08000 100%)",
+                      boxShadow:
+                        "0 0 18px 4px rgba(255,215,0,0.85), 0 0 36px 6px rgba(255,180,0,0.55), inset -2px -3px 5px rgba(120,60,0,0.6), inset 2px 2px 4px rgba(255,255,255,0.85)",
+                    }}
+                  >
+                    <span
+                      className="absolute top-[14%] left-[24%] w-[35%] h-[28%] rounded-full"
+                      style={{ background: "radial-gradient(circle, rgba(255,255,255,0.95) 0%, rgba(255,255,255,0) 70%)", filter: "blur(0.5px)" }}
+                    />
+                  </motion.div>
                 )}
               </AnimatePresence>
             </div>
             
             <div className="flex justify-between w-full mt-4 gap-1">
-              {[0.2, 0.5, 1.2, 2, 5, 2, 1.2, 0.5, 0.2].map((m, i) => (
+              {slotMults.map((m, i) => (
                 <div 
                   key={i} 
                   className={`flex-1 h-12 flex items-center justify-center rounded-lg text-[10px] font-bold border border-white/10 transition-all ${
