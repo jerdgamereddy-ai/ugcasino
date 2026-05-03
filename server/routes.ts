@@ -1005,11 +1005,9 @@ export async function registerRoutes(
 
       const settings = await storage.getGameSettings("hilo");
       const winChance = settings?.winChance ?? 0.48;
-      const hiloMaxWin = bet * (settings?.payoutMultiplier ?? 5);
-      const hiloGuard = await checkBankrollFloorForBet(hiloMaxWin);
-      if (hiloGuard.blocked) {
-        return res.status(400).json({ message: "Bet too large — maximum possible payout exceeds the house bankroll. Please lower your bet.", bankrollBlocked: true });
-      }
+      // Bankroll floor is enforced inside processCombinedBetAndWin via
+      // checkUniversalForceLose — the round will simply be a guaranteed loss
+      // when the bet's max payout would breach the floor. No pre-block needed.
 
       await storage.updateUserBalance(req.user.id, -bet);
       await storage.createTransaction({ userId: req.user.id, amount: -bet, type: "bet", description: "HiLo play" });
@@ -1086,10 +1084,8 @@ export async function registerRoutes(
       const dogSettingsPre = await storage.getGameSettings("dog-racing");
       const dogExtraPre = (() => { try { return dogSettingsPre?.extraSettings ? JSON.parse(dogSettingsPre.extraSettings) : {}; } catch { return {}; } })();
       const dogMaxOdds = Math.max(...((dogExtraPre.odds as number[]) ?? [3.7, 5.5, 2.2, 11.75, 17.25, 8.75]));
-      const dogGuard = await checkBankrollFloorForBet(totBet * dogMaxOdds);
-      if (dogGuard.blocked) {
-        return res.status(400).json({ message: "Bet too large — maximum possible payout exceeds the house bankroll. Please lower your bet.", bankrollBlocked: true });
-      }
+      // No pre-block: computeForceLose below already consults the bankroll
+      // floor and will return forceLose=true so the iframe shows a losing race.
       await storage.updateUserBalance(req.user.id, -totBet);
       await storage.createTransaction({ userId: req.user.id, amount: -totBet, type: "bet", description: "Greyhound Racing bet" });
       await recordBetAndCheckHighBet("dog-racing", req.user.id, totBet);
@@ -1177,10 +1173,8 @@ export async function registerRoutes(
       const h4Settings = await storage.getGameSettings("horse4");
       const h4Extra = (() => { try { return h4Settings?.extraSettings ? JSON.parse(h4Settings.extraSettings) : {}; } catch { return {}; } })();
       const h4MaxOdds = Math.max(...((h4Extra.odds as number[]) ?? [3.7, 5.5, 2.2, 11.75, 17.25, 8.75, 7.15, 6.15]));
-      const h4Guard = await checkBankrollFloorForBet(totBet * h4MaxOdds);
-      if (h4Guard.blocked) {
-        return res.status(400).json({ message: "Bet too large — maximum possible payout exceeds the house bankroll. Please lower your bet.", bankrollBlocked: true });
-      }
+      // No pre-block: computeForceLose below already consults the bankroll
+      // floor and will return forceLose=true so the iframe shows a losing race.
       await storage.updateUserBalance(req.user.id, -totBet);
       await storage.createTransaction({ userId: req.user.id, amount: -totBet, type: "bet", description: "Horse4 Racing bet" });
       await recordBetAndCheckHighBet("horse4", req.user.id, totBet);
@@ -1270,10 +1264,8 @@ export async function registerRoutes(
       const hjSettings = await storage.getGameSettings("horse-js");
       const hjExtra = (() => { try { return hjSettings?.extraSettings ? JSON.parse(hjSettings.extraSettings) : {}; } catch { return {}; } })();
       const hjMaxOdds = Math.max(...((hjExtra.odds as number[]) ?? [2.0, 2.5, 3.0, 3.5]));
-      const hjGuard = await checkBankrollFloorForBet(totBet * hjMaxOdds);
-      if (hjGuard.blocked) {
-        return res.status(400).json({ message: "Bet too large — maximum possible payout exceeds the house bankroll. Please lower your bet.", bankrollBlocked: true });
-      }
+      // No pre-block: computeForceLose below already consults the bankroll
+      // floor and will return forceLose=true so the iframe shows a losing race.
       await storage.updateUserBalance(req.user.id, -totBet);
       await storage.createTransaction({ userId: req.user.id, amount: -totBet, type: "bet", description: "Horse Racing bet" });
       await recordBetAndCheckHighBet("horse-js", req.user.id, totBet);
@@ -1326,11 +1318,6 @@ export async function registerRoutes(
 
       const settings = await storage.getGameSettings("dice");
       const winChance = settings?.winChance ?? 0.48;
-      const diceMaxWin = bet * (settings?.payoutMultiplier ?? 5);
-      const diceGuard = await checkBankrollFloorForBet(diceMaxWin);
-      if (diceGuard.blocked) {
-        return res.status(400).json({ message: "Bet too large — maximum possible payout exceeds the house bankroll. Please lower your bet.", bankrollBlocked: true });
-      }
 
       await storage.updateUserBalance(req.user.id, -bet);
       await storage.createTransaction({ userId: req.user.id, amount: -bet, type: "bet", description: "Dice roll" });
@@ -1378,11 +1365,6 @@ export async function registerRoutes(
 
       const settings = await storage.getGameSettings("coinflip");
       const winChance = settings?.winChance ?? 0.48;
-      const coinMaxWin = bet * (settings?.payoutMultiplier ?? 1.95);
-      const coinGuard = await checkBankrollFloorForBet(coinMaxWin);
-      if (coinGuard.blocked) {
-        return res.status(400).json({ message: "Bet too large — maximum possible payout exceeds the house bankroll. Please lower your bet.", bankrollBlocked: true });
-      }
 
       await storage.updateUserBalance(req.user.id, -bet);
       await storage.createTransaction({ userId: req.user.id, amount: -bet, type: "bet", description: "Coin Flip play" });
@@ -1431,11 +1413,6 @@ export async function registerRoutes(
       const settings = await storage.getGameSettings("plinko");
       const winChance = settings?.winChance ?? 0.48;
       const extraParsed = (() => { try { return settings?.extraSettings ? JSON.parse(settings.extraSettings) : {}; } catch { return {}; } })();
-      const plinkoMults: number[] = (Array.isArray(extraParsed.multipliers) && extraParsed.multipliers.length === 9) ? extraParsed.multipliers : PLINKO_DEFAULT_MULTIPLIERS;
-      const plinkoGuard = await checkBankrollFloorForBet(bet * Math.max(...plinkoMults));
-      if (plinkoGuard.blocked) {
-        return res.status(400).json({ message: "Bet too large — maximum possible payout exceeds the house bankroll. Please lower your bet.", bankrollBlocked: true });
-      }
       await storage.updateUserBalance(req.user.id, -bet);
       await storage.createTransaction({ userId: req.user.id, amount: -bet, type: "bet", description: "Plinko play" });
       
@@ -1505,11 +1482,6 @@ export async function registerRoutes(
       const settings = await storage.getGameSettings("wheel");
       const winChance = settings?.winChance ?? 0.48;
       const extraParsed = (() => { try { return settings?.extraSettings ? JSON.parse(settings.extraSettings) : {}; } catch { return {}; } })();
-      const wheelMultsPre: number[] = (Array.isArray(extraParsed.multipliers) && extraParsed.multipliers.length === 16) ? extraParsed.multipliers : WHEEL_DEFAULT_MULTIPLIERS;
-      const wheelGuard = await checkBankrollFloorForBet(bet * Math.max(...wheelMultsPre));
-      if (wheelGuard.blocked) {
-        return res.status(400).json({ message: "Bet too large — maximum possible payout exceeds the house bankroll. Please lower your bet.", bankrollBlocked: true });
-      }
       
       await storage.updateUserBalance(req.user.id, -bet);
       await storage.createTransaction({ userId: req.user.id, amount: -bet, type: "bet", description: "Wheel spin" });
@@ -1708,11 +1680,6 @@ export async function registerRoutes(
       const adjustedChance = winChance * difficulty;
       let caught = Math.random() < adjustedChance;
 
-      const fhGuard = await checkBankrollFloorForBet(bet * multiplier);
-      if (fhGuard.blocked) {
-        return res.status(400).json({ message: "Shot too large — maximum possible payout exceeds the house bankroll. Please target a smaller fish or lower your bet.", bankrollBlocked: true });
-      }
-
       await storage.updateUserBalance(req.user.id, -bet);
       await storage.createTransaction({ userId: req.user.id, amount: -bet, type: "bet", description: `Fish Hunt: Shot at ${fishType}` });
 
@@ -1792,20 +1759,20 @@ export async function registerRoutes(
 
       const settings = await storage.getGameSettings("aviator");
       const houseEdgePct = settings?.houseEdgePct ?? 5;
-      // Aviator can theoretically pay up to AVIATOR_CRASH_CAP (1000x). Probe
-      // against the bankroll using that worst case before debiting.
+      // Aviator can theoretically pay up to AVIATOR_CRASH_CAP (1000x). If even
+      // a 1.01x cashout would breach the bankroll floor, force an insta-crash
+      // so the player still gets to bet but can't win on this round.
       const aviatorGuard = await checkBankrollFloorForBet(bet * AVIATOR_CRASH_CAP);
-      if (aviatorGuard.blocked) {
-        return res.status(400).json({ message: "Bet too large — maximum possible payout exceeds the house bankroll. Please lower your bet.", bankrollBlocked: true });
-      }
 
       await storage.updateUserBalance(req.user.id, -bet);
       await storage.createTransaction({ userId: req.user.id, amount: -bet, type: "bet", description: `Aviator: bet placed (${bet} UGX)` });
       await recordBetAndCheckHighBet("aviator", req.user.id, bet);
 
-      // If high-bet anti-laundering flagged this round, the plane crashes instantly.
+      // If high-bet anti-laundering or the bankroll floor flagged this round,
+      // the plane crashes instantly at 1.00x.
       const locked = lockedLossMap.get(lossKey(req.user.id, "aviator"));
-      let crashPoint = locked ? 1.00 : generateAviatorCrashPoint(houseEdgePct);
+      const forceCrash = locked || aviatorGuard.blocked;
+      let crashPoint = forceCrash ? 1.00 : generateAviatorCrashPoint(houseEdgePct);
       if (locked) {
         lockedLossMap.delete(lossKey(req.user.id, "aviator"));
         lockedBetAmountMap.delete(lossKey(req.user.id, "aviator"));
@@ -2021,10 +1988,6 @@ export async function registerRoutes(
 
       const settings = await storage.getGameSettings("slots");
       const winChance = settings?.winChance ?? 0.3;
-      const slotsGuard = await checkBankrollFloorForBet(bet * (settings?.payoutMultiplier ?? 10));
-      if (slotsGuard.blocked) {
-        return res.status(400).json({ message: "Bet too large — maximum possible payout exceeds the house bankroll. Please lower your bet.", bankrollBlocked: true });
-      }
 
       await storage.updateUserBalance(req.user.id, -bet);
       await storage.createTransaction({ userId: req.user.id, amount: -bet, type: "bet", description: "Slots spin" });
@@ -2095,12 +2058,6 @@ export async function registerRoutes(
 
       const settings = await storage.getGameSettings("roulette");
       const houseEdgeChance = settings?.winChance ?? 0.45;
-      const rExtraPre = (() => { try { return settings?.extraSettings ? JSON.parse(settings.extraSettings) : {}; } catch { return {}; } })();
-      const rMaxOdds = Math.max(rExtraPre.numberOdds ?? 35, rExtraPre.colorOdds ?? 1, rExtraPre.parityOdds ?? 1) + 1;
-      const rouletteGuard = await checkBankrollFloorForBet(bet * rMaxOdds);
-      if (rouletteGuard.blocked) {
-        return res.status(400).json({ message: "Bet too large — maximum possible payout exceeds the house bankroll. Please lower your bet.", bankrollBlocked: true });
-      }
 
       await storage.updateUserBalance(req.user.id, -bet);
       await storage.createTransaction({ userId: req.user.id, amount: -bet, type: "bet", description: "Roulette spin" });
