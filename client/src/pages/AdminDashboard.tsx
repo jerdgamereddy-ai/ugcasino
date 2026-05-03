@@ -42,6 +42,7 @@ type UniversalHouseEdgeData = {
   totalPaid: number;
   bankroll: number;
   currentRTP: number;
+  bypassClassicSlotsBankroll: boolean;
 };
 
 function UniversalHouseEdgePanel() {
@@ -62,7 +63,7 @@ function UniversalHouseEdgePanel() {
   }, [data]);
 
   const update = useMutation({
-    mutationFn: async (body: { enabled?: boolean; houseEdgePct?: number; minHouseBalance?: number }) => {
+    mutationFn: async (body: { enabled?: boolean; houseEdgePct?: number; minHouseBalance?: number; bypassClassicSlotsBankroll?: boolean }) => {
       const res = await apiRequest("PATCH", "/api/admin/universal-house-edge", body);
       return res.json();
     },
@@ -115,6 +116,18 @@ function UniversalHouseEdgePanel() {
             checked={data.enabled}
             onCheckedChange={(v) => update.mutate({ enabled: v })}
             data-testid="switch-universal-enabled"
+          />
+        </div>
+
+        <div className="flex items-center justify-between p-3 rounded-md bg-white/5 border border-white/10">
+          <div>
+            <p className="font-semibold">Allow Classic Slots below bankroll floor</p>
+            <p className="text-xs text-muted-foreground">When ON, Classic Slots ignores the minimum-bankroll check and stays playable. The win-side cap still applies, so any payout that would breach the floor is voided server-side.</p>
+          </div>
+          <Switch
+            checked={data.bypassClassicSlotsBankroll}
+            onCheckedChange={(v) => update.mutate({ bypassClassicSlotsBankroll: v })}
+            data-testid="switch-bypass-classic-slots-bankroll"
           />
         </div>
 

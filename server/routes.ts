@@ -1963,9 +1963,14 @@ export async function registerRoutes(
       // game's actual top paytable multiplier (200x, see classic-slots/index.html).
       const csSettings = await storage.getGameSettings("classic-slots");
       const csMaxMult = Math.max(200, csSettings?.payoutMultiplier ?? 200);
-      const csGuard = await checkBankrollFloorForBet(amount * csMaxMult);
-      if (csGuard.blocked) {
-        return res.status(400).json({ message: "Bet too large — maximum possible payout exceeds the house bankroll. Please lower your bet.", bankrollBlocked: true });
+      // Admin override: when bypassClassicSlotsBankroll is on, skip the
+      // pre-block so Classic Slots stays playable even below the floor.
+      const csUniversal = await storage.getUniversalHouseEdge().catch(() => null);
+      if (!csUniversal?.bypassClassicSlotsBankroll) {
+        const csGuard = await checkBankrollFloorForBet(amount * csMaxMult);
+        if (csGuard.blocked) {
+          return res.status(400).json({ message: "Bet too large — maximum possible payout exceeds the house bankroll. Please lower your bet.", bankrollBlocked: true });
+        }
       }
       await storage.updateUserBalance(req.user.id, -amount);
       await storage.createTransaction({ userId: req.user.id, amount: -amount, type: "bet", description: "Classic Slots bet" });
