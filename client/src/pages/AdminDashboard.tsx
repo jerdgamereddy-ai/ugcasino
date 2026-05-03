@@ -10,7 +10,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useState, useRef, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { Shield, Plus, Users, Ticket, Copy, Banknote, CheckCircle, Loader2, Ban, Trash2, ArrowUpCircle, KeyRound, UserCog, Lock, BarChart3, Settings2, ChevronUp, ChevronDown, Megaphone, Calculator, Phone, CircleDot, Crown, Briefcase, Printer, Music, Upload, X, Palette } from "lucide-react";
+import { Shield, Plus, Users, Ticket, Copy, Banknote, CheckCircle, Loader2, Ban, Trash2, ArrowUpCircle, KeyRound, UserCog, Lock, BarChart3, Settings2, ChevronUp, ChevronDown, Megaphone, Calculator, Phone, CircleDot, Crown, Briefcase, Printer, Music, Upload, X, Palette, Clock } from "lucide-react";
 import { AppearanceControl } from "@/components/AppearanceControl";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useForm } from "react-hook-form";
@@ -121,6 +121,186 @@ function FishJoyOddsCard() {
 }
 
 const ACTIVE_GAME_TYPES = ["classic-slots", "roulette", "dice", "hilo", "coinflip", "plinko", "wheel", "fishhunt", "dog-racing", "horse4", "horse-js", "aviator"];
+
+type GameSchedule = {
+  id: number;
+  gameType: string;
+  label: string;
+  startTime: string;
+  endTime: string;
+  daysOfWeek: string;
+  winChancePct: number | null;
+  payoutMultiplier: number | null;
+  enabled: boolean;
+};
+
+const DOW_LABELS = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
+
+function ScheduleManager() {
+  const { toast } = useToast();
+  const { data: schedules = [], isLoading } = useQuery<GameSchedule[]>({ queryKey: ["/api/admin/game-schedules"] });
+  const [gameType, setGameType] = useState<string>("roulette");
+  const [label, setLabel] = useState("");
+  const [startTime, setStartTime] = useState("18:00");
+  const [endTime, setEndTime] = useState("22:00");
+  const [days, setDays] = useState<Set<string>>(new Set(["0","1","2","3","4","5","6"]));
+  const [winChancePct, setWinChancePct] = useState<string>("");
+  const [payoutMultiplier, setPayoutMultiplier] = useState<string>("");
+  const invalidate = () => queryClient.invalidateQueries({ queryKey: ["/api/admin/game-schedules"] });
+
+  const createMut = useMutation({
+    mutationFn: async () => {
+      const body: any = {
+        gameType, label: label || `${gameType} ${startTime}-${endTime}`,
+        startTime, endTime,
+        daysOfWeek: Array.from(days).sort().join(",") || "0,1,2,3,4,5,6",
+        enabled: true,
+      };
+      if (winChancePct !== "") body.winChancePct = parseFloat(winChancePct);
+      if (payoutMultiplier !== "") body.payoutMultiplier = parseFloat(payoutMultiplier);
+      const res = await fetch("/api/admin/game-schedules", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+      if (!res.ok) throw new Error((await res.json()).message || "Failed");
+      return res.json();
+    },
+    onSuccess: () => { invalidate(); setLabel(""); setWinChancePct(""); setPayoutMultiplier(""); toast({ title: "Schedule added", description: "It will apply at the next minute tick." }); },
+    onError: (e: any) => toast({ title: "Failed", description: e.message, variant: "destructive" }),
+  });
+
+  const toggleMut = useMutation({
+    mutationFn: async ({ id, enabled }: { id: number; enabled: boolean }) => {
+      const res = await fetch(`/api/admin/game-schedules/${id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ enabled }) });
+      if (!res.ok) throw new Error("Failed");
+      return res.json();
+    },
+    onSuccess: () => invalidate(),
+  });
+
+  const deleteMut = useMutation({
+    mutationFn: async (id: number) => {
+      const res = await fetch(`/api/admin/game-schedules/${id}`, { method: "DELETE" });
+      if (!res.ok) throw new Error("Failed");
+      return res.json();
+    },
+    onSuccess: () => invalidate(),
+  });
+
+  const toggleDay = (d: string) => setDays(prev => { const n = new Set(prev); n.has(d) ? n.delete(d) : n.add(d); return n; });
+
+  return (
+    <div className="space-y-6">
+      <Card className="glass-card">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-base"><Plus className="w-4 h-4" /> Add Auto Schedule</CardTitle>
+          <CardDescription>Define a time window during which a game's win-chance and/or payout-multiplier are applied automatically. Leave a value blank to skip changing it.</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs text-muted-foreground">Game</label>
+              <select value={gameType} onChange={e => setGameType(e.target.value)} className="w-full mt-1 bg-white/5 border border-white/10 rounded h-9 px-2 text-sm" data-testid="select-schedule-game">
+                {ACTIVE_GAME_TYPES.map(g => <option key={g} value={g}>{g}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="text-xs text-muted-foreground">Label (optional)</label>
+              <Input value={label} onChange={e => setLabel(e.target.value)} placeholder="Evening rush" className="bg-white/5 border-white/10 h-9 mt-1" data-testid="input-schedule-label" />
+            </div>
+            <div>
+              <label className="text-xs text-muted-foreground">Start (HH:MM, 24h)</label>
+              <Input type="time" value={startTime} onChange={e => setStartTime(e.target.value)} className="bg-white/5 border-white/10 h-9 mt-1" data-testid="input-schedule-start" />
+            </div>
+            <div>
+              <label className="text-xs text-muted-foreground">End (HH:MM, 24h)</label>
+              <Input type="time" value={endTime} onChange={e => setEndTime(e.target.value)} className="bg-white/5 border-white/10 h-9 mt-1" data-testid="input-schedule-end" />
+            </div>
+            <div>
+              <label className="text-xs text-muted-foreground">Win Chance %</label>
+              <Input type="number" min={0} max={100} step={1} value={winChancePct} onChange={e => setWinChancePct(e.target.value)} placeholder="e.g. 25" className="bg-white/5 border-white/10 h-9 mt-1 font-mono" data-testid="input-schedule-winchance" />
+            </div>
+            <div>
+              <label className="text-xs text-muted-foreground">Payout Multiplier (x)</label>
+              <Input type="number" min={1.01} max={100} step={0.05} value={payoutMultiplier} onChange={e => setPayoutMultiplier(e.target.value)} placeholder="e.g. 1.8" className="bg-white/5 border-white/10 h-9 mt-1 font-mono" data-testid="input-schedule-multiplier" />
+            </div>
+          </div>
+          <div>
+            <label className="text-xs text-muted-foreground">Days</label>
+            <div className="flex flex-wrap gap-1.5 mt-1">
+              {DOW_LABELS.map((lbl, i) => {
+                const v = String(i);
+                const on = days.has(v);
+                return (
+                  <button key={v} type="button" onClick={() => toggleDay(v)} className={`px-2.5 py-1 rounded text-xs border transition ${on ? "bg-primary text-primary-foreground border-primary" : "bg-white/5 border-white/10 text-muted-foreground"}`} data-testid={`button-day-${v}`}>
+                    {lbl}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+          <Button size="sm" onClick={() => createMut.mutate()} disabled={createMut.isPending || (!winChancePct && !payoutMultiplier) || days.size === 0} data-testid="button-add-schedule">
+            {createMut.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Add Schedule"}
+          </Button>
+        </CardContent>
+      </Card>
+
+      <Card className="glass-card">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-base"><Clock className="w-4 h-4" /> Active Schedules ({schedules.length})</CardTitle>
+          <CardDescription>The background scheduler reapplies these every minute. Last-defined active rule per game wins. Overnight windows (e.g. 22:00–02:00) are supported.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {isLoading ? (
+            <div className="flex justify-center py-6"><Loader2 className="h-5 w-5 animate-spin" /></div>
+          ) : schedules.length === 0 ? (
+            <p className="text-sm text-muted-foreground text-center py-6">No schedules yet. Add one above.</p>
+          ) : (
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow className="border-white/10">
+                    <TableHead>Game</TableHead>
+                    <TableHead>Label</TableHead>
+                    <TableHead>Window</TableHead>
+                    <TableHead>Days</TableHead>
+                    <TableHead className="text-right">Win %</TableHead>
+                    <TableHead className="text-right">Payout x</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead></TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {schedules.map((s) => (
+                    <TableRow key={s.id} className="border-white/10" data-testid={`row-schedule-${s.id}`}>
+                      <TableCell className="font-medium capitalize">{s.gameType}</TableCell>
+                      <TableCell className="text-sm text-muted-foreground">{s.label}</TableCell>
+                      <TableCell className="font-mono text-xs">{s.startTime}–{s.endTime}</TableCell>
+                      <TableCell className="text-xs text-muted-foreground">{s.daysOfWeek.split(",").map(d => DOW_LABELS[parseInt(d)]).join(" ")}</TableCell>
+                      <TableCell className="text-right font-mono">{s.winChancePct == null ? "—" : `${s.winChancePct}%`}</TableCell>
+                      <TableCell className="text-right font-mono">{s.payoutMultiplier == null ? "—" : `${s.payoutMultiplier}x`}</TableCell>
+                      <TableCell>
+                        <Badge variant={s.enabled ? "default" : "secondary"} className="text-[10px]">{s.enabled ? "Enabled" : "Paused"}</Badge>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex gap-1 justify-end">
+                          <Button size="sm" variant="ghost" onClick={() => toggleMut.mutate({ id: s.id, enabled: !s.enabled })} disabled={toggleMut.isPending} data-testid={`button-toggle-schedule-${s.id}`}>
+                            {s.enabled ? "Pause" : "Resume"}
+                          </Button>
+                          <Button size="sm" variant="ghost" onClick={() => { if (confirm("Delete this schedule?")) deleteMut.mutate(s.id); }} disabled={deleteMut.isPending} data-testid={`button-delete-schedule-${s.id}`}>
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
 
 const HORSE4_NAMES = ["Engineer", "Pin", "Doughnut", "Mayhem", "Last Things", "Chatterbox", "Hypno", "Croquette"];
 const HORSE4_DEFAULT_ODDS = [3.7, 5.5, 2.2, 11.75, 17.25, 8.75, 7.15, 6.15];
@@ -978,6 +1158,7 @@ export default function AdminDashboard() {
             <TabsTrigger value="requests" data-testid="tab-requests">Withdrawals</TabsTrigger>
             <TabsTrigger value="gamecontrol" data-testid="tab-gamecontrol"><Settings2 className="w-3 h-3 mr-1" /> Game Control</TabsTrigger>
             <TabsTrigger value="gameaccess" data-testid="tab-gameaccess"><Lock className="w-3 h-3 mr-1" /> Game Access</TabsTrigger>
+            <TabsTrigger value="schedules" data-testid="tab-schedules"><Clock className="w-3 h-3 mr-1" /> Auto Schedule</TabsTrigger>
             <TabsTrigger value="reports" data-testid="tab-reports">Reports</TabsTrigger>
             <TabsTrigger value="profit" data-testid="tab-profit"><Calculator className="w-3 h-3 mr-1" /> Profit Calculator</TabsTrigger>
             <TabsTrigger value="broadcast" data-testid="tab-broadcast"><Megaphone className="w-3 h-3 mr-1" /> Broadcast</TabsTrigger>
@@ -1337,6 +1518,10 @@ export default function AdminDashboard() {
               </div>
               <GameAccessControl />
             </div>
+          </TabsContent>
+
+          <TabsContent value="schedules" className="mt-6">
+            <ScheduleManager />
           </TabsContent>
 
           <TabsContent value="appearance" className="mt-6">

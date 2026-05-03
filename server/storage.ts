@@ -1,4 +1,4 @@
-import { users, vouchers, transactions, gameSettings, withdrawalRequests, adminSecurityAnswers, broadcasts, broadcastDismissals, messages, audioTracks, userGameDisables, siteSettings, backgroundImages, type User, type InsertUser, type Voucher, type InsertVoucher, type Transaction, type GameSetting, type WithdrawalRequest, type InsertWithdrawalRequest, type AdminSecurityAnswer, type Broadcast, type BroadcastDismissal, type Message, type AudioTrack, type InsertAudioTrack, type UserGameDisable, type SiteSettings, type BackgroundImage } from "@shared/schema";
+import { users, vouchers, transactions, gameSettings, withdrawalRequests, adminSecurityAnswers, broadcasts, broadcastDismissals, messages, audioTracks, userGameDisables, siteSettings, backgroundImages, gameSchedules, type User, type InsertUser, type Voucher, type InsertVoucher, type Transaction, type GameSetting, type WithdrawalRequest, type InsertWithdrawalRequest, type AdminSecurityAnswer, type Broadcast, type BroadcastDismissal, type Message, type AudioTrack, type InsertAudioTrack, type UserGameDisable, type SiteSettings, type BackgroundImage, type GameSchedule, type InsertGameSchedule } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, sql, and, inArray, gte, lte, between } from "drizzle-orm";
 import session from "express-session";
@@ -86,6 +86,10 @@ export interface IStorage {
   getBroadcastById(id: number): Promise<Broadcast | undefined>;
   deleteBroadcast(id: number): Promise<boolean>;
   expireBroadcast(id: number): Promise<Broadcast | undefined>;
+  listGameSchedules(): Promise<GameSchedule[]>;
+  createGameSchedule(data: InsertGameSchedule, createdBy: number): Promise<GameSchedule>;
+  updateGameSchedule(id: number, data: Partial<InsertGameSchedule>): Promise<GameSchedule | undefined>;
+  deleteGameSchedule(id: number): Promise<boolean>;
   setGameDisabled(userId: number, gameType: string, disabled: boolean): Promise<void>;
 
   getAudioTracks(): Promise<AudioTrack[]>;
@@ -476,6 +480,25 @@ export class DatabaseStorage implements IStorage {
     // Mark as already-expired so the marquee stops showing it but the row stays for history.
     const [updated] = await db.update(broadcasts).set({ expiresAt: new Date(Date.now() - 1000) }).where(eq(broadcasts.id, id)).returning();
     return updated;
+  }
+
+  async listGameSchedules(): Promise<GameSchedule[]> {
+    return await db.select().from(gameSchedules).orderBy(gameSchedules.gameType, gameSchedules.startTime);
+  }
+
+  async createGameSchedule(data: InsertGameSchedule, createdBy: number): Promise<GameSchedule> {
+    const [row] = await db.insert(gameSchedules).values({ ...data, createdBy } as any).returning();
+    return row;
+  }
+
+  async updateGameSchedule(id: number, data: Partial<InsertGameSchedule>): Promise<GameSchedule | undefined> {
+    const [row] = await db.update(gameSchedules).set(data as any).where(eq(gameSchedules.id, id)).returning();
+    return row;
+  }
+
+  async deleteGameSchedule(id: number): Promise<boolean> {
+    const r = await db.delete(gameSchedules).where(eq(gameSchedules.id, id)).returning();
+    return r.length > 0;
   }
 
   async getPublicBroadcasts(): Promise<Broadcast[]> {

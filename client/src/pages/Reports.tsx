@@ -7,6 +7,15 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useState, useMemo } from "react";
+
+// 16-shade palette for the per-game pie chart so each game gets a clearly
+// distinct slice (gold/casino feel + tertiary hues for fallback variety).
+const PIE_PALETTE = [
+  '#eab308', '#f59e0b', '#f97316', '#ef4444', '#ec4899', '#d946ef',
+  '#a855f7', '#8b5cf6', '#6366f1', '#3b82f6', '#0ea5e9', '#06b6d4',
+  '#14b8a6', '#10b981', '#84cc16', '#facc15',
+];
+
 import { useQuery } from "@tanstack/react-query";
 import {
   Shield,
@@ -460,6 +469,36 @@ export default function Reports() {
                       </TableBody>
                     </Table>
                   </div>
+                  {reports.perGame.some((g) => g.bets > 0) && (
+                    <div className="h-[340px] mt-4">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <PieChart>
+                          <RechartsTooltip
+                            contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '8px' }}
+                            itemStyle={{ color: 'hsl(var(--foreground))' }}
+                            labelStyle={{ color: 'hsl(var(--foreground))', fontWeight: 'bold' }}
+                            formatter={(value: number, _name: string, props: any) => [`UGX ${Number(value).toLocaleString()}`, props?.payload?.label]}
+                          />
+                          <Legend wrapperStyle={{ fontSize: 11 }} />
+                          <Pie
+                            data={reports.perGame.filter((g) => g.bets > 0).map((g) => ({ name: g.label, label: g.label, value: g.bets }))}
+                            dataKey="value"
+                            nameKey="name"
+                            cx="50%"
+                            cy="50%"
+                            innerRadius={60}
+                            outerRadius={120}
+                            paddingAngle={2}
+                            label={(p: any) => `${p.name} ${(p.percent * 100).toFixed(0)}%`}
+                          >
+                            {reports.perGame.filter((g) => g.bets > 0).map((_g, i) => (
+                              <Cell key={`pie-cell-${i}`} fill={PIE_PALETTE[i % PIE_PALETTE.length]} stroke="hsl(var(--card))" strokeWidth={2} />
+                            ))}
+                          </Pie>
+                        </PieChart>
+                      </ResponsiveContainer>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             )}

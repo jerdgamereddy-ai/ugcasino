@@ -2335,6 +2335,106 @@ export async function registerRoutes(
     }
   });
 
+  // === GAME SCHEDULES (automated odds/multiplier rotation) ===
+  // Admin defines rules like "between 18:00-22:00 on weekends, set Roulette
+  // win-chance to 25% and payout-multiplier to 1.8". A background tick (below)
+  // reconciles game settings against the active rules every minute.
+  const SCHEDULABLE_GAMES = ["classic-slots", "roulette", "dice", "hilo", "coinflip", "plinko", "wheel", "fishhunt", "dog-racing", "horse4", "horse-js", "aviator"] as const;
+  const scheduleSchema = z.object({
+    gameType: z.enum(SCHEDULABLE_GAMES as any),
+    label: z.string().min(1).max(100),
+    startTime: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Use HH:MM"),
+    endTime: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Use HH:MM"),
+    daysOfWeek: z.string().regex(/^([0-6])(,[0-6])*$/, "CSV of 0-6").default("0,1,2,3,4,5,6"),
+    winChancePct: z.number().min(0).max(100).nullable().optional(),
+    payoutMultiplier: z.number().min(1.01).max(100).nullable().optional(),
+    enabled: z.boolean().default(true),
+  });
+
+  app.get("/api/admin/game-schedules", async (req, res) => {
+    if (!req.isAuthenticated() || req.user.role !== "admin") return res.status(403).send("Forbidden");
+    res.json(await storage.listGameSchedules());
+  });
+
+  app.post("/api/admin/game-schedules", async (req, res) => {
+    if (!req.isAuthenticated() || req.user.role !== "admin") return res.status(403).send("Forbidden");
+    try {
+      const parsed = scheduleSchema.parse(req.body);
+      const created = await storage.createGameSchedule(parsed as any, req.user.id);
+      res.json(created);
+    } catch (e: any) {
+      res.status(400).json({ message: e.errors?.[0]?.message || "Invalid input" });
+    }
+  });
+
+  app.patch("/api/admin/game-schedules/:id", async (req, res) => {
+    if (!req.isAuthenticated() || req.user.role !== "admin") return res.status(403).send("Forbidden");
+    try {
+      const parsed = scheduleSchema.partial().parse(req.body);
+      const updated = await storage.updateGameSchedule(parseInt(req.params.id), parsed as any);
+      if (!updated) return res.status(404).json({ message: "Not found" });
+      res.json(updated);
+    } catch (e: any) {
+      res.status(400).json({ message: e.errors?.[0]?.message || "Invalid input" });
+    }
+  });
+
+  app.delete("/api/admin/game-schedules/:id", async (req, res) => {
+    if (!req.isAuthenticated() || req.user.role !== "admin") return res.status(403).send("Forbidden");
+    await storage.deleteGameSchedule(parseInt(req.params.id));
+    res.json({ success: true });
+  });
+
+  // Background tick: every 60s, find enabled schedules whose current
+  // (HH:MM, weekday) falls inside their window and force-write their
+  // winChance/payoutMultiplier to gameSettings if different. Only one tick
+  // ever runs (registerRoutes is called once at boot).
+  const SCHEDULE_TICK_MS = 60_000;
+  const ADMIN_SYSTEM_USER_ID = 1; // for `updatedBy` audit trail
+  let scheduleTickRunning = false;
+  const applySchedules = async () => {
+    if (scheduleTickRunning) return; // skip if previous tick is still in flight
+    scheduleTickRunning = true;
+    try {
+      const rules = await storage.listGameSchedules();
+      const now = new Date();
+      const dow = String(now.getDay());
+      const hhmm = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
+      const isInWindow = (s: string, e: string) => {
+        // Supports overnight windows (e.g. 22:00-02:00).
+        if (s <= e) return hhmm >= s && hhmm <= e;
+        return hhmm >= s || hhmm <= e;
+      };
+      const active = rules.filter(r => r.enabled && r.daysOfWeek.split(",").includes(dow) && isInWindow(r.startTime, r.endTime));
+      // For each game, last-defined active rule wins (deterministic ordering by gameType,startTime in storage).
+      const perGame = new Map<string, typeof active[number]>();
+      for (const r of active) perGame.set(r.gameType, r);
+      for (const [gameType, r] of Array.from(perGame.entries())) {
+        const current = await storage.getGameSettings(gameType);
+        if (r.winChancePct != null) {
+          const wc = r.winChancePct / 100;
+          if (!current || Math.abs((current.winChance ?? 0) - wc) > 1e-6) {
+            await storage.updateGameSettings(gameType, wc, ADMIN_SYSTEM_USER_ID);
+          }
+        }
+        if (r.payoutMultiplier != null) {
+          if (!current || Math.abs((current.payoutMultiplier ?? 0) - r.payoutMultiplier) > 1e-6) {
+            await storage.updateGamePayoutMultiplier(gameType, r.payoutMultiplier, ADMIN_SYSTEM_USER_ID);
+          }
+        }
+      }
+    } catch (err) {
+      console.error("[schedule-tick] failed:", err);
+    } finally {
+      scheduleTickRunning = false;
+    }
+  };
+  // Avoid double-registration in dev HMR scenarios.
+  if (!(global as any).__gameScheduleTick) {
+    (global as any).__gameScheduleTick = setInterval(applySchedules, SCHEDULE_TICK_MS);
+    setTimeout(applySchedules, 5_000); // initial run shortly after boot
+  }
+
   // Permanently delete a broadcast. Same authorization as disable.
   app.delete("/api/broadcasts/:id", async (req, res) => {
     if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");

@@ -182,6 +182,29 @@ export const audioTracks = pgTable("audio_tracks", {
 export type AudioTrack = typeof audioTracks.$inferSelect;
 export type InsertAudioTrack = typeof audioTracks.$inferInsert;
 
+// Automated odds/multiplier scheduling. Each row is a rule: between
+// `startTime` and `endTime` (24h "HH:MM" strings, server-local time),
+// optionally restricted to specific weekdays, the named gameType's
+// `winChance` and/or `payoutMultiplier` are forced to the configured values.
+// A background tick (every 60s) reconciles game settings against the
+// currently-active rules so admin doesn't need to edit anything by hand.
+export const gameSchedules = pgTable("game_schedules", {
+  id: serial("id").primaryKey(),
+  gameType: text("game_type").notNull(),
+  label: text("label").notNull(),
+  startTime: text("start_time").notNull(),                    // "HH:MM"
+  endTime: text("end_time").notNull(),                        // "HH:MM"
+  daysOfWeek: text("days_of_week").default("0,1,2,3,4,5,6").notNull(), // CSV of 0(Sun)..6(Sat)
+  winChancePct: doublePrecision("win_chance_pct"),            // 0..100, optional
+  payoutMultiplier: doublePrecision("payout_multiplier"),     // 1.01..100, optional
+  enabled: boolean("enabled").default(true).notNull(),
+  createdBy: integer("created_by").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+export type GameSchedule = typeof gameSchedules.$inferSelect;
+export const insertGameScheduleSchema = createInsertSchema(gameSchedules).omit({ id: true, createdAt: true, createdBy: true });
+export type InsertGameSchedule = z.infer<typeof insertGameScheduleSchema>;
+
 // === RELATIONS ===
 
 export const usersRelations = relations(users, ({ one, many }) => ({
