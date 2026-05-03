@@ -3,8 +3,9 @@ import { useUser } from "@/hooks/use-auth";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Link, useLocation } from "wouter";
-import { Coins, Trophy, CreditCard, ChevronRight, Club, Dice5, Dices, Banknote, Sparkles, Zap, Star, RotateCcw, LucideIcon, Crown, Diamond, Fish, Plane } from "lucide-react";
+import { Coins, Trophy, CreditCard, ChevronRight, Club, Dice5, Dices, Banknote, Sparkles, Zap, Star, RotateCcw, LucideIcon, Crown, Diamond, Fish, Plane, Lock } from "lucide-react";
 import { useRedeemVoucher } from "@/hooks/use-vouchers";
+import { useQuery } from "@tanstack/react-query";
 import { useState, useEffect, useRef } from "react";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
@@ -176,7 +177,23 @@ export default function Lobby() {
   const { mutate: redeem, isPending } = useRedeemVoucher();
   const { toast } = useToast();
 
-  const openGame = (href: string) => {
+  // List of games this player is blocked from (cascades from any ancestor).
+  // Keys come from /api/user/disabled-games and are matched against game `id`s
+  // on the tile registry below.
+  const { data: disabledGames = [] } = useQuery<string[]>({
+    queryKey: ["/api/user/disabled-games"],
+  });
+  const isDisabled = (id: string) => disabledGames.includes(id);
+
+  const openGame = (href: string, id: string) => {
+    if (isDisabled(id)) {
+      toast({
+        title: "Game unavailable",
+        description: "This game has been turned off by the administrator.",
+        variant: "destructive",
+      });
+      return;
+    }
     if (document.documentElement.requestFullscreen) {
       document.documentElement.requestFullscreen().catch(() => {});
     }
@@ -539,13 +556,16 @@ export default function Lobby() {
             },
             {
               href: "/horse-racing",
+              // server-side gameType for /api/games/horse-js/* — matches the
+              // disable list returned by /api/user/disabled-games.
+              _aliasMatch: "horse-js" as any,
               img: "https://images.unsplash.com/photo-1574096163878-c3e4b3a79dcd?q=80&w=2070",
               icon: Star as LucideIcon,
               tag: "NEW",
               tagColor: "bg-red-700",
               title: "Quick Horse Race",
               desc: "Fast 4-horse race with custom odds and lap settings!",
-              id: "horse-racing"
+              id: "horse-js"
             },
             {
               href: "/aviator",
@@ -564,15 +584,27 @@ export default function Lobby() {
               whileHover={{ y: -10 }}
               transition={{ type: "spring", stiffness: 300 }}
             >
-              <div onClick={() => openGame(game.href)} className="cursor-pointer">
-                <div className="group relative h-72 rounded-3xl overflow-hidden cursor-pointer border border-white/10 hover:border-primary/50 transition-all duration-500 shadow-2xl hover:shadow-[0_0_50px_rgba(212,175,55,0.2)]" data-testid={`card-game-${game.id}`}>
+              <div onClick={() => openGame(game.href, game.id)} className={isDisabled(game.id) ? "cursor-not-allowed" : "cursor-pointer"}>
+                <div
+                  className={`group relative h-72 rounded-3xl overflow-hidden border transition-all duration-500 shadow-2xl casino-tile ${
+                    isDisabled(game.id)
+                      ? "border-rose-500/30 grayscale brightness-75 hover:border-rose-500/50"
+                      : "border-white/10 hover:border-primary/50 hover:shadow-[0_0_50px_rgba(212,175,55,0.35)]"
+                  }`}
+                  data-testid={`card-game-${game.id}`}
+                >
                   {/* Image Background with Parallax effect */}
-                  <motion.div 
-                    className="absolute inset-0 bg-cover bg-center transition-transform duration-700 group-hover:scale-110" 
+                  <motion.div
+                    className="absolute inset-0 bg-cover bg-center transition-transform duration-700 group-hover:scale-110"
                     style={{ backgroundImage: `url(${game.img})` }}
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-transparent group-hover:from-black/90 transition-all" />
-                  
+
+                  {/* Bright animated neon ring on hover (casino-floor feel) */}
+                  {!isDisabled(game.id) && (
+                    <div className="pointer-events-none absolute inset-0 rounded-3xl opacity-0 group-hover:opacity-100 transition-opacity duration-500 casino-neon-ring" />
+                  )}
+
                   <div className="absolute inset-0 p-8 flex flex-col justify-end">
                     <div className="space-y-3 transform translate-y-6 group-hover:translate-y-0 transition-transform duration-500">
                       <div className="flex items-center gap-3">
@@ -588,13 +620,26 @@ export default function Lobby() {
                       <motion.div
                         className="pt-2 opacity-0 group-hover:opacity-100 transition-all duration-500 delay-200"
                       >
-                        <Button variant="luxury" className="w-full sm:w-auto h-12 px-8 shadow-[0_5px_15px_rgba(0,0,0,0.3)]">
-                          Play Now <ChevronRight className="w-4 h-4 ml-2" />
+                        <Button variant="luxury" className="w-full sm:w-auto h-12 px-8 shadow-[0_5px_15px_rgba(0,0,0,0.3)]" disabled={isDisabled(game.id)}>
+                          {isDisabled(game.id) ? <>Disabled <Lock className="w-4 h-4 ml-2" /></> : <>Play Now <ChevronRight className="w-4 h-4 ml-2" /></>}
                         </Button>
                       </motion.div>
                     </div>
                   </div>
-                  
+
+                  {/* Locked overlay when game is turned off for this user */}
+                  {isDisabled(game.id) && (
+                    <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-20">
+                      <div className="bg-black/70 backdrop-blur-sm border-2 border-rose-500/60 rounded-2xl px-6 py-4 flex items-center gap-3 shadow-[0_0_30px_rgba(244,63,94,0.4)]">
+                        <Lock className="w-6 h-6 text-rose-400" />
+                        <div>
+                          <div className="text-rose-400 font-black uppercase tracking-widest text-xs">Out of order</div>
+                          <div className="text-white/70 text-[10px]">Disabled by admin</div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
                   {/* Decorative overlay for extra "luxury" feel */}
                   <div className="absolute inset-0 border-[0.5px] border-white/5 rounded-3xl pointer-events-none" />
                 </div>

@@ -103,6 +103,39 @@ export const messages = pgTable("messages", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+// One row per (user, gameType) disabled. The DB additionally enforces a
+// UNIQUE(user_id, game_type) constraint (created via migration) so the
+// `setGameDisabled` ON CONFLICT clause is safe.
+export const userGameDisables = pgTable("user_game_disables", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull(),
+  gameType: text("game_type").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export type UserGameDisable = typeof userGameDisables.$inferSelect;
+
+// Canonical list of toggleable games. Keep in sync with server route gating
+// and with the lobby tile registry. The `id` here matches the `gameType` used
+// in /api/games/<id>/* endpoints.
+export const GAMES_REGISTRY = [
+  { id: "classic-slots", label: "Classic Slots" },
+  { id: "roulette",      label: "European Roulette" },
+  { id: "dice",          label: "Royal Dice" },
+  { id: "hilo",          label: "High-Low Cards" },
+  { id: "coinflip",      label: "Double or Nothing" },
+  { id: "plinko",        label: "Plinko" },
+  { id: "wheel",         label: "Wheel of Fortune" },
+  { id: "fishhunt",      label: "Fish Joy / Hunt" },
+  { id: "fishjoy",       label: "Fish Joy (Iframe)" },
+  { id: "dog-racing",    label: "Greyhound Racing" },
+  { id: "horse4",        label: "Horse Racing" },
+  { id: "horse-js",      label: "Quick Horse Race" },
+  { id: "aviator",       label: "Aviator" },
+] as const;
+
+export type GameId = typeof GAMES_REGISTRY[number]["id"];
+
 export const audioTracks = pgTable("audio_tracks", {
   id: serial("id").primaryKey(),
   filename: text("filename").notNull(),

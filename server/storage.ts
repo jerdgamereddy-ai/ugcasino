@@ -1,4 +1,4 @@
-import { users, vouchers, transactions, gameSettings, withdrawalRequests, adminSecurityAnswers, broadcasts, broadcastDismissals, messages, audioTracks, type User, type InsertUser, type Voucher, type InsertVoucher, type Transaction, type GameSetting, type WithdrawalRequest, type InsertWithdrawalRequest, type AdminSecurityAnswer, type Broadcast, type BroadcastDismissal, type Message, type AudioTrack, type InsertAudioTrack } from "@shared/schema";
+import { users, vouchers, transactions, gameSettings, withdrawalRequests, adminSecurityAnswers, broadcasts, broadcastDismissals, messages, audioTracks, userGameDisables, type User, type InsertUser, type Voucher, type InsertVoucher, type Transaction, type GameSetting, type WithdrawalRequest, type InsertWithdrawalRequest, type AdminSecurityAnswer, type Broadcast, type BroadcastDismissal, type Message, type AudioTrack, type InsertAudioTrack, type UserGameDisable } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, sql, and, inArray, gte, lte, between } from "drizzle-orm";
 import session from "express-session";
@@ -80,6 +80,10 @@ export interface IStorage {
 
   getPendingUsersByManager(managerId: number): Promise<User[]>;
   getVouchersByCreator(creatorId: number): Promise<Voucher[]>;
+
+  getDisabledGamesForUser(userId: number): Promise<string[]>;
+  getEffectiveDisabledGames(userId: number): Promise<string[]>;
+  setGameDisabled(userId: number, gameType: string, disabled: boolean): Promise<void>;
 
   getAudioTracks(): Promise<AudioTrack[]>;
   getAudioTrackByFilename(filename: string): Promise<AudioTrack | undefined>;
@@ -512,6 +516,49 @@ export class DatabaseStorage implements IStorage {
     return await db.select().from(vouchers)
       .where(eq(vouchers.createdBy, creatorId))
       .orderBy(desc(vouchers.createdAt));
+  }
+
+  async getDisabledGamesForUser(userId: number): Promise<string[]> {
+    const rows = await db.select({ gameType: userGameDisables.gameType })
+      .from(userGameDisables)
+      .where(eq(userGameDisables.userId, userId));
+    return rows.map(r => r.gameType);
+  }
+
+  // Walks up the createdBy chain. A game is "effectively disabled" for a user
+  // if it is disabled for them OR any ancestor (the manager / super_manager /
+  // admin who sits above them). This implements the cascading shut-off rule.
+  async getEffectiveDisabledGames(userId: number): Promise<string[]> {
+    const ids: number[] = [];
+    let current: number | null = userId;
+    const seen = new Set<number>();
+    while (current && !seen.has(current)) {
+      seen.add(current);
+      ids.push(current);
+      const [u] = await db.select({ createdBy: users.createdBy })
+        .from(users)
+        .where(eq(users.id, current));
+      current = u?.createdBy ?? null;
+      if (ids.length > 8) break; // safety
+    }
+    if (ids.length === 0) return [];
+    const rows = await db.select({ gameType: userGameDisables.gameType })
+      .from(userGameDisables)
+      .where(inArray(userGameDisables.userId, ids));
+    return Array.from(new Set(rows.map(r => r.gameType)));
+  }
+
+  async setGameDisabled(userId: number, gameType: string, disabled: boolean): Promise<void> {
+    if (disabled) {
+      await db.execute(sql`
+        INSERT INTO user_game_disables (user_id, game_type)
+        VALUES (${userId}, ${gameType})
+        ON CONFLICT (user_id, game_type) DO NOTHING
+      `);
+    } else {
+      await db.delete(userGameDisables)
+        .where(and(eq(userGameDisables.userId, userId), eq(userGameDisables.gameType, gameType)));
+    }
   }
 
   async getAudioTracks(): Promise<AudioTrack[]> {

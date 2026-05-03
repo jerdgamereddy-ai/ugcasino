@@ -37,6 +37,7 @@ Preferred communication style: Simple, everyday language.
     - **Classic Slots iframe wrapper** (`GameClassicSlots`): adds a glowing win-line overlay (CSS only, `pointer-events:none`) on top of the iframe whenever a paying win is settled. Iframe game itself plays its own `reel_stop`/`reels` sounds via Howler.
     - **Fish Hunt iframe wrapper** (`GameFishJoy`): overlays a light water shimmer + surface caustics layer on top of the iframe via CSS keyframes (`fishhunt-water-shimmer`, `fishhunt-water-caustics` in `index.css`); pointer-events:none preserves click-through.
     - **React `SlotMachine` + `GameFishHunt`** (currently un-routed but kept polished): staggered reel stops with per-reel tick + flash, glowing win-line bar, ambient bubble loop and water shimmer.
+- **Per-User Game Enable/Disable** (`user_game_disables` table + `gateGame` middleware): Admin-only "Game Access Control" tab in `AdminDashboard` lets the admin toggle any individual game on/off for any user. The toggle writes a row keyed by `(user_id, game_type)`. Server-side enforcement walks the `createdBy` chain on every game request via `storage.getEffectiveDisabledGames(userId)`, so disabling a game for a super manager OR manager automatically blocks every player below them — admins can yank a buggy game out of circulation for an entire branch with one click. Every `/api/games/<id>/(bet|win|play|roll|spin|cashout|shoot)` endpoint now starts with `if (await gateGame(req, res, "<id>")) return;` returning 403 + `{gameDisabled:true}`. The lobby (`Lobby.tsx`) reads `/api/user/disabled-games` and grays out + locks (with a "Out of order — Disabled by admin" overlay) any tile whose `id` is in the list; clicking blocked tiles shows a toast instead of navigating. The `id` of the Quick-Horse tile was renamed `horse-racing → horse-js` so it lines up with the server `gameType`.
 - **Role-Based Access Control**:
     - **User**: Play games, redeem vouchers, view balance.
     - **Manager**: User permissions + create players, manage player passwords, view player reports.
@@ -57,6 +58,10 @@ Preferred communication style: Simple, everyday language.
 ### Database
 - **PostgreSQL**: Main database.
 - **connect-pg-simple**: For PostgreSQL session storage.
+
+### Casino Visual Polish
+- Game tiles in `Lobby.tsx` now carry a `casino-tile` class (slow gold/rose/violet box-shadow pulse) plus a `casino-neon-ring` hover overlay that paints a rotating multicolor conic-gradient marquee around the tile (gold → pink → purple → cyan → emerald). Both keyframes live in `client/src/index.css`.
+- Disabled tiles get a grayscale + brightness-75 treatment plus a `Lock` icon "Out of order" badge so blocked games are visually obvious at a glance.
 
 ### Background Music Player (`GlobalMusicPlayer`)
 - Audio binaries are stored as `bytea` in `audio_tracks.data` so the music survives Replit deploys (the `/uploads` folder is rebuilt on each deploy and would otherwise lose all tracks).

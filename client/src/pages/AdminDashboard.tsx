@@ -25,6 +25,7 @@ import { BroadcastBanner } from "@/components/BroadcastBanner";
 import { BroadcastSender } from "@/components/BroadcastSender";
 import { ProfitCalculator } from "@/components/ProfitCalculator";
 import { ChatPanel } from "@/components/ChatPanel";
+import { GameAccessControl } from "@/components/GameAccessControl";
 import { MessageCircle } from "lucide-react";
 
 type GameFormData = z.infer<typeof updateGameSettingsSchema>;
@@ -975,6 +976,7 @@ export default function AdminDashboard() {
             <TabsTrigger value="vouchers" data-testid="tab-vouchers">Vouchers</TabsTrigger>
             <TabsTrigger value="requests" data-testid="tab-requests">Withdrawals</TabsTrigger>
             <TabsTrigger value="gamecontrol" data-testid="tab-gamecontrol"><Settings2 className="w-3 h-3 mr-1" /> Game Control</TabsTrigger>
+            <TabsTrigger value="gameaccess" data-testid="tab-gameaccess"><Lock className="w-3 h-3 mr-1" /> Game Access</TabsTrigger>
             <TabsTrigger value="reports" data-testid="tab-reports">Reports</TabsTrigger>
             <TabsTrigger value="profit" data-testid="tab-profit"><Calculator className="w-3 h-3 mr-1" /> Profit Calculator</TabsTrigger>
             <TabsTrigger value="broadcast" data-testid="tab-broadcast"><Megaphone className="w-3 h-3 mr-1" /> Broadcast</TabsTrigger>
@@ -1322,6 +1324,16 @@ export default function AdminDashboard() {
                 )}
               </div>
               <FishJoyOddsCard />
+            </div>
+          </TabsContent>
+
+          <TabsContent value="gameaccess" className="mt-6">
+            <div className="space-y-4">
+              <div className="flex items-center gap-2">
+                <Lock className="w-5 h-5 text-primary" />
+                <h2 className="text-xl font-bold">Game Access Control</h2>
+              </div>
+              <GameAccessControl />
             </div>
           </TabsContent>
 

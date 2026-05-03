@@ -131,6 +131,61 @@ export async function registerRoutes(
     return intendedWin;
   }
 
+  // === PER-USER GAME ENABLE / DISABLE (admin-controlled, cascades) ===
+  // gateGame returns `true` (and writes a response) when the request should be
+  // blocked: either unauthenticated, or this game is disabled for the user OR
+  // any of their ancestors in the createdBy chain. Callers do
+  // `if (await gateGame(req, res, "dice")) return;` at the top of game routes.
+  async function gateGame(req: any, res: any, gameType: string): Promise<boolean> {
+    if (!req.isAuthenticated()) { res.status(401).send("Unauthorized"); return true; }
+    try {
+      const disabled = await storage.getEffectiveDisabledGames(req.user.id);
+      if (disabled.includes(gameType)) {
+        res.status(403).json({ message: "This game is currently disabled for your account.", gameDisabled: true, gameType });
+        return true;
+      }
+    } catch (e) {
+      // Fail-CLOSED: if we cannot determine whether this game is allowed for
+      // the user, refuse the request. This prevents a transient DB error from
+      // becoming an authorization-bypass that lets disabled games run.
+      res.status(503).json({ message: "Game access check unavailable, please try again." });
+      return true;
+    }
+    return false;
+  }
+
+  // Effective disabled list for the logged-in player (used by the lobby UI).
+  app.get("/api/user/disabled-games", async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    const list = await storage.getEffectiveDisabledGames(req.user.id);
+    res.json(list);
+  });
+
+  // Admin: read the disable rows that were set *directly* on a user (not the
+  // effective/cascaded list) — this is what the toggle UI binds to.
+  app.get("/api/admin/users/:id/disabled-games", async (req, res) => {
+    if (!req.isAuthenticated() || req.user.role !== 'admin') return res.status(403).send("Forbidden");
+    const userId = parseInt(req.params.id, 10);
+    if (!userId) return res.status(400).json({ message: "Invalid user id" });
+    const own = await storage.getDisabledGamesForUser(userId);
+    const effective = await storage.getEffectiveDisabledGames(userId);
+    res.json({ own, effective });
+  });
+
+  // Admin: toggle a single (user, gameType) on/off. Cascades to all sub-users
+  // automatically because the lookup walks the createdBy chain on every check.
+  app.post("/api/admin/users/:id/disabled-games", async (req, res) => {
+    if (!req.isAuthenticated() || req.user.role !== 'admin') return res.status(403).send("Forbidden");
+    const userId = parseInt(req.params.id, 10);
+    if (!userId) return res.status(400).json({ message: "Invalid user id" });
+    const { gameType, disabled } = z.object({
+      gameType: z.string().min(1),
+      disabled: z.boolean(),
+    }).parse(req.body);
+    await storage.setGameDisabled(userId, gameType, disabled);
+    res.json({ ok: true });
+  });
+
   // === ADMIN USER STATS ===
   app.get("/api/admin/user-stats", async (req, res) => {
     if (!req.isAuthenticated() || req.user.role !== 'admin') return res.status(403).send("Forbidden");
@@ -840,6 +895,7 @@ export async function registerRoutes(
   // === HILO GAME ===
   app.post("/api/games/hilo/play", async (req, res) => {
     if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    if (await gateGame(req, res, "hilo")) return;
     try {
       const { bet, prediction, lastCard } = z.object({ 
         bet: z.number().min(500),
@@ -920,6 +976,7 @@ export async function registerRoutes(
 
   app.post("/api/games/dog-racing/bet", async (req, res) => {
     if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    if (await gateGame(req, res, "dog-racing")) return;
     try {
       const { totBet } = z.object({ bet: z.number().min(1), totBet: z.number().min(1) }).parse(req.body);
       if (req.user.balance < totBet) return res.status(400).json({ message: "Insufficient balance" });
@@ -939,6 +996,7 @@ export async function registerRoutes(
 
   app.post("/api/games/dog-racing/win", async (req, res) => {
     if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    if (await gateGame(req, res, "dog-racing")) return;
     try {
       const { winAmount, roundId } = z.object({
         winAmount: z.number().min(0).max(50000000),
@@ -1005,6 +1063,7 @@ export async function registerRoutes(
 
   app.post("/api/games/horse4/bet", async (req, res) => {
     if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    if (await gateGame(req, res, "horse4")) return;
     try {
       const { totBet } = z.object({ bet: z.number().min(1), totBet: z.number().min(1) }).parse(req.body);
       if (req.user.balance < totBet) return res.status(400).json({ message: "Insufficient balance" });
@@ -1024,6 +1083,7 @@ export async function registerRoutes(
 
   app.post("/api/games/horse4/win", async (req, res) => {
     if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    if (await gateGame(req, res, "horse4")) return;
     try {
       const { winAmount, roundId } = z.object({
         winAmount: z.number().min(0).max(50000000),
@@ -1092,6 +1152,7 @@ export async function registerRoutes(
 
   app.post("/api/games/horse-js/bet", async (req, res) => {
     if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    if (await gateGame(req, res, "horse-js")) return;
     try {
       const { totBet } = z.object({ bet: z.number().min(500), totBet: z.number().min(500) }).parse(req.body);
       if (req.user.balance < totBet) return res.status(400).json({ message: "Insufficient balance" });
@@ -1111,6 +1172,7 @@ export async function registerRoutes(
 
   app.post("/api/games/horse-js/win", async (req, res) => {
     if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    if (await gateGame(req, res, "horse-js")) return;
     try {
       const { winAmount, roundId } = z.object({
         winAmount: z.number().min(0).max(50000000),
@@ -1138,6 +1200,7 @@ export async function registerRoutes(
   // === DICE GAME ===
   app.post("/api/games/dice/roll", async (req, res) => {
     if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    if (await gateGame(req, res, "dice")) return;
     try {
       const { bet, choice } = z.object({ 
         bet: z.number().min(500),
@@ -1184,6 +1247,7 @@ export async function registerRoutes(
 
   app.post("/api/games/coinflip/play", async (req, res) => {
     if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    if (await gateGame(req, res, "coinflip")) return;
     try {
       const { bet, choice } = z.object({ 
         bet: z.number().min(500),
@@ -1217,6 +1281,7 @@ export async function registerRoutes(
   // === PLINKO GAME ===
   app.post("/api/games/plinko/play", async (req, res) => {
     if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    if (await gateGame(req, res, "plinko")) return;
     try {
       const { bet } = z.object({ bet: z.number().min(500) }).parse(req.body);
       if (req.user.balance < bet) return res.status(400).json({ message: "Insufficient balance" });
@@ -1257,6 +1322,7 @@ export async function registerRoutes(
   // === WHEEL GAME ===
   app.post("/api/games/wheel/play", async (req, res) => {
     if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    if (await gateGame(req, res, "wheel")) return;
     try {
       const { bet } = z.object({ bet: z.number().min(500) }).parse(req.body);
       if (req.user.balance < bet) return res.status(400).json({ message: "Insufficient balance" });
@@ -1430,6 +1496,7 @@ export async function registerRoutes(
   // === FISH HUNT GAME ===
   app.post("/api/games/fishhunt/shoot", async (req, res) => {
     if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    if (await gateGame(req, res, "fishhunt")) return;
 
     try {
       const settings = await storage.getGameSettings("fishhunt");
@@ -1548,6 +1615,7 @@ export async function registerRoutes(
 
   app.post("/api/games/aviator/bet", async (req, res) => {
     if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    if (await gateGame(req, res, "aviator")) return;
     try {
       const { bet } = z.object({ bet: z.number().int().min(100) }).parse(req.body);
       if (req.user.balance < bet) return res.status(400).json({ message: "Insufficient balance" });
@@ -1580,6 +1648,7 @@ export async function registerRoutes(
 
   app.post("/api/games/aviator/cashout", async (req, res) => {
     if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    if (await gateGame(req, res, "aviator")) return;
     try {
       const { roundId } = z.object({ roundId: z.string().min(1) }).parse(req.body);
       const round = aviatorRounds.get(roundId);
@@ -1653,6 +1722,7 @@ export async function registerRoutes(
   // === FISH JOY ===
   app.post("/api/games/fishjoy/bet", async (req, res) => {
     if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    if (await gateGame(req, res, "fishjoy")) return;
     try {
       const { bet } = z.object({ bet: z.number().min(1) }).parse(req.body);
       if (req.user.balance < bet) return res.status(400).json({ message: "Insufficient balance" });
@@ -1668,6 +1738,7 @@ export async function registerRoutes(
 
   app.post("/api/games/fishjoy/win", async (req, res) => {
     if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    if (await gateGame(req, res, "fishjoy")) return;
     try {
       const { winAmount } = z.object({ winAmount: z.number().min(1) }).parse(req.body);
       const finalWin = await applyHouseEdgeForWin("fishjoy", req.user.id, winAmount);
@@ -1721,6 +1792,7 @@ export async function registerRoutes(
 
   app.post("/api/games/classic-slots/bet", async (req, res) => {
     if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    if (await gateGame(req, res, "classic-slots")) return;
     try {
       const { bet, totBet } = z.object({ bet: z.number().min(1), totBet: z.number().min(1) }).parse(req.body);
       const amount = totBet || bet;
@@ -1735,6 +1807,7 @@ export async function registerRoutes(
 
   app.post("/api/games/classic-slots/win", async (req, res) => {
     if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    if (await gateGame(req, res, "classic-slots")) return;
     try {
       const { winAmount } = z.object({ winAmount: z.number().min(0) }).parse(req.body);
       const finalWin = await applyHouseEdgeForWin("classic-slots", req.user.id, winAmount);
