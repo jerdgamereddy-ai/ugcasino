@@ -1084,8 +1084,14 @@ export async function registerRoutes(
       const dogSettingsPre = await storage.getGameSettings("dog-racing");
       const dogExtraPre = (() => { try { return dogSettingsPre?.extraSettings ? JSON.parse(dogSettingsPre.extraSettings) : {}; } catch { return {}; } })();
       const dogMaxOdds = Math.max(...((dogExtraPre.odds as number[]) ?? [3.7, 5.5, 2.2, 11.75, 17.25, 8.75]));
-      // No pre-block: computeForceLose below already consults the bankroll
-      // floor and will return forceLose=true so the iframe shows a losing race.
+      // Race games are the ONLY games where a player can guarantee a win by
+      // dutching across every runner — forceLose can't help if they covered
+      // all positions. So we hard-block here when the worst-case payout would
+      // breach the bankroll floor.
+      const dogGuard = await checkBankrollFloorForBet(totBet * dogMaxOdds);
+      if (dogGuard.blocked) {
+        return res.status(400).json({ message: "Bet too large — maximum possible payout exceeds the house bankroll. Please lower your bet.", bankrollBlocked: true });
+      }
       await storage.updateUserBalance(req.user.id, -totBet);
       await storage.createTransaction({ userId: req.user.id, amount: -totBet, type: "bet", description: "Greyhound Racing bet" });
       await recordBetAndCheckHighBet("dog-racing", req.user.id, totBet);
@@ -1173,8 +1179,13 @@ export async function registerRoutes(
       const h4Settings = await storage.getGameSettings("horse4");
       const h4Extra = (() => { try { return h4Settings?.extraSettings ? JSON.parse(h4Settings.extraSettings) : {}; } catch { return {}; } })();
       const h4MaxOdds = Math.max(...((h4Extra.odds as number[]) ?? [3.7, 5.5, 2.2, 11.75, 17.25, 8.75, 7.15, 6.15]));
-      // No pre-block: computeForceLose below already consults the bankroll
-      // floor and will return forceLose=true so the iframe shows a losing race.
+      // Race games are the ONLY games where a player can guarantee a win by
+      // dutching across every runner — hard-block when worst-case payout
+      // would breach the bankroll floor.
+      const h4Guard = await checkBankrollFloorForBet(totBet * h4MaxOdds);
+      if (h4Guard.blocked) {
+        return res.status(400).json({ message: "Bet too large — maximum possible payout exceeds the house bankroll. Please lower your bet.", bankrollBlocked: true });
+      }
       await storage.updateUserBalance(req.user.id, -totBet);
       await storage.createTransaction({ userId: req.user.id, amount: -totBet, type: "bet", description: "Horse4 Racing bet" });
       await recordBetAndCheckHighBet("horse4", req.user.id, totBet);
@@ -1264,8 +1275,13 @@ export async function registerRoutes(
       const hjSettings = await storage.getGameSettings("horse-js");
       const hjExtra = (() => { try { return hjSettings?.extraSettings ? JSON.parse(hjSettings.extraSettings) : {}; } catch { return {}; } })();
       const hjMaxOdds = Math.max(...((hjExtra.odds as number[]) ?? [2.0, 2.5, 3.0, 3.5]));
-      // No pre-block: computeForceLose below already consults the bankroll
-      // floor and will return forceLose=true so the iframe shows a losing race.
+      // Race games are the ONLY games where a player can guarantee a win by
+      // dutching across every runner (especially with only 4 horses) —
+      // hard-block when worst-case payout would breach the bankroll floor.
+      const hjGuard = await checkBankrollFloorForBet(totBet * hjMaxOdds);
+      if (hjGuard.blocked) {
+        return res.status(400).json({ message: "Bet too large — maximum possible payout exceeds the house bankroll. Please lower your bet.", bankrollBlocked: true });
+      }
       await storage.updateUserBalance(req.user.id, -totBet);
       await storage.createTransaction({ userId: req.user.id, amount: -totBet, type: "bet", description: "Horse Racing bet" });
       await recordBetAndCheckHighBet("horse-js", req.user.id, totBet);
