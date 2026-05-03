@@ -4,6 +4,7 @@ import { useLocation } from "wouter";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, Maximize, Minimize } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 import type { User } from "@shared/schema";
 
 export default function GameHorse4() {
@@ -13,6 +14,7 @@ export default function GameHorse4() {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const balanceSentRef = useRef(false);
   const iframeLoadedRef = useRef(false);
+  const { toast } = useToast();
 
   const { data: user } = useQuery<User>({ queryKey: ["/api/user"] });
   const { data: gameSettings } = useQuery<{ winOccurrence: number; odds?: number[]; placeOdds?: number[]; showOdds?: number[] }>({
@@ -27,8 +29,12 @@ export default function GameHorse4() {
       const res = await apiRequest("POST", "/api/games/horse4/bet", data);
       return res.json();
     },
-    onSuccess: (data: { balance: number }) => {
+    onSuccess: (data: { balance: number; forceLose?: boolean }) => {
       postBetBalanceRef.current = data.balance;
+      iframeRef.current?.contentWindow?.postMessage(
+        { type: "set_win_chance", winOccurrence: data.forceLose ? 0 : (gameSettings?.winOccurrence ?? 40) },
+        "*"
+      );
       queryClient.invalidateQueries({ queryKey: ["/api/user"] });
     },
     onError: () => {
@@ -42,7 +48,18 @@ export default function GameHorse4() {
       const res = await apiRequest("POST", "/api/games/horse4/win", data);
       return res.json();
     },
-    onSuccess: () => {
+    onSuccess: (data: { balance: number; blocked?: boolean }) => {
+      if (data.blocked) {
+        iframeRef.current?.contentWindow?.postMessage(
+          { type: "sync_balance", balance: data.balance },
+          "*"
+        );
+        toast({
+          title: "Round result voided",
+          description: "Your balance has been refreshed to the live server amount.",
+          variant: "destructive",
+        });
+      }
       queryClient.invalidateQueries({ queryKey: ["/api/user"] });
     },
   });

@@ -76,6 +76,21 @@ export async function registerRoutes(
     lockedLossMap.delete(lossKey(userId, gameType));
   }
 
+  // Pre-flight: would the maximum credible win for this round be blocked right now?
+  // Used by /bet endpoints so the iframe game can force a losing visual outcome
+  // (avoids showing a "win" that the server then silently refuses to credit).
+  // maxPotentialWin should be the largest payout this bet can produce (e.g. bet * maxOdds).
+  async function computeForceLose(gameType: string, userId: number, maxPotentialWin: number = 1): Promise<boolean> {
+    const k = lossKey(userId, gameType);
+    if (lockedLossMap.get(k)) return true;
+    const settings = await storage.getGameSettings(gameType);
+    if (!settings) return false;
+    const targetRTP = 1 - (settings.houseEdgePct ?? 5) / 100;
+    const probe = Math.max(1, maxPotentialWin);
+    if (settings.totalBet > 0 && (settings.totalPaid + probe) / settings.totalBet > targetRTP) return true;
+    return false;
+  }
+
   async function applyHouseEdgeForWin(
     gameType: string, userId: number, intendedWin: number
   ): Promise<number> {
@@ -897,8 +912,12 @@ export async function registerRoutes(
       await storage.updateUserBalance(req.user.id, -totBet);
       await storage.createTransaction({ userId: req.user.id, amount: -totBet, type: "bet", description: "Greyhound Racing bet" });
       await recordBetAndCheckHighBet("dog-racing", req.user.id, totBet);
+      const dogSettings = await storage.getGameSettings("dog-racing");
+      const dogExtra = (() => { try { return dogSettings?.extraSettings ? JSON.parse(dogSettings.extraSettings) : {}; } catch { return {}; } })();
+      const dogMaxOdds = Math.max(...((dogExtra.odds as number[]) ?? [3.7, 5.5, 2.2, 11.75, 17.25, 8.75]));
+      const forceLose = await computeForceLose("dog-racing", req.user.id, totBet * dogMaxOdds);
       const user = await storage.getUser(req.user.id);
-      res.json({ balance: user?.balance ?? 0 });
+      res.json({ balance: user?.balance ?? 0, forceLose });
     } catch (err) { res.status(500).json({ message: "Internal Server Error" }); }
   });
 
@@ -962,8 +981,12 @@ export async function registerRoutes(
       await storage.updateUserBalance(req.user.id, -totBet);
       await storage.createTransaction({ userId: req.user.id, amount: -totBet, type: "bet", description: "Horse4 Racing bet" });
       await recordBetAndCheckHighBet("horse4", req.user.id, totBet);
+      const h4Settings = await storage.getGameSettings("horse4");
+      const h4Extra = (() => { try { return h4Settings?.extraSettings ? JSON.parse(h4Settings.extraSettings) : {}; } catch { return {}; } })();
+      const h4MaxOdds = Math.max(...((h4Extra.odds as number[]) ?? [3.7, 5.5, 2.2, 11.75, 17.25, 8.75, 7.15, 6.15]));
+      const forceLose = await computeForceLose("horse4", req.user.id, totBet * h4MaxOdds);
       const user = await storage.getUser(req.user.id);
-      res.json({ balance: user?.balance ?? 0 });
+      res.json({ balance: user?.balance ?? 0, forceLose });
     } catch (err) { res.status(500).json({ message: "Internal Server Error" }); }
   });
 
@@ -1031,8 +1054,12 @@ export async function registerRoutes(
       await storage.updateUserBalance(req.user.id, -totBet);
       await storage.createTransaction({ userId: req.user.id, amount: -totBet, type: "bet", description: "Horse Racing bet" });
       await recordBetAndCheckHighBet("horse-js", req.user.id, totBet);
+      const hjSettings = await storage.getGameSettings("horse-js");
+      const hjExtra = (() => { try { return hjSettings?.extraSettings ? JSON.parse(hjSettings.extraSettings) : {}; } catch { return {}; } })();
+      const hjMaxOdds = Math.max(...((hjExtra.odds as number[]) ?? [2.0, 2.5, 3.0, 3.5]));
+      const forceLose = await computeForceLose("horse-js", req.user.id, totBet * hjMaxOdds);
       const user = await storage.getUser(req.user.id);
-      res.json({ balance: user?.balance ?? 0 });
+      res.json({ balance: user?.balance ?? 0, forceLose });
     } catch (err) { res.status(500).json({ message: "Internal Server Error" }); }
   });
 

@@ -30,6 +30,27 @@
                     }
                     return;
                 }
+                // Server-driven win-chance override (per-race house-edge gate).
+                // 0 forces a losing race; positive value restores the configured win chance.
+                // Force-correct iframe's local money to server's truth (after a blocked win).
+                if (event.data && event.data.type === 'sync_balance' && typeof event.data.balance === 'number') {
+                    if (typeof s_iCurMoney !== 'undefined') {
+                        s_iCurMoney = event.data.balance;
+                        if (typeof s_oInterface !== 'undefined' && s_oInterface && typeof s_oInterface.refreshMoney === 'function') {
+                            try { s_oInterface.refreshMoney(); } catch (e) {}
+                        }
+                    }
+                    return;
+                }
+                if (event.data && event.data.type === 'set_win_chance') {
+                    if (typeof event.data.winOccurrence === 'number') {
+                        _winOccurrence = event.data.winOccurrence;
+                        if (typeof WIN_OCCURRENCE !== 'undefined') {
+                            WIN_OCCURRENCE = event.data.winOccurrence;
+                        }
+                    }
+                    return;
+                }
                 if (event.data && event.data.type === 'init_balance' && !_gameInitialized) {
                     _parentBalance = event.data.balance;
                     if (typeof event.data.winOccurrence === 'number') {
