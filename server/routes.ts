@@ -6,7 +6,7 @@ import { api } from "@shared/routes";
 import { z } from "zod";
 import { randomBytes } from "crypto";
 import { hashPassword } from "./auth";
-import { adminPasswordSchema, securityAnswersSchema, securityVerifySchema, ADMIN_SECURITY_QUESTIONS, type User } from "@shared/schema";
+import { adminPasswordSchema, securityAnswersSchema, securityVerifySchema, ADMIN_SECURITY_QUESTIONS, updateUniversalHouseEdgeSchema, type User } from "@shared/schema";
 import multer from "multer";
 import path from "path";
 import fs from "fs";
@@ -45,37 +45,80 @@ export async function registerRoutes(
     }
   }, 60 * 1000).unref?.();
 
+  // ===== UNIVERSAL HOUSE EDGE =====
+  // When the admin enables the universal house edge, every game consults this
+  // single config (RTP target + minimum house bankroll) instead of its own
+  // per-game houseEdgePct/totalBet/totalPaid stats. We additionally block any
+  // payout that would push the combined house bankroll (admin + super
+  // managers + managers) below `minHouseBalance`.
+  //
+  // Returns the per-game force-lose decision against universal stats, or null
+  // when the universal toggle is OFF (callers should fall back to per-game).
+  async function checkUniversalForceLose(probeWin: number): Promise<boolean | null> {
+    let u;
+    try { u = await storage.getUniversalHouseEdge(); } catch { return null; }
+    if (!u.enabled) return null;
+    // Bankroll floor: never let a win drag the house below the configured floor.
+    if (u.minHouseBalance > 0) {
+      const bankroll = await storage.getHouseBankroll().catch(() => 0);
+      if (bankroll - probeWin < u.minHouseBalance) return true;
+    }
+    // RTP target across all games.
+    const targetRTP = 1 - (u.houseEdgePct ?? 5) / 100;
+    if (u.totalBet > 0 && (u.totalPaid + Math.max(1, probeWin)) / u.totalBet > targetRTP) return true;
+    return false;
+  }
+
+  async function recordBet(gameType: string, betAmount: number) {
+    if (betAmount <= 0) return;
+    await storage.recordHouseEdgeBet(gameType, betAmount).catch(() => {});
+    await storage.recordUniversalBet(betAmount).catch(() => {});
+  }
+
+  async function recordPayout(gameType: string, payout: number) {
+    if (payout <= 0) return;
+    await storage.recordHouseEdgePayout(gameType, payout).catch(() => {});
+    await storage.recordUniversalPayout(payout).catch(() => {});
+  }
+
   // Single-call helper: records the bet, then validates the intended win against
   // house-edge & high-bet protection. Returns the actually-paid win amount.
   async function processCombinedBetAndWin(
     gameType: string, userId: number, betAmount: number, intendedWin: number
   ): Promise<number> {
-    await storage.recordHouseEdgeBet(gameType, betAmount).catch(() => {});
+    await recordBet(gameType, betAmount);
     if (intendedWin <= 0) return 0;
     const settings = await storage.getGameSettings(gameType);
     if (!settings) {
-      await storage.recordHouseEdgePayout(gameType, intendedWin).catch(() => {});
+      const blockedByUniversal = await checkUniversalForceLose(intendedWin);
+      if (blockedByUniversal) return 0;
+      await recordPayout(gameType, intendedWin);
       return intendedWin;
     }
-    // High-bet protection
+    // High-bet protection (always active)
     if (settings.highBetThreshold > 0 && betAmount >= settings.highBetThreshold) {
       const totalWagered = await storage.getUserTotalWagered(userId);
       const required = settings.highBetThreshold * settings.highBetWagerMultiplier;
       if (totalWagered < required) return 0;
     }
-    // House edge
-    const targetRTP = 1 - (settings.houseEdgePct ?? 5) / 100;
-    const newTotalBet = settings.totalBet + betAmount;
-    if (newTotalBet > 0 && (settings.totalPaid + intendedWin) / newTotalBet > targetRTP) {
-      return 0;
+    // Universal house edge takes precedence when enabled.
+    const universalDecision = await checkUniversalForceLose(intendedWin);
+    if (universalDecision === true) return 0;
+    if (universalDecision === null) {
+      // Per-game house edge
+      const targetRTP = 1 - (settings.houseEdgePct ?? 5) / 100;
+      const newTotalBet = settings.totalBet + betAmount;
+      if (newTotalBet > 0 && (settings.totalPaid + intendedWin) / newTotalBet > targetRTP) {
+        return 0;
+      }
     }
-    await storage.recordHouseEdgePayout(gameType, intendedWin).catch(() => {});
+    await recordPayout(gameType, intendedWin);
     return intendedWin;
   }
 
   // Split-call helpers: bet endpoint records and may flag a forced loss; win endpoint applies it.
   async function recordBetAndCheckHighBet(gameType: string, userId: number, betAmount: number) {
-    await storage.recordHouseEdgeBet(gameType, betAmount).catch(() => {});
+    await recordBet(gameType, betAmount);
     lockedBetAmountMap.set(lossKey(userId, gameType), betAmount);
     const settings = await storage.getGameSettings(gameType);
     if (!settings) { lockedLossMap.delete(lossKey(userId, gameType)); return; }
@@ -97,10 +140,14 @@ export async function registerRoutes(
   async function computeForceLose(gameType: string, userId: number, maxPotentialWin: number = 1): Promise<boolean> {
     const k = lossKey(userId, gameType);
     if (lockedLossMap.get(k)) return true;
+    const probe = Math.max(1, maxPotentialWin);
+    const universalDecision = await checkUniversalForceLose(probe);
+    if (universalDecision === true) return true;
+    if (universalDecision === false) return false; // universal is enabled and allows it
+    // Universal disabled — fall back to per-game
     const settings = await storage.getGameSettings(gameType);
     if (!settings) return false;
     const targetRTP = 1 - (settings.houseEdgePct ?? 5) / 100;
-    const probe = Math.max(1, maxPotentialWin);
     if (settings.totalBet > 0 && (settings.totalPaid + probe) / settings.totalBet > targetRTP) return true;
     return false;
   }
@@ -115,18 +162,23 @@ export async function registerRoutes(
       lockedBetAmountMap.delete(k);
       return 0;
     }
-    const settings = await storage.getGameSettings(gameType);
-    if (!settings) {
-      await storage.recordHouseEdgePayout(gameType, intendedWin).catch(() => {});
-      lockedBetAmountMap.delete(k);
-      return intendedWin;
-    }
-    const targetRTP = 1 - (settings.houseEdgePct ?? 5) / 100;
-    if (settings.totalBet > 0 && (settings.totalPaid + intendedWin) / settings.totalBet > targetRTP) {
+    const universalDecision = await checkUniversalForceLose(intendedWin);
+    if (universalDecision === true) {
       lockedBetAmountMap.delete(k);
       return 0;
     }
-    await storage.recordHouseEdgePayout(gameType, intendedWin).catch(() => {});
+    if (universalDecision === null) {
+      // Universal disabled — apply per-game RTP cap.
+      const settings = await storage.getGameSettings(gameType);
+      if (settings) {
+        const targetRTP = 1 - (settings.houseEdgePct ?? 5) / 100;
+        if (settings.totalBet > 0 && (settings.totalPaid + intendedWin) / settings.totalBet > targetRTP) {
+          lockedBetAmountMap.delete(k);
+          return 0;
+        }
+      }
+    }
+    await recordPayout(gameType, intendedWin);
     lockedBetAmountMap.delete(k);
     return intendedWin;
   }
@@ -805,6 +857,37 @@ export async function registerRoutes(
     } catch (err) {
       res.status(400).json({ message: "Invalid input" });
     }
+  });
+
+  // === UNIVERSAL HOUSE EDGE (admin) ===
+  // GET returns the current config + the live house bankroll (admin + manager
+  // balances) so the admin UI can show whether wins are currently being capped
+  // by the bankroll floor.
+  app.get("/api/admin/universal-house-edge", async (req, res) => {
+    if (!req.isAuthenticated() || req.user.role !== 'admin') return res.status(403).send("Forbidden");
+    const [config, bankroll] = await Promise.all([
+      storage.getUniversalHouseEdge(),
+      storage.getHouseBankroll().catch(() => 0),
+    ]);
+    const rtp = config.totalBet > 0 ? config.totalPaid / config.totalBet : 0;
+    res.json({ ...config, bankroll, currentRTP: rtp });
+  });
+
+  app.patch("/api/admin/universal-house-edge", async (req, res) => {
+    if (!req.isAuthenticated() || req.user.role !== 'admin') return res.status(403).send("Forbidden");
+    try {
+      const data = updateUniversalHouseEdgeSchema.parse(req.body);
+      const updated = await storage.updateUniversalHouseEdge(data, req.user.id);
+      res.json(updated);
+    } catch {
+      res.status(400).json({ message: "Invalid input" });
+    }
+  });
+
+  app.post("/api/admin/universal-house-edge/reset-stats", async (req, res) => {
+    if (!req.isAuthenticated() || req.user.role !== 'admin') return res.status(403).send("Forbidden");
+    const updated = await storage.resetUniversalHouseEdgeStats(req.user.id);
+    res.json(updated);
   });
 
   // === DIRECT CREDIT USER BALANCE (admin / super_manager / manager) ===

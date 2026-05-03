@@ -205,6 +205,30 @@ export type GameSchedule = typeof gameSchedules.$inferSelect;
 export const insertGameScheduleSchema = createInsertSchema(gameSchedules).omit({ id: true, createdAt: true, createdBy: true });
 export type InsertGameSchedule = z.infer<typeof insertGameScheduleSchema>;
 
+// Singleton row (id=1) holding the global "Universal House Edge" config.
+// When `enabled=true`, ALL games consult this single house-edge configuration
+// instead of their per-game houseEdgePct / totalBet / totalPaid stats. Wins
+// are also blocked whenever the combined house bankroll (admin + super
+// managers + managers) would drop below `minHouseBalance`.
+export const universalHouseEdge = pgTable("universal_house_edge", {
+  id: integer("id").primaryKey().default(1),
+  enabled: boolean("enabled").default(false).notNull(),
+  houseEdgePct: doublePrecision("house_edge_pct").default(5.0).notNull(),
+  minHouseBalance: integer("min_house_balance").default(0).notNull(),
+  totalBet: integer("total_bet").default(0).notNull(),
+  totalPaid: integer("total_paid").default(0).notNull(),
+  updatedBy: integer("updated_by"),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+export type UniversalHouseEdge = typeof universalHouseEdge.$inferSelect;
+
+export const updateUniversalHouseEdgeSchema = z.object({
+  enabled: z.boolean().optional(),
+  houseEdgePct: z.number().min(0).max(100).optional(),
+  minHouseBalance: z.number().int().min(0).optional(),
+});
+export type UpdateUniversalHouseEdge = z.infer<typeof updateUniversalHouseEdgeSchema>;
+
 // === RELATIONS ===
 
 export const usersRelations = relations(users, ({ one, many }) => ({

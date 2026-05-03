@@ -30,6 +30,7 @@ Preferred communication style: Simple, everyday language.
 - **Per-User Game Enable/Disable**: Admin-controlled system allowing specific games to be enabled or disabled for individual users, managers, or super managers, with server-side enforcement and UI updates.
 - **Role-Based Access Control (RBAC)**: A 4-tier system (User, Manager, Super Manager, Admin) with granular permissions for game access, financial management, user management, reporting, and administrative tasks.
 - **Race Game House-Edge Safety**: Implements `computeForceLose` and `applyHouseEdgeForWin` to ensure house edge and prevent over-payouts in race games.
+- **Universal House Edge**: Admin-toggleable global house-edge override. When enabled, all games consult a single `houseEdgePct` and shared `totalBet`/`totalPaid` counters instead of per-game stats. A configurable `minHouseBalance` floor blocks any payout that would drop the combined house bankroll (admin + super_manager + manager balances) below the threshold. Live bankroll, totals, and RTP are shown in the Admin → Game Control tab.
 - **Aviator RTP Cap**: Ensures the Return To Player (RTP) for Aviator stays within configured limits.
 - **Reporting System**: Unified API for time-filtered financial reports (Profit/Loss, Deposits, Withdrawals, Bets, Wins) with per-game breakdowns and hierarchical access.
 - **Withdrawal System**: Player-initiated withdrawal requests, manager approval/rejection, and admin oversight.

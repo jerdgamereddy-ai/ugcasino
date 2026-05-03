@@ -27,9 +27,167 @@ import { BroadcastSender } from "@/components/BroadcastSender";
 import { ProfitCalculator } from "@/components/ProfitCalculator";
 import { ChatPanel } from "@/components/ChatPanel";
 import { GameAccessControl } from "@/components/GameAccessControl";
-import { MessageCircle } from "lucide-react";
+import { MessageCircle, Globe } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
+import { apiRequest } from "@/lib/queryClient";
 
 type GameFormData = z.infer<typeof updateGameSettingsSchema>;
+
+type UniversalHouseEdgeData = {
+  id: number;
+  enabled: boolean;
+  houseEdgePct: number;
+  minHouseBalance: number;
+  totalBet: number;
+  totalPaid: number;
+  bankroll: number;
+  currentRTP: number;
+};
+
+function UniversalHouseEdgePanel() {
+  const { toast } = useToast();
+  const { data, isLoading } = useQuery<UniversalHouseEdgeData>({
+    queryKey: ['/api/admin/universal-house-edge'],
+    refetchInterval: 5000,
+  });
+  const [houseEdgePct, setHouseEdgePct] = useState<string>("");
+  const [minHouseBalance, setMinHouseBalance] = useState<string>("");
+  const loadedRef = useRef(false);
+  useEffect(() => {
+    if (data && !loadedRef.current) {
+      loadedRef.current = true;
+      setHouseEdgePct(String(data.houseEdgePct));
+      setMinHouseBalance(String(data.minHouseBalance));
+    }
+  }, [data]);
+
+  const update = useMutation({
+    mutationFn: async (body: { enabled?: boolean; houseEdgePct?: number; minHouseBalance?: number }) => {
+      const res = await apiRequest("PATCH", "/api/admin/universal-house-edge", body);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/universal-house-edge'] });
+      toast({ title: "Saved", description: "Universal house edge updated." });
+    },
+    onError: () => toast({ title: "Failed to save", variant: "destructive" }),
+  });
+
+  const reset = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", "/api/admin/universal-house-edge/reset-stats", {});
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/universal-house-edge'] });
+      toast({ title: "Stats reset" });
+    },
+  });
+
+  if (isLoading || !data) {
+    return <Card className="glass-card"><CardContent className="py-8 flex justify-center"><Loader2 className="h-5 w-5 animate-spin" /></CardContent></Card>;
+  }
+
+  const fmt = (n: number) => n.toLocaleString();
+  const rtpPct = (data.currentRTP * 100).toFixed(2);
+  const targetRtpPct = (100 - data.houseEdgePct).toFixed(2);
+  const bankrollLow = data.minHouseBalance > 0 && data.bankroll < data.minHouseBalance;
+
+  return (
+    <Card className="glass-card border-amber-500/40">
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2 text-amber-400">
+          <Globe className="w-5 h-5" /> Universal House Edge
+          {data.enabled && <Badge className="ml-2 bg-amber-500 text-black" data-testid="badge-universal-active">ACTIVE</Badge>}
+        </CardTitle>
+        <CardDescription>
+          When enabled, this single configuration overrides every per-game house edge. Wins are also blocked
+          whenever the combined house bankroll (admin + super managers + managers) would fall below the minimum.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-5">
+        <div className="flex items-center justify-between p-3 rounded-md bg-white/5 border border-white/10">
+          <div>
+            <p className="font-semibold">Enable universal house edge</p>
+            <p className="text-xs text-muted-foreground">Overrides all per-game house edge settings.</p>
+          </div>
+          <Switch
+            checked={data.enabled}
+            onCheckedChange={(v) => update.mutate({ enabled: v })}
+            data-testid="switch-universal-enabled"
+          />
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <label className="text-xs uppercase text-muted-foreground font-bold">House Edge %</label>
+            <div className="flex gap-2">
+              <Input
+                type="number" step="0.1" min="0" max="100"
+                value={houseEdgePct}
+                onChange={(e) => setHouseEdgePct(e.target.value)}
+                data-testid="input-universal-house-edge-pct"
+              />
+              <Button
+                onClick={() => update.mutate({ houseEdgePct: Number(houseEdgePct) })}
+                disabled={update.isPending}
+                data-testid="button-save-universal-house-edge-pct"
+              >Save</Button>
+            </div>
+            <p className="text-xs text-muted-foreground">Target RTP: {targetRtpPct}%</p>
+          </div>
+          <div className="space-y-2">
+            <label className="text-xs uppercase text-muted-foreground font-bold">Min House Bankroll (UGX)</label>
+            <div className="flex gap-2">
+              <Input
+                type="number" step="1000" min="0"
+                value={minHouseBalance}
+                onChange={(e) => setMinHouseBalance(e.target.value)}
+                data-testid="input-universal-min-bankroll"
+              />
+              <Button
+                onClick={() => update.mutate({ minHouseBalance: Math.max(0, Math.floor(Number(minHouseBalance))) })}
+                disabled={update.isPending}
+                data-testid="button-save-universal-min-bankroll"
+              >Save</Button>
+            </div>
+            <p className="text-xs text-muted-foreground">Wins are denied if they would drop the bankroll below this.</p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <div className="p-3 rounded-md bg-white/5 border border-white/10">
+            <p className="text-[10px] uppercase text-muted-foreground">House Bankroll</p>
+            <p className={`text-lg font-bold ${bankrollLow ? 'text-red-400' : 'text-amber-400'}`} data-testid="text-house-bankroll">{fmt(data.bankroll)}</p>
+            {bankrollLow && <p className="text-[10px] text-red-400">Below minimum — wins blocked</p>}
+          </div>
+          <div className="p-3 rounded-md bg-white/5 border border-white/10">
+            <p className="text-[10px] uppercase text-muted-foreground">Total Bet</p>
+            <p className="text-lg font-bold" data-testid="text-universal-total-bet">{fmt(data.totalBet)}</p>
+          </div>
+          <div className="p-3 rounded-md bg-white/5 border border-white/10">
+            <p className="text-[10px] uppercase text-muted-foreground">Total Paid</p>
+            <p className="text-lg font-bold" data-testid="text-universal-total-paid">{fmt(data.totalPaid)}</p>
+          </div>
+          <div className="p-3 rounded-md bg-white/5 border border-white/10">
+            <p className="text-[10px] uppercase text-muted-foreground">Current RTP</p>
+            <p className="text-lg font-bold" data-testid="text-universal-current-rtp">{rtpPct}%</p>
+            <p className="text-[10px] text-muted-foreground">Target: {targetRtpPct}%</p>
+          </div>
+        </div>
+
+        <div className="flex justify-end">
+          <Button
+            variant="outline" size="sm"
+            onClick={() => reset.mutate()}
+            disabled={reset.isPending}
+            data-testid="button-reset-universal-stats"
+          >Reset Stats</Button>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
 
 const FISH_JOY_NAMES = ['Tiny Fish','Small Fish','Sea Fish','Stripe Fish','Angel Fish','Puffer Fish','Sword Fish','Bat Fish','Coral Fish','Bull Fish','Shark','Giant Shark'];
 const FISH_JOY_DEFAULT_ODDS     = [2, 4, 6, 10, 15, 25, 40, 60, 80, 100, 150, 300];
@@ -1580,6 +1738,7 @@ export default function AdminDashboard() {
 
           <TabsContent value="gamecontrol" className="mt-6">
             <div className="space-y-6">
+              <UniversalHouseEdgePanel />
               <div>
                 <div className="flex items-center gap-2 mb-2">
                   <Settings2 className="w-5 h-5 text-primary" />

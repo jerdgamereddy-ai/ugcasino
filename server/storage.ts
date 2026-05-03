@@ -1,4 +1,4 @@
-import { users, vouchers, transactions, gameSettings, withdrawalRequests, adminSecurityAnswers, broadcasts, broadcastDismissals, messages, audioTracks, userGameDisables, siteSettings, backgroundImages, gameSchedules, type User, type InsertUser, type Voucher, type InsertVoucher, type Transaction, type GameSetting, type WithdrawalRequest, type InsertWithdrawalRequest, type AdminSecurityAnswer, type Broadcast, type BroadcastDismissal, type Message, type AudioTrack, type InsertAudioTrack, type UserGameDisable, type SiteSettings, type BackgroundImage, type GameSchedule, type InsertGameSchedule } from "@shared/schema";
+import { users, vouchers, transactions, gameSettings, withdrawalRequests, adminSecurityAnswers, broadcasts, broadcastDismissals, messages, audioTracks, userGameDisables, siteSettings, backgroundImages, gameSchedules, universalHouseEdge, type User, type InsertUser, type Voucher, type InsertVoucher, type Transaction, type GameSetting, type WithdrawalRequest, type InsertWithdrawalRequest, type AdminSecurityAnswer, type Broadcast, type BroadcastDismissal, type Message, type AudioTrack, type InsertAudioTrack, type UserGameDisable, type SiteSettings, type BackgroundImage, type GameSchedule, type InsertGameSchedule, type UniversalHouseEdge, type UpdateUniversalHouseEdge } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, sql, and, inArray, gte, lte, between } from "drizzle-orm";
 import session from "express-session";
@@ -52,6 +52,15 @@ export interface IStorage {
   recordHouseEdgePayout(gameType: string, amount: number): Promise<void>;
   resetGameHouseEdgeStats(gameType: string, updatedBy: number): Promise<GameSetting>;
   getUserTotalWagered(userId: number): Promise<number>;
+
+  // Universal house edge (covers all games when enabled)
+  getUniversalHouseEdge(): Promise<UniversalHouseEdge>;
+  updateUniversalHouseEdge(data: UpdateUniversalHouseEdge, updatedBy: number): Promise<UniversalHouseEdge>;
+  recordUniversalBet(amount: number): Promise<void>;
+  recordUniversalPayout(amount: number): Promise<void>;
+  resetUniversalHouseEdgeStats(updatedBy: number): Promise<UniversalHouseEdge>;
+  // Sum of all house-side balances (admin + super_manager + manager).
+  getHouseBankroll(): Promise<number>;
 
   createWithdrawalRequest(req: { userId: number, amount: number, managerCode?: string, managerId?: number }): Promise<WithdrawalRequest>;
   getWithdrawalRequest(id: number): Promise<WithdrawalRequest | undefined>;
@@ -351,6 +360,54 @@ export class DatabaseStorage implements IStorage {
       })
       .returning();
     return updated;
+  }
+
+  async getUniversalHouseEdge(): Promise<UniversalHouseEdge> {
+    // Idempotent singleton init: upsert id=1 with no-op ON CONFLICT so two
+    // concurrent first-time callers can't collide on the primary key.
+    await db.insert(universalHouseEdge)
+      .values({ id: 1 })
+      .onConflictDoNothing({ target: universalHouseEdge.id });
+    const [row] = await db.select().from(universalHouseEdge).where(eq(universalHouseEdge.id, 1));
+    return row;
+  }
+
+  async updateUniversalHouseEdge(data: UpdateUniversalHouseEdge, updatedBy: number): Promise<UniversalHouseEdge> {
+    await this.getUniversalHouseEdge(); // ensure row exists
+    const setObj: any = { updatedBy, updatedAt: new Date() };
+    if (data.enabled !== undefined) setObj.enabled = data.enabled;
+    if (data.houseEdgePct !== undefined) setObj.houseEdgePct = data.houseEdgePct;
+    if (data.minHouseBalance !== undefined) setObj.minHouseBalance = data.minHouseBalance;
+    const [row] = await db.update(universalHouseEdge).set(setObj).where(eq(universalHouseEdge.id, 1)).returning();
+    return row;
+  }
+
+  async recordUniversalBet(amount: number): Promise<void> {
+    if (amount <= 0) return;
+    await this.getUniversalHouseEdge();
+    await db.execute(sql`UPDATE universal_house_edge SET total_bet = total_bet + ${amount}, updated_at = NOW() WHERE id = 1`);
+  }
+
+  async recordUniversalPayout(amount: number): Promise<void> {
+    if (amount <= 0) return;
+    await this.getUniversalHouseEdge();
+    await db.execute(sql`UPDATE universal_house_edge SET total_paid = total_paid + ${amount}, updated_at = NOW() WHERE id = 1`);
+  }
+
+  async resetUniversalHouseEdgeStats(updatedBy: number): Promise<UniversalHouseEdge> {
+    await this.getUniversalHouseEdge();
+    const [row] = await db.update(universalHouseEdge)
+      .set({ totalBet: 0, totalPaid: 0, updatedBy, updatedAt: new Date() })
+      .where(eq(universalHouseEdge.id, 1))
+      .returning();
+    return row;
+  }
+
+  async getHouseBankroll(): Promise<number> {
+    const [{ total }] = await db.select({
+      total: sql<number>`COALESCE(SUM(${users.balance}), 0)`,
+    }).from(users).where(inArray(users.role, ['admin', 'super_manager', 'manager']));
+    return Number(total);
   }
 
   async getUserTotalWagered(userId: number): Promise<number> {
