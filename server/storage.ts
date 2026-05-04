@@ -59,6 +59,8 @@ export interface IStorage {
   recordUniversalBet(amount: number): Promise<void>;
   recordUniversalPayout(amount: number): Promise<void>;
   resetUniversalHouseEdgeStats(updatedBy: number): Promise<UniversalHouseEdge>;
+  // Zero out totalBet/totalPaid on every per-game settings row.
+  resetAllGameStats(updatedBy: number): Promise<void>;
   // Sum of all house-side balances (admin + super_manager + manager).
   getHouseBankroll(): Promise<number>;
 
@@ -378,6 +380,8 @@ export class DatabaseStorage implements IStorage {
     if (data.enabled !== undefined) setObj.enabled = data.enabled;
     if (data.houseEdgePct !== undefined) setObj.houseEdgePct = data.houseEdgePct;
     if (data.minHouseBalance !== undefined) setObj.minHouseBalance = data.minHouseBalance;
+    if (data.bypassClassicSlotsBankroll !== undefined) setObj.bypassClassicSlotsBankroll = data.bypassClassicSlotsBankroll;
+    if (data.bypassHorse4Bankroll !== undefined) setObj.bypassHorse4Bankroll = data.bypassHorse4Bankroll;
     const [row] = await db.update(universalHouseEdge).set(setObj).where(eq(universalHouseEdge.id, 1)).returning();
     return row;
   }
@@ -401,6 +405,10 @@ export class DatabaseStorage implements IStorage {
       .where(eq(universalHouseEdge.id, 1))
       .returning();
     return row;
+  }
+
+  async resetAllGameStats(updatedBy: number): Promise<void> {
+    await db.update(gameSettings).set({ totalBet: 0, totalPaid: 0, updatedBy, updatedAt: new Date() });
   }
 
   async getHouseBankroll(): Promise<number> {

@@ -43,6 +43,7 @@ type UniversalHouseEdgeData = {
   bankroll: number;
   currentRTP: number;
   bypassClassicSlotsBankroll: boolean;
+  bypassHorse4Bankroll: boolean;
 };
 
 function UniversalHouseEdgePanel() {
@@ -63,7 +64,7 @@ function UniversalHouseEdgePanel() {
   }, [data]);
 
   const update = useMutation({
-    mutationFn: async (body: { enabled?: boolean; houseEdgePct?: number; minHouseBalance?: number; bypassClassicSlotsBankroll?: boolean }) => {
+    mutationFn: async (body: { enabled?: boolean; houseEdgePct?: number; minHouseBalance?: number; bypassClassicSlotsBankroll?: boolean; bypassHorse4Bankroll?: boolean }) => {
       const res = await apiRequest("PATCH", "/api/admin/universal-house-edge", body);
       return res.json();
     },
@@ -83,6 +84,19 @@ function UniversalHouseEdgePanel() {
       queryClient.invalidateQueries({ queryKey: ['/api/admin/universal-house-edge'] });
       toast({ title: "Stats reset" });
     },
+  });
+
+  const resetBankroll = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", "/api/admin/house-bankroll/reset", {});
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/universal-house-edge'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/games/settings'] });
+      toast({ title: "House bankroll counters reset", description: "All per-game and universal totalBet/totalPaid have been zeroed." });
+    },
+    onError: () => toast({ title: "Reset failed", variant: "destructive" }),
   });
 
   if (isLoading || !data) {
@@ -125,9 +139,21 @@ function UniversalHouseEdgePanel() {
             <p className="text-xs text-muted-foreground">When ON, Classic Slots ignores the minimum-bankroll check and stays playable. The win-side cap still applies, so any payout that would breach the floor is voided server-side.</p>
           </div>
           <Switch
-            checked={data.bypassClassicSlotsBankroll}
+            checked={!!data.bypassClassicSlotsBankroll}
             onCheckedChange={(v) => update.mutate({ bypassClassicSlotsBankroll: v })}
             data-testid="switch-bypass-classic-slots-bankroll"
+          />
+        </div>
+
+        <div className="flex items-center justify-between p-3 rounded-md bg-white/5 border border-white/10">
+          <div>
+            <p className="font-semibold">Allow 8-Horse Racing below bankroll floor</p>
+            <p className="text-xs text-muted-foreground">When ON, the 8-Horse race ignores the minimum-bankroll check and stays playable even when a player could dutching-bet across all 8 horses. Excessive payouts are still voided server-side.</p>
+          </div>
+          <Switch
+            checked={!!data.bypassHorse4Bankroll}
+            onCheckedChange={(v) => update.mutate({ bypassHorse4Bankroll: v })}
+            data-testid="switch-bypass-horse4-bankroll"
           />
         </div>
 
@@ -189,13 +215,23 @@ function UniversalHouseEdgePanel() {
           </div>
         </div>
 
-        <div className="flex justify-end">
+        <div className="flex justify-end gap-2">
           <Button
             variant="outline" size="sm"
             onClick={() => reset.mutate()}
             disabled={reset.isPending}
             data-testid="button-reset-universal-stats"
-          >Reset Stats</Button>
+          >Reset Universal Stats</Button>
+          <Button
+            variant="destructive" size="sm"
+            onClick={() => {
+              if (window.confirm("Reset every game's totalBet/totalPaid counters AND the universal counters? Player balances and house bankroll are NOT affected — only the RTP-tracking stats.")) {
+                resetBankroll.mutate();
+              }
+            }}
+            disabled={resetBankroll.isPending}
+            data-testid="button-reset-house-bankroll"
+          >Reset House Bankroll Stats</Button>
         </div>
       </CardContent>
     </Card>

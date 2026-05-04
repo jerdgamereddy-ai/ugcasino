@@ -905,6 +905,15 @@ export async function registerRoutes(
     res.json(updated);
   });
 
+  // Full bankroll reset: zero out the universal counters AND every per-game
+  // totalBet/totalPaid so RTP tracking starts fresh across the entire system.
+  app.post("/api/admin/house-bankroll/reset", async (req, res) => {
+    if (!req.isAuthenticated() || req.user.role !== 'admin') return res.status(403).send("Forbidden");
+    await storage.resetUniversalHouseEdgeStats(req.user.id);
+    await storage.resetAllGameStats(req.user.id);
+    res.json({ ok: true });
+  });
+
   // === DIRECT CREDIT USER BALANCE (admin / super_manager / manager) ===
   app.post("/api/admin/users/:id/credit", async (req, res) => {
     if (!req.isAuthenticated() || (req.user.role !== 'admin' && req.user.role !== 'super_manager' && req.user.role !== 'manager')) {
@@ -1181,10 +1190,15 @@ export async function registerRoutes(
       const h4MaxOdds = Math.max(...((h4Extra.odds as number[]) ?? [3.7, 5.5, 2.2, 11.75, 17.25, 8.75, 7.15, 6.15]));
       // Race games are the ONLY games where a player can guarantee a win by
       // dutching across every runner — hard-block when worst-case payout
-      // would breach the bankroll floor.
-      const h4Guard = await checkBankrollFloorForBet(totBet * h4MaxOdds);
-      if (h4Guard.blocked) {
-        return res.status(400).json({ message: "Bet too large — maximum possible payout exceeds the house bankroll. Please lower your bet.", bankrollBlocked: true });
+      // would breach the bankroll floor. Admin toggle bypassHorse4Bankroll
+      // lets the game stay open (the win-side cap still voids excessive
+      // payouts, which can show as "horse won but no payout").
+      const h4Universal = await storage.getUniversalHouseEdge().catch(() => null);
+      if (!h4Universal?.bypassHorse4Bankroll) {
+        const h4Guard = await checkBankrollFloorForBet(totBet * h4MaxOdds);
+        if (h4Guard.blocked) {
+          return res.status(400).json({ message: "Bet too large — maximum possible payout exceeds the house bankroll. Please lower your bet.", bankrollBlocked: true });
+        }
       }
       await storage.updateUserBalance(req.user.id, -totBet);
       await storage.createTransaction({ userId: req.user.id, amount: -totBet, type: "bet", description: "Horse4 Racing bet" });
