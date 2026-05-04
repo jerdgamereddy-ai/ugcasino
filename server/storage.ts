@@ -382,6 +382,7 @@ export class DatabaseStorage implements IStorage {
     if (data.minHouseBalance !== undefined) setObj.minHouseBalance = data.minHouseBalance;
     if (data.bypassClassicSlotsBankroll !== undefined) setObj.bypassClassicSlotsBankroll = data.bypassClassicSlotsBankroll;
     if (data.bypassHorse4Bankroll !== undefined) setObj.bypassHorse4Bankroll = data.bypassHorse4Bankroll;
+    if (data.bypassDogRacingBankroll !== undefined) setObj.bypassDogRacingBankroll = data.bypassDogRacingBankroll;
     const [row] = await db.update(universalHouseEdge).set(setObj).where(eq(universalHouseEdge.id, 1)).returning();
     return row;
   }

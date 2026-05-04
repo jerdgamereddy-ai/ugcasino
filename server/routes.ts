@@ -1096,10 +1096,14 @@ export async function registerRoutes(
       // Race games are the ONLY games where a player can guarantee a win by
       // dutching across every runner — forceLose can't help if they covered
       // all positions. So we hard-block here when the worst-case payout would
-      // breach the bankroll floor.
-      const dogGuard = await checkBankrollFloorForBet(totBet * dogMaxOdds);
-      if (dogGuard.blocked) {
-        return res.status(400).json({ message: "Bet too large — maximum possible payout exceeds the house bankroll. Please lower your bet.", bankrollBlocked: true });
+      // breach the bankroll floor. Admin toggle bypassDogRacingBankroll lets
+      // the game stay open; excessive payouts are still voided server-side.
+      const dogUniversal = await storage.getUniversalHouseEdge().catch(() => null);
+      if (!dogUniversal?.bypassDogRacingBankroll) {
+        const dogGuard = await checkBankrollFloorForBet(totBet * dogMaxOdds);
+        if (dogGuard.blocked) {
+          return res.status(400).json({ message: "Bet too large — maximum possible payout exceeds the house bankroll. Please lower your bet.", bankrollBlocked: true });
+        }
       }
       await storage.updateUserBalance(req.user.id, -totBet);
       await storage.createTransaction({ userId: req.user.id, amount: -totBet, type: "bet", description: "Greyhound Racing bet" });

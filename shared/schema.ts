@@ -219,6 +219,7 @@ export const universalHouseEdge = pgTable("universal_house_edge", {
   totalPaid: integer("total_paid").default(0).notNull(),
   bypassClassicSlotsBankroll: boolean("bypass_classic_slots_bankroll").default(false).notNull(),
   bypassHorse4Bankroll: boolean("bypass_horse4_bankroll").default(false).notNull(),
+  bypassDogRacingBankroll: boolean("bypass_dog_racing_bankroll").default(false).notNull(),
   updatedBy: integer("updated_by"),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -230,6 +231,7 @@ export const updateUniversalHouseEdgeSchema = z.object({
   minHouseBalance: z.number().int().min(0).optional(),
   bypassClassicSlotsBankroll: z.boolean().optional(),
   bypassHorse4Bankroll: z.boolean().optional(),
+  bypassDogRacingBankroll: z.boolean().optional(),
 });
 export type UpdateUniversalHouseEdge = z.infer<typeof updateUniversalHouseEdgeSchema>;
 

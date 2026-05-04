@@ -44,6 +44,7 @@ type UniversalHouseEdgeData = {
   currentRTP: number;
   bypassClassicSlotsBankroll: boolean;
   bypassHorse4Bankroll: boolean;
+  bypassDogRacingBankroll: boolean;
 };
 
 function UniversalHouseEdgePanel() {
@@ -64,7 +65,7 @@ function UniversalHouseEdgePanel() {
   }, [data]);
 
   const update = useMutation({
-    mutationFn: async (body: { enabled?: boolean; houseEdgePct?: number; minHouseBalance?: number; bypassClassicSlotsBankroll?: boolean; bypassHorse4Bankroll?: boolean }) => {
+    mutationFn: async (body: { enabled?: boolean; houseEdgePct?: number; minHouseBalance?: number; bypassClassicSlotsBankroll?: boolean; bypassHorse4Bankroll?: boolean; bypassDogRacingBankroll?: boolean }) => {
       const res = await apiRequest("PATCH", "/api/admin/universal-house-edge", body);
       return res.json();
     },
@@ -154,6 +155,18 @@ function UniversalHouseEdgePanel() {
             checked={!!data.bypassHorse4Bankroll}
             onCheckedChange={(v) => update.mutate({ bypassHorse4Bankroll: v })}
             data-testid="switch-bypass-horse4-bankroll"
+          />
+        </div>
+
+        <div className="flex items-center justify-between p-3 rounded-md bg-white/5 border border-white/10">
+          <div>
+            <p className="font-semibold">Allow Greyhound Racing below bankroll floor</p>
+            <p className="text-xs text-muted-foreground">When ON, Greyhound Racing ignores the minimum-bankroll check and stays playable even when a player could dutching-bet across all dogs. Excessive payouts are still voided server-side.</p>
+          </div>
+          <Switch
+            checked={!!data.bypassDogRacingBankroll}
+            onCheckedChange={(v) => update.mutate({ bypassDogRacingBankroll: v })}
+            data-testid="switch-bypass-dog-racing-bankroll"
           />
         </div>
 
