@@ -1,4 +1,4 @@
-import { users, vouchers, transactions, gameSettings, withdrawalRequests, adminSecurityAnswers, broadcasts, broadcastDismissals, messages, audioTracks, userGameDisables, siteSettings, backgroundImages, gameSchedules, universalHouseEdge, type User, type InsertUser, type Voucher, type InsertVoucher, type Transaction, type GameSetting, type WithdrawalRequest, type InsertWithdrawalRequest, type AdminSecurityAnswer, type Broadcast, type BroadcastDismissal, type Message, type AudioTrack, type InsertAudioTrack, type UserGameDisable, type SiteSettings, type BackgroundImage, type GameSchedule, type InsertGameSchedule, type UniversalHouseEdge, type UpdateUniversalHouseEdge } from "@shared/schema";
+import { users, vouchers, transactions, gameSettings, withdrawalRequests, adminSecurityAnswers, broadcasts, broadcastDismissals, messages, audioTracks, userGameDisables, siteSettings, backgroundImages, gameSchedules, universalHouseEdge, managerGameOverrides, type User, type InsertUser, type Voucher, type InsertVoucher, type Transaction, type GameSetting, type WithdrawalRequest, type InsertWithdrawalRequest, type AdminSecurityAnswer, type Broadcast, type BroadcastDismissal, type Message, type AudioTrack, type InsertAudioTrack, type UserGameDisable, type SiteSettings, type BackgroundImage, type GameSchedule, type InsertGameSchedule, type UniversalHouseEdge, type UpdateUniversalHouseEdge, type ManagerGameOverride } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, sql, and, inArray, gte, lte, between } from "drizzle-orm";
 import session from "express-session";
@@ -84,6 +84,15 @@ export interface IStorage {
   setManagerBusinessMoneyMode(managerId: number, useSeparate: boolean): Promise<User>;
   adjustManagerBusinessMoney(managerId: number, delta: number): Promise<User>;
   setManagerReportSinceAt(managerId: number, ts: Date | null): Promise<User>;
+
+  // === PER-MANAGER GAME OVERRIDES ===
+  // Each row may set winChance and/or payoutMultiplier for one (manager,
+  // gameType). Null cells inherit the global gameSettings value. Use
+  // `getEffectiveGameSettings(userId, gameType)` from routes.ts to resolve.
+  getManagerGameOverride(managerId: number, gameType: string): Promise<ManagerGameOverride | undefined>;
+  getManagerGameOverridesByManager(managerId: number): Promise<ManagerGameOverride[]>;
+  upsertManagerGameOverride(managerId: number, gameType: string, data: { winChance?: number | null; payoutMultiplier?: number | null }): Promise<ManagerGameOverride>;
+  clearManagerGameOverride(managerId: number, gameType: string): Promise<void>;
 
   createWithdrawalRequest(req: { userId: number, amount: number, managerCode?: string, managerId?: number }): Promise<WithdrawalRequest>;
   getWithdrawalRequest(id: number): Promise<WithdrawalRequest | undefined>;
@@ -501,6 +510,42 @@ export class DatabaseStorage implements IStorage {
     const newVal = Math.max(0, m.businessMoney + delta);
     const [row] = await db.update(users).set({ businessMoney: newVal }).where(eq(users.id, managerId)).returning();
     return row;
+  }
+
+  async getManagerGameOverride(managerId: number, gameType: string): Promise<ManagerGameOverride | undefined> {
+    const [row] = await db.select().from(managerGameOverrides)
+      .where(and(eq(managerGameOverrides.managerId, managerId), eq(managerGameOverrides.gameType, gameType)));
+    return row;
+  }
+  async getManagerGameOverridesByManager(managerId: number): Promise<ManagerGameOverride[]> {
+    return await db.select().from(managerGameOverrides).where(eq(managerGameOverrides.managerId, managerId));
+  }
+  async upsertManagerGameOverride(
+    managerId: number, gameType: string,
+    data: { winChance?: number | null; payoutMultiplier?: number | null }
+  ): Promise<ManagerGameOverride> {
+    // Atomic upsert via the unique (manager_id, game_type) constraint.
+    // Omitted fields preserve the existing value via a self-reference in SET.
+    const setClause: Record<string, any> = { updatedAt: new Date() };
+    setClause.winChance = data.winChance === undefined
+      ? sql`${managerGameOverrides.winChance}`
+      : data.winChance;
+    setClause.payoutMultiplier = data.payoutMultiplier === undefined
+      ? sql`${managerGameOverrides.payoutMultiplier}`
+      : data.payoutMultiplier;
+    const [row] = await db.insert(managerGameOverrides).values({
+      managerId, gameType,
+      winChance: data.winChance ?? null,
+      payoutMultiplier: data.payoutMultiplier ?? null,
+    }).onConflictDoUpdate({
+      target: [managerGameOverrides.managerId, managerGameOverrides.gameType],
+      set: setClause,
+    }).returning();
+    return row;
+  }
+  async clearManagerGameOverride(managerId: number, gameType: string): Promise<void> {
+    await db.delete(managerGameOverrides)
+      .where(and(eq(managerGameOverrides.managerId, managerId), eq(managerGameOverrides.gameType, gameType)));
   }
 
   async setManagerReportSinceAt(managerId: number, ts: Date | null): Promise<User> {

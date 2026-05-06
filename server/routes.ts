@@ -6,7 +6,7 @@ import { api } from "@shared/routes";
 import { z } from "zod";
 import { randomBytes } from "crypto";
 import { hashPassword } from "./auth";
-import { adminPasswordSchema, securityAnswersSchema, securityVerifySchema, ADMIN_SECURITY_QUESTIONS, updateUniversalHouseEdgeSchema, type User } from "@shared/schema";
+import { adminPasswordSchema, securityAnswersSchema, securityVerifySchema, ADMIN_SECURITY_QUESTIONS, updateUniversalHouseEdgeSchema, GAMES_REGISTRY, type User, type GameSetting } from "@shared/schema";
 import multer from "multer";
 import path from "path";
 import fs from "fs";
@@ -96,6 +96,25 @@ export async function registerRoutes(
     return { blocked: false };
   }
 
+  // Resolve game settings for a specific player: starts from the global
+  // `gameSettings` row, then overlays any non-null override fields from
+  // the player's direct manager. Player-facing game routes use this so a
+  // manager can tune winChance / payoutMultiplier for THEIR players only,
+  // without touching the admin globals or other managers' players.
+  async function getEffectiveGameSettings(userId: number, gameType: string): Promise<GameSetting | undefined> {
+    const global = await storage.getGameSettings(gameType);
+    if (!global) return undefined;
+    const mgrId = await storage.getPlayerManagerId(userId).catch(() => null);
+    if (mgrId == null) return global;
+    const ov = await storage.getManagerGameOverride(mgrId, gameType).catch(() => undefined);
+    if (!ov) return global;
+    return {
+      ...global,
+      winChance: ov.winChance ?? global.winChance,
+      payoutMultiplier: ov.payoutMultiplier ?? global.payoutMultiplier,
+    } as GameSetting;
+  }
+
   async function recordBet(gameType: string, userId: number, betAmount: number) {
     if (betAmount <= 0) return;
     await storage.recordHouseEdgeBet(gameType, betAmount).catch(() => {});
@@ -131,7 +150,7 @@ export async function registerRoutes(
   ): Promise<number> {
     await recordBet(gameType, userId, betAmount);
     if (intendedWin <= 0) return 0;
-    const settings = await storage.getGameSettings(gameType);
+    const settings = await getEffectiveGameSettings(userId, gameType);
     if (!settings) {
       const blockedByUniversal = await checkUniversalForceLose(intendedWin);
       if (blockedByUniversal) return 0;
@@ -165,7 +184,7 @@ export async function registerRoutes(
   async function recordBetAndCheckHighBet(gameType: string, userId: number, betAmount: number) {
     await recordBet(gameType, userId, betAmount);
     lockedBetAmountMap.set(lossKey(userId, gameType), betAmount);
-    const settings = await storage.getGameSettings(gameType);
+    const settings = await getEffectiveGameSettings(userId, gameType);
     if (!settings) { lockedLossMap.delete(lossKey(userId, gameType)); return; }
     if (settings.highBetThreshold > 0 && betAmount >= settings.highBetThreshold) {
       const totalWagered = await storage.getUserTotalWagered(userId);
@@ -190,7 +209,7 @@ export async function registerRoutes(
     if (universalDecision === true) return true;
     if (universalDecision === false) return false; // universal is enabled and allows it
     // Universal disabled — fall back to per-game
-    const settings = await storage.getGameSettings(gameType);
+    const settings = await getEffectiveGameSettings(userId, gameType);
     if (!settings) return false;
     const targetRTP = 1 - (settings.houseEdgePct ?? 5) / 100;
     if (settings.totalBet > 0 && (settings.totalPaid + probe) / settings.totalBet > targetRTP) return true;
@@ -214,7 +233,7 @@ export async function registerRoutes(
     }
     if (universalDecision === null) {
       // Universal disabled — apply per-game RTP cap.
-      const settings = await storage.getGameSettings(gameType);
+      const settings = await getEffectiveGameSettings(userId, gameType);
       if (settings) {
         const targetRTP = 1 - (settings.houseEdgePct ?? 5) / 100;
         if (settings.totalBet > 0 && (settings.totalPaid + intendedWin) / settings.totalBet > targetRTP) {
@@ -638,6 +657,54 @@ export async function registerRoutes(
       const updated = await storage.setManagerReportSinceAt(mgr.id, ts);
       res.json({ ok: true, reportSinceAt: updated.reportSinceAt });
     } catch { res.status(400).json({ message: "Invalid input" }); }
+  });
+
+  // === MANAGER: Per-game overrides for OWN players only ===
+  // GET returns one row per game in the registry, with the global value and
+  // the manager's override (null if inheriting). PUT upserts a single field
+  // (winChance OR payoutMultiplier — null clears it). DELETE wipes the row.
+  app.get("/api/manager/game-overrides", async (req, res) => {
+    if (!req.isAuthenticated() || req.user.role !== 'manager') return res.status(403).send("Forbidden");
+    try {
+      const all = await storage.getAllGameSettings();
+      const overrides = await storage.getManagerGameOverridesByManager(req.user.id);
+      const byType = new Map(overrides.map(o => [o.gameType, o]));
+      const rows = GAMES_REGISTRY.map(g => {
+        const global = all.find(s => s.gameType === g.id);
+        const ov = byType.get(g.id);
+        return {
+          gameType: g.id,
+          label: g.label,
+          globalWinChance: global?.winChance ?? null,
+          globalPayoutMultiplier: global?.payoutMultiplier ?? null,
+          overrideWinChance: ov?.winChance ?? null,
+          overridePayoutMultiplier: ov?.payoutMultiplier ?? null,
+        };
+      });
+      res.json(rows);
+    } catch { res.status(500).json({ message: "Internal Server Error" }); }
+  });
+
+  app.put("/api/manager/game-overrides/:gameType", async (req, res) => {
+    if (!req.isAuthenticated() || req.user.role !== 'manager') return res.status(403).send("Forbidden");
+    const gameType = req.params.gameType;
+    if (!GAMES_REGISTRY.find(g => g.id === gameType)) return res.status(400).json({ message: "Unknown game" });
+    try {
+      const body = z.object({
+        winChance: z.number().min(0).max(1).nullable().optional(),
+        payoutMultiplier: z.number().min(0.01).max(1000).nullable().optional(),
+      }).parse(req.body);
+      const row = await storage.upsertManagerGameOverride(req.user.id, gameType, body);
+      res.json(row);
+    } catch { res.status(400).json({ message: "Invalid input" }); }
+  });
+
+  app.delete("/api/manager/game-overrides/:gameType", async (req, res) => {
+    if (!req.isAuthenticated() || req.user.role !== 'manager') return res.status(403).send("Forbidden");
+    const gameType = req.params.gameType;
+    if (!GAMES_REGISTRY.find(g => g.id === gameType)) return res.status(400).json({ message: "Unknown game" });
+    await storage.clearManagerGameOverride(req.user.id, gameType);
+    res.json({ ok: true });
   });
 
   // === MANAGER: Create users ===
@@ -1116,7 +1183,7 @@ export async function registerRoutes(
   app.get("/api/games/slots/settings", async (req, res) => {
     if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
     try {
-      const settings = await storage.getGameSettings("slots");
+      const settings = await getEffectiveGameSettings(req.user.id, "slots");
       const payoutMultiplier = settings?.payoutMultiplier ?? 10;
       res.json({ payoutMultiplier });
     } catch (err) {
@@ -1127,7 +1194,7 @@ export async function registerRoutes(
   app.get("/api/games/dice/settings", async (req, res) => {
     if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
     try {
-      const settings = await storage.getGameSettings("dice");
+      const settings = await getEffectiveGameSettings(req.user.id, "dice");
       const payoutMultiplier = settings?.payoutMultiplier ?? 2;
       res.json({ payoutMultiplier });
     } catch (err) {
@@ -1138,7 +1205,7 @@ export async function registerRoutes(
   app.get("/api/games/hilo/settings", async (req, res) => {
     if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
     try {
-      const settings = await storage.getGameSettings("hilo");
+      const settings = await getEffectiveGameSettings(req.user.id, "hilo");
       const payoutMultiplier = settings?.payoutMultiplier ?? 2;
       res.json({ payoutMultiplier });
     } catch (err) {
@@ -1159,7 +1226,7 @@ export async function registerRoutes(
 
       if (req.user.balance < bet) return res.status(400).json({ message: "Insufficient balance" });
 
-      const settings = await storage.getGameSettings("hilo");
+      const settings = await getEffectiveGameSettings(req.user.id, "hilo");
       const winChance = settings?.winChance ?? 0.48;
       // Bankroll floor is enforced inside processCombinedBetAndWin via
       // checkUniversalForceLose — the round will simply be a guaranteed loss
@@ -1196,7 +1263,7 @@ export async function registerRoutes(
   app.get("/api/games/dog-racing/settings", async (req, res) => {
     if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
     try {
-      const settings = await storage.getGameSettings("dog-racing");
+      const settings = await getEffectiveGameSettings(req.user.id, "dog-racing");
       const extraParsed = (() => { try { return settings?.extraSettings ? JSON.parse(settings.extraSettings) : {}; } catch { return {}; } })();
       const defaultOdds = [3.7, 5.5, 2.2, 11.75, 17.25, 8.75];
       const defaultPlace = defaultOdds.map(o => Math.max(1.05, +(o * 0.45).toFixed(2)));
@@ -1237,7 +1304,7 @@ export async function registerRoutes(
     try {
       const { totBet } = z.object({ bet: z.number().min(1), totBet: z.number().min(1) }).parse(req.body);
       if (req.user.balance < totBet) return res.status(400).json({ message: "Insufficient balance" });
-      const dogSettingsPre = await storage.getGameSettings("dog-racing");
+      const dogSettingsPre = await getEffectiveGameSettings(req.user.id, "dog-racing");
       const dogExtraPre = (() => { try { return dogSettingsPre?.extraSettings ? JSON.parse(dogSettingsPre.extraSettings) : {}; } catch { return {}; } })();
       const dogMaxOdds = Math.max(...((dogExtraPre.odds as number[]) ?? [3.7, 5.5, 2.2, 11.75, 17.25, 8.75]));
       // Race games are the ONLY games where a player can guarantee a win by
@@ -1296,7 +1363,7 @@ export async function registerRoutes(
   app.get("/api/games/horse4/settings", async (req, res) => {
     if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
     try {
-      const settings = await storage.getGameSettings("horse4");
+      const settings = await getEffectiveGameSettings(req.user.id, "horse4");
       const extraParsed = (() => { try { return settings?.extraSettings ? JSON.parse(settings.extraSettings) : {}; } catch { return {}; } })();
       const defaultOdds = [3.7, 5.5, 2.2, 11.75, 17.25, 8.75, 7.15, 6.15];
       const defaultPlace = defaultOdds.map(o => Math.max(1.05, +(o * 0.45).toFixed(2)));
@@ -1336,7 +1403,7 @@ export async function registerRoutes(
     try {
       const { totBet } = z.object({ bet: z.number().min(1), totBet: z.number().min(1) }).parse(req.body);
       if (req.user.balance < totBet) return res.status(400).json({ message: "Insufficient balance" });
-      const h4Settings = await storage.getGameSettings("horse4");
+      const h4Settings = await getEffectiveGameSettings(req.user.id, "horse4");
       const h4Extra = (() => { try { return h4Settings?.extraSettings ? JSON.parse(h4Settings.extraSettings) : {}; } catch { return {}; } })();
       const h4MaxOdds = Math.max(...((h4Extra.odds as number[]) ?? [3.7, 5.5, 2.2, 11.75, 17.25, 8.75, 7.15, 6.15]));
       // Race games are the ONLY games where a player can guarantee a win by
@@ -1393,7 +1460,7 @@ export async function registerRoutes(
   app.get("/api/games/horse-js/settings", async (req, res) => {
     if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
     try {
-      const settings = await storage.getGameSettings("horse-js");
+      const settings = await getEffectiveGameSettings(req.user.id, "horse-js");
       const extra = settings?.extraSettings ? JSON.parse(settings.extraSettings) : {};
       const defaultOdds = [2.0, 2.5, 3.0, 3.5];
       const defaultPlace = defaultOdds.map(o => Math.max(1.05, +(o * 0.5).toFixed(2)));
@@ -1437,7 +1504,7 @@ export async function registerRoutes(
     try {
       const { totBet } = z.object({ bet: z.number().min(500), totBet: z.number().min(500) }).parse(req.body);
       if (req.user.balance < totBet) return res.status(400).json({ message: "Insufficient balance" });
-      const hjSettings = await storage.getGameSettings("horse-js");
+      const hjSettings = await getEffectiveGameSettings(req.user.id, "horse-js");
       const hjExtra = (() => { try { return hjSettings?.extraSettings ? JSON.parse(hjSettings.extraSettings) : {}; } catch { return {}; } })();
       const hjMaxOdds = Math.max(...((hjExtra.odds as number[]) ?? [2.0, 2.5, 3.0, 3.5]));
       // Quick Horse only allows one horse + one bet type per round, so the
@@ -1493,7 +1560,7 @@ export async function registerRoutes(
 
       if (req.user.balance < bet) return res.status(400).json({ message: "Insufficient balance" });
 
-      const settings = await storage.getGameSettings("dice");
+      const settings = await getEffectiveGameSettings(req.user.id, "dice");
       const winChance = settings?.winChance ?? 0.48;
 
       await storage.updateUserBalance(req.user.id, -bet);
@@ -1521,7 +1588,7 @@ export async function registerRoutes(
   app.get("/api/games/coinflip/settings", async (req, res) => {
     if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
     try {
-      const settings = await storage.getGameSettings("coinflip");
+      const settings = await getEffectiveGameSettings(req.user.id, "coinflip");
       const payoutMultiplier = settings?.payoutMultiplier ?? 1.95;
       res.json({ payoutMultiplier });
     } catch (err) {
@@ -1540,7 +1607,7 @@ export async function registerRoutes(
 
       if (req.user.balance < bet) return res.status(400).json({ message: "Insufficient balance" });
 
-      const settings = await storage.getGameSettings("coinflip");
+      const settings = await getEffectiveGameSettings(req.user.id, "coinflip");
       const winChance = settings?.winChance ?? 0.48;
 
       await storage.updateUserBalance(req.user.id, -bet);
@@ -1566,7 +1633,7 @@ export async function registerRoutes(
   const PLINKO_DEFAULT_MULTIPLIERS = [0.2, 0.5, 1.2, 2, 5, 2, 1.2, 0.5, 0.2];
   app.get("/api/games/plinko/settings", async (req, res) => {
     if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
-    const s = await storage.getGameSettings("plinko");
+    const s = await getEffectiveGameSettings(req.user.id, "plinko");
     const extra = (() => { try { return s?.extraSettings ? JSON.parse(s.extraSettings) : {}; } catch { return {}; } })();
     res.json({ multipliers: extra.multipliers ?? PLINKO_DEFAULT_MULTIPLIERS });
   });
@@ -1587,7 +1654,7 @@ export async function registerRoutes(
     try {
       const { bet } = z.object({ bet: z.number().min(500) }).parse(req.body);
       if (req.user.balance < bet) return res.status(400).json({ message: "Insufficient balance" });
-      const settings = await storage.getGameSettings("plinko");
+      const settings = await getEffectiveGameSettings(req.user.id, "plinko");
       const winChance = settings?.winChance ?? 0.48;
       const extraParsed = (() => { try { return settings?.extraSettings ? JSON.parse(settings.extraSettings) : {}; } catch { return {}; } })();
       await storage.updateUserBalance(req.user.id, -bet);
@@ -1634,7 +1701,7 @@ export async function registerRoutes(
   const WHEEL_DEFAULT_MULTIPLIERS = [0, 0.5, 0, 1, 0, 1.5, 0, 2, 0, 0.5, 0, 3, 0, 1, 5, 10];
   app.get("/api/games/wheel/settings", async (req, res) => {
     if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
-    const s = await storage.getGameSettings("wheel");
+    const s = await getEffectiveGameSettings(req.user.id, "wheel");
     const extra = (() => { try { return s?.extraSettings ? JSON.parse(s.extraSettings) : {}; } catch { return {}; } })();
     res.json({ multipliers: extra.multipliers ?? WHEEL_DEFAULT_MULTIPLIERS });
   });
@@ -1656,7 +1723,7 @@ export async function registerRoutes(
       const { bet } = z.object({ bet: z.number().min(500) }).parse(req.body);
       if (req.user.balance < bet) return res.status(400).json({ message: "Insufficient balance" });
       
-      const settings = await storage.getGameSettings("wheel");
+      const settings = await getEffectiveGameSettings(req.user.id, "wheel");
       const winChance = settings?.winChance ?? 0.48;
       const extraParsed = (() => { try { return settings?.extraSettings ? JSON.parse(settings.extraSettings) : {}; } catch { return {}; } })();
       
@@ -1813,7 +1880,7 @@ export async function registerRoutes(
     if (await gateGame(req, res, "fishhunt")) return;
 
     try {
-      const settings = await storage.getGameSettings("fishhunt");
+      const settings = await getEffectiveGameSettings(req.user.id, "fishhunt");
       const winChance = settings?.winChance ?? 0.45;
 
       const { bet, fishType } = z.object({
@@ -1917,7 +1984,7 @@ export async function registerRoutes(
   app.get("/api/games/aviator/settings", async (req, res) => {
     if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
     try {
-      let settings = await storage.getGameSettings("aviator");
+      let settings = await getEffectiveGameSettings(req.user.id, "aviator");
       if (!settings) {
         // Seed with sensible defaults so admin sees the card immediately
         settings = await storage.updateGameHouseEdge("aviator", { houseEdgePct: 5 }, req.user.id);
@@ -1934,7 +2001,7 @@ export async function registerRoutes(
       const { bet } = z.object({ bet: z.number().int().min(100) }).parse(req.body);
       if (req.user.balance < bet) return res.status(400).json({ message: "Insufficient balance" });
 
-      const settings = await storage.getGameSettings("aviator");
+      const settings = await getEffectiveGameSettings(req.user.id, "aviator");
       const houseEdgePct = settings?.houseEdgePct ?? 5;
       // Aviator can theoretically pay up to AVIATOR_CRASH_CAP (1000x). If even
       // a 1.01x cashout would breach the bankroll floor, force an insta-crash
@@ -2046,7 +2113,7 @@ export async function registerRoutes(
     try {
       const { bet } = z.object({ bet: z.number().min(1) }).parse(req.body);
       if (req.user.balance < bet) return res.status(400).json({ message: "Insufficient balance" });
-      const fjSettings = await storage.getGameSettings("fishjoy");
+      const fjSettings = await getEffectiveGameSettings(req.user.id, "fishjoy");
       const fjExtra = (() => { try { return fjSettings?.extraSettings ? JSON.parse(fjSettings.extraSettings) : {}; } catch { return {}; } })();
       const fjMaxOdds = Math.max(...((fjExtra.fishOdds as number[]) ?? [2, 4, 6, 10, 15, 25, 40, 60, 80, 100, 150, 300]));
       const fjGuard = await checkBankrollFloorForBet(req.user.id, bet * fjMaxOdds);
@@ -2086,7 +2153,7 @@ export async function registerRoutes(
   app.get("/api/games/fishjoy/settings", async (req, res) => {
     if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
     try {
-      const settings = await storage.getGameSettings("fishjoy");
+      const settings = await getEffectiveGameSettings(req.user.id, "fishjoy");
       const extra = (() => { try { return settings?.extraSettings ? JSON.parse(settings.extraSettings) : {}; } catch { return {}; } })();
       const fishOdds = extra.fishOdds ?? [2, 4, 6, 10, 15, 25, 40, 60, 80, 100, 150, 300];
       const fishWinRates = extra.fishWinRates ?? DEFAULT_FISH_WIN_RATES;
@@ -2112,7 +2179,7 @@ export async function registerRoutes(
   app.get("/api/games/classic-slots/settings", async (req, res) => {
     if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
     try {
-      const settings = await storage.getGameSettings("classic-slots");
+      const settings = await getEffectiveGameSettings(req.user.id, "classic-slots");
       res.json({ winOccurrence: Math.round((settings?.winChance ?? 0.4) * 100) });
     } catch (err) { res.status(500).json({ message: "Internal Server Error" }); }
   });
@@ -2126,7 +2193,7 @@ export async function registerRoutes(
       if (req.user.balance < amount) return res.status(400).json({ message: "Insufficient balance" });
       // Classic-slots iframe sends arbitrary winAmount, so probe against the
       // game's actual top paytable multiplier (200x, see classic-slots/index.html).
-      const csSettings = await storage.getGameSettings("classic-slots");
+      const csSettings = await getEffectiveGameSettings(req.user.id, "classic-slots");
       const csMaxMult = Math.max(200, csSettings?.payoutMultiplier ?? 200);
       // Admin override: when bypassClassicSlotsBankroll is on, skip the
       // pre-block so Classic Slots stays playable even below the floor.
@@ -2168,7 +2235,7 @@ export async function registerRoutes(
       const { bet } = api.games.slots.spin.input.parse(req.body);
       if (req.user.balance < bet) return res.status(400).json({ message: "Insufficient balance" });
 
-      const settings = await storage.getGameSettings("slots");
+      const settings = await getEffectiveGameSettings(req.user.id, "slots");
       const winChance = settings?.winChance ?? 0.3;
 
       await storage.updateUserBalance(req.user.id, -bet);
@@ -2210,7 +2277,7 @@ export async function registerRoutes(
   app.get("/api/games/roulette/settings", async (req, res) => {
     if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
     try {
-      const settings = await storage.getGameSettings("roulette");
+      const settings = await getEffectiveGameSettings(req.user.id, "roulette");
       const extraParsed = (() => { try { return settings?.extraSettings ? JSON.parse(settings.extraSettings) : {}; } catch { return {}; } })();
       res.json({ numberOdds: extraParsed.numberOdds ?? 35, colorOdds: extraParsed.colorOdds ?? 1, parityOdds: extraParsed.parityOdds ?? 1 });
     } catch (err) { res.status(500).json({ message: "Internal Server Error" }); }
@@ -2238,7 +2305,7 @@ export async function registerRoutes(
       const { bet, type, value } = api.games.roulette.spin.input.parse(req.body);
       if (req.user.balance < bet) return res.status(400).json({ message: "Insufficient balance" });
 
-      const settings = await storage.getGameSettings("roulette");
+      const settings = await getEffectiveGameSettings(req.user.id, "roulette");
       const houseEdgeChance = settings?.winChance ?? 0.45;
 
       await storage.updateUserBalance(req.user.id, -bet);
@@ -2277,7 +2344,7 @@ export async function registerRoutes(
       let won = false;
       let payout = 0;
 
-      const rouletteSettings = await storage.getGameSettings("roulette");
+      const rouletteSettings = await getEffectiveGameSettings(req.user.id, "roulette");
       const rouletteExtra = (() => { try { return rouletteSettings?.extraSettings ? JSON.parse(rouletteSettings.extraSettings) : {}; } catch { return {}; } })();
       const numberOdds = rouletteExtra.numberOdds ?? 35;
       const colorOdds = rouletteExtra.colorOdds ?? 1;

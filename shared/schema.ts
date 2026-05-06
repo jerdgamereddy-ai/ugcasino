@@ -74,6 +74,20 @@ export const gameSettings = pgTable("game_settings", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
+// Per-manager overrides for the two most-used game levers — winChance and
+// payoutMultiplier. Either column may be null to inherit the global value
+// from `gameSettings`. House edge / bet limits / extras (dog odds, plinko
+// multipliers, etc.) remain admin-global and are NOT per-manager.
+export const managerGameOverrides = pgTable("manager_game_overrides", {
+  id: serial("id").primaryKey(),
+  managerId: integer("manager_id").notNull(),
+  gameType: text("game_type").notNull(),
+  winChance: doublePrecision("win_chance"),
+  payoutMultiplier: doublePrecision("payout_multiplier"),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+export type ManagerGameOverride = typeof managerGameOverrides.$inferSelect;
+
 export const withdrawalRequests = pgTable("withdrawal_requests", {
   id: serial("id").primaryKey(),
   userId: integer("user_id").notNull(),
