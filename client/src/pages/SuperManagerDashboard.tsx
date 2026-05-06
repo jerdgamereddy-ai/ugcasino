@@ -456,16 +456,6 @@ export default function SuperManagerDashboard() {
     }
   };
 
-  if (user?.role !== "super_manager") {
-    return (
-      <div className="text-center py-20">
-        <Shield className="w-16 h-16 text-destructive mx-auto mb-4" />
-        <h1 className="text-2xl font-bold" data-testid="text-access-denied">Access Denied</h1>
-        <p className="text-muted-foreground">Super Managers only.</p>
-      </div>
-    );
-  }
-
   const managers = subordinates?.filter(u => u.role === 'manager') || [];
   const players = subordinates?.filter(u => u.role === 'user') || [];
 
@@ -487,6 +477,16 @@ export default function SuperManagerDashboard() {
     },
     enabled: user?.role === 'super_manager',
   });
+
+  if (user?.role !== "super_manager") {
+    return (
+      <div className="text-center py-20">
+        <Shield className="w-16 h-16 text-destructive mx-auto mb-4" />
+        <h1 className="text-2xl font-bold" data-testid="text-access-denied">Access Denied</h1>
+        <p className="text-muted-foreground">Super Managers only.</p>
+      </div>
+    );
+  }
 
   const statCards = reports ? [
     { title: "Profit / Loss", value: reports.profit, icon: reports.profit >= 0 ? TrendingUp : TrendingDown, color: reports.profit >= 0 ? "text-green-500" : "text-red-500" },
