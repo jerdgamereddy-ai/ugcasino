@@ -827,7 +827,7 @@ export class DatabaseStorage implements IStorage {
       mimeType: audioTracks.mimeType,
       size: audioTracks.size,
       uploadedBy: audioTracks.uploadedBy,
-      data: sql<Buffer | null>`NULL`.as("data"),
+      data: sql<Buffer>`NULL`.as("data"),
       createdAt: audioTracks.createdAt,
     }).from(audioTracks).orderBy(desc(audioTracks.createdAt));
   }
@@ -880,7 +880,7 @@ export class DatabaseStorage implements IStorage {
       originalName: backgroundImages.originalName,
       mimeType: backgroundImages.mimeType,
       size: backgroundImages.size,
-      data: sql<Buffer | null>`NULL`.as("data"),
+      data: sql<Buffer>`NULL`.as("data"),
       uploadedBy: backgroundImages.uploadedBy,
       createdAt: backgroundImages.createdAt,
     }).from(backgroundImages).orderBy(desc(backgroundImages.createdAt));

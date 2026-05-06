@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { api, type InsertVoucher } from "@shared/routes";
+import { api } from "@shared/routes";
+import type { InsertVoucher } from "@shared/schema";
 import { z } from "zod";
 
 export function useVouchers() {

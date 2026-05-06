@@ -1309,7 +1309,7 @@ export default function AdminDashboard() {
     toast({ title: "Copied!", description: code });
   };
 
-  const printVoucher = (v: { code: string; amount: number; createdAt?: string | null }) => {
+  const printVoucher = (v: { code: string; amount: number; createdAt?: string | Date | null }) => {
     const w = window.open("", "_blank", "width=400,height=520");
     if (!w) return;
     w.document.write(`<!DOCTYPE html><html><head><title>UG Casino Voucher</title>
