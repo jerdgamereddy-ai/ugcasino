@@ -64,6 +64,27 @@ export interface IStorage {
   // Sum of all house-side balances (admin + super_manager + manager).
   getHouseBankroll(): Promise<number>;
 
+  // === MANAGER-OWNED CASINO POOL (decentralized bankroll) ===
+  // Walks the createdBy chain to find the role='manager' ancestor of a player.
+  getPlayerManagerId(userId: number): Promise<number | null>;
+  // Returns the active casino bankroll for a manager: businessMoney if
+  // useSeparateBusinessMoney=true, otherwise the manager's wallet balance.
+  getManagerBankroll(managerId: number): Promise<number>;
+  // Add to / subtract from the manager's casino pool (transparent on which
+  // field per the manager's mode). Used by bet (credit) and win (debit).
+  // All atomic via single SQL UPDATEs so concurrent bets cannot lose updates.
+  creditManagerPool(managerId: number, amount: number): Promise<void>;
+  debitManagerPool(managerId: number, amount: number): Promise<void>;
+  // Atomic conditional debit: subtract `amount` only if the active pool can
+  // cover it. Returns true on success, false if insufficient. Use this on
+  // the win path so the affordability check and the deduction are one
+  // operation (no time-of-check/time-of-use race).
+  tryDebitManagerPool(managerId: number, amount: number): Promise<boolean>;
+  // Super-manager actions on a single manager:
+  setManagerBusinessMoneyMode(managerId: number, useSeparate: boolean): Promise<User>;
+  adjustManagerBusinessMoney(managerId: number, delta: number): Promise<User>;
+  setManagerReportSinceAt(managerId: number, ts: Date | null): Promise<User>;
+
   createWithdrawalRequest(req: { userId: number, amount: number, managerCode?: string, managerId?: number }): Promise<WithdrawalRequest>;
   getWithdrawalRequest(id: number): Promise<WithdrawalRequest | undefined>;
   updateWithdrawalRequest(id: number, status: "approved" | "rejected", processedBy: number): Promise<WithdrawalRequest>;
@@ -410,6 +431,81 @@ export class DatabaseStorage implements IStorage {
 
   async resetAllGameStats(updatedBy: number): Promise<void> {
     await db.update(gameSettings).set({ totalBet: 0, totalPaid: 0, updatedBy, updatedAt: new Date() });
+  }
+
+  // === MANAGER-OWNED CASINO POOL ===
+  async getPlayerManagerId(userId: number): Promise<number | null> {
+    let current = await this.getUser(userId);
+    let hops = 0;
+    while (current && hops < 6) {
+      if (current.role === 'manager') return current.id;
+      if (current.createdBy == null) return null;
+      current = await this.getUser(current.createdBy);
+      hops++;
+    }
+    return null;
+  }
+
+  async getManagerBankroll(managerId: number): Promise<number> {
+    const m = await this.getUser(managerId);
+    if (!m) return 0;
+    return m.useSeparateBusinessMoney ? m.businessMoney : m.balance;
+  }
+
+  // Atomic credit: single UPDATE picks the active pool column via CASE on
+  // use_separate_business_money so concurrent bets cannot lose updates.
+  async creditManagerPool(managerId: number, amount: number): Promise<void> {
+    if (amount <= 0) return;
+    await db.execute(sql`
+      UPDATE users
+      SET business_money = business_money + (CASE WHEN use_separate_business_money THEN ${amount} ELSE 0 END),
+          balance        = balance        + (CASE WHEN use_separate_business_money THEN 0 ELSE ${amount} END)
+      WHERE id = ${managerId}
+    `);
+  }
+
+  // Atomic unconditional debit (used by super-manager withdraw-profits where
+  // the route already verified sufficiency).
+  async debitManagerPool(managerId: number, amount: number): Promise<void> {
+    if (amount <= 0) return;
+    await db.execute(sql`
+      UPDATE users
+      SET business_money = business_money - (CASE WHEN use_separate_business_money THEN ${amount} ELSE 0 END),
+          balance        = balance        - (CASE WHEN use_separate_business_money THEN 0 ELSE ${amount} END)
+      WHERE id = ${managerId}
+    `);
+  }
+
+  // Atomic conditional debit: subtract only if the active pool can cover.
+  async tryDebitManagerPool(managerId: number, amount: number): Promise<boolean> {
+    if (amount <= 0) return true;
+    const result: any = await db.execute(sql`
+      UPDATE users
+      SET business_money = business_money - (CASE WHEN use_separate_business_money THEN ${amount} ELSE 0 END),
+          balance        = balance        - (CASE WHEN use_separate_business_money THEN 0 ELSE ${amount} END)
+      WHERE id = ${managerId}
+        AND (CASE WHEN use_separate_business_money THEN business_money ELSE balance END) >= ${amount}
+    `);
+    // node-postgres returns rowCount on the result
+    return (result?.rowCount ?? result?.count ?? 0) > 0;
+  }
+
+  async setManagerBusinessMoneyMode(managerId: number, useSeparate: boolean): Promise<User> {
+    const [row] = await db.update(users).set({ useSeparateBusinessMoney: useSeparate }).where(eq(users.id, managerId)).returning();
+    return row;
+  }
+
+  async adjustManagerBusinessMoney(managerId: number, delta: number): Promise<User> {
+    const m = await this.getUser(managerId);
+    if (!m) throw new Error("Manager not found");
+    const newVal = Math.max(0, m.businessMoney + delta);
+    const [row] = await db.update(users).set({ businessMoney: newVal }).where(eq(users.id, managerId)).returning();
+    return row;
+  }
+
+  async setManagerReportSinceAt(managerId: number, ts: Date | null): Promise<User> {
+    const [row] = await db.update(users).set({ reportSinceAt: ts }).where(eq(users.id, managerId)).returning();
+    return row;
   }
 
   async getHouseBankroll(): Promise<number> {

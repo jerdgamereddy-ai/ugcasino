@@ -69,11 +69,23 @@ export async function registerRoutes(
     return false;
   }
 
-  // Pre-bet bankroll guard: if the universal house edge is enabled with a
-  // minimum-bankroll floor, refuse a bet whose maximum possible payout would
-  // drop the combined house bankroll below that floor. This stops the player
-  // from seeing a "win" animation that the server would later have to void.
-  async function checkBankrollFloorForBet(maxPotentialWin: number): Promise<{ blocked: boolean; bankroll?: number; floor?: number }> {
+  // Pre-bet bankroll guard: blocks a bet whose maximum possible payout
+  // can't be covered by the player's manager pool (or the universal floor
+  // when no manager exists in the chain). Runs at /bet endpoints so iframe
+  // games can force a losing visual outcome rather than show a "win" the
+  // server then voids.
+  async function checkBankrollFloorForBet(userId: number, maxPotentialWin: number): Promise<{ blocked: boolean; bankroll?: number; floor?: number }> {
+    const managerId = await storage.getPlayerManagerId(userId).catch(() => null);
+    if (managerId != null) {
+      const pool = await storage.getManagerBankroll(managerId).catch(() => 0);
+      // Manager-owned pool: block when worst-case win would drain it past zero.
+      if (pool < maxPotentialWin) {
+        return { blocked: true, bankroll: pool, floor: 0 };
+      }
+      return { blocked: false };
+    }
+    // No manager in the chain (admin/super-manager-created players) — fall
+    // back to the legacy global house bankroll + universal floor check.
     let u;
     try { u = await storage.getUniversalHouseEdge(); } catch { return { blocked: false }; }
     if (!u.enabled || u.minHouseBalance <= 0) return { blocked: false };
@@ -84,16 +96,32 @@ export async function registerRoutes(
     return { blocked: false };
   }
 
-  async function recordBet(gameType: string, betAmount: number) {
+  async function recordBet(gameType: string, userId: number, betAmount: number) {
     if (betAmount <= 0) return;
     await storage.recordHouseEdgeBet(gameType, betAmount).catch(() => {});
     await storage.recordUniversalBet(betAmount).catch(() => {});
+    // Decentralised pool: bet money flows from player into their manager.
+    const managerId = await storage.getPlayerManagerId(userId).catch(() => null);
+    if (managerId != null) {
+      await storage.creditManagerPool(managerId, betAmount).catch(() => {});
+    }
   }
 
-  async function recordPayout(gameType: string, payout: number) {
-    if (payout <= 0) return;
+  // Returns true if the payout was credited (counters bumped & manager pool
+  // debited). Returns false ONLY when the player has a manager and that
+  // manager's pool can't atomically cover the payout — callers must then
+  // void the win (return 0 to the player). The manager-pool debit happens
+  // FIRST so a failed `tryDebitManagerPool` aborts before counters move.
+  async function recordPayout(gameType: string, userId: number, payout: number): Promise<boolean> {
+    if (payout <= 0) return true;
+    const managerId = await storage.getPlayerManagerId(userId).catch(() => null);
+    if (managerId != null) {
+      const ok = await storage.tryDebitManagerPool(managerId, payout).catch(() => false);
+      if (!ok) return false;
+    }
     await storage.recordHouseEdgePayout(gameType, payout).catch(() => {});
     await storage.recordUniversalPayout(payout).catch(() => {});
+    return true;
   }
 
   // Single-call helper: records the bet, then validates the intended win against
@@ -101,14 +129,16 @@ export async function registerRoutes(
   async function processCombinedBetAndWin(
     gameType: string, userId: number, betAmount: number, intendedWin: number
   ): Promise<number> {
-    await recordBet(gameType, betAmount);
+    await recordBet(gameType, userId, betAmount);
     if (intendedWin <= 0) return 0;
     const settings = await storage.getGameSettings(gameType);
     if (!settings) {
       const blockedByUniversal = await checkUniversalForceLose(intendedWin);
       if (blockedByUniversal) return 0;
-      await recordPayout(gameType, intendedWin);
-      return intendedWin;
+      // Atomic try-debit inside recordPayout decides affordability — no
+      // separate pre-check needed (eliminates the TOCTOU window).
+      const paid = await recordPayout(gameType, userId, intendedWin);
+      return paid ? intendedWin : 0;
     }
     // High-bet protection (always active)
     if (settings.highBetThreshold > 0 && betAmount >= settings.highBetThreshold) {
@@ -127,13 +157,13 @@ export async function registerRoutes(
         return 0;
       }
     }
-    await recordPayout(gameType, intendedWin);
-    return intendedWin;
+    const paidCombined = await recordPayout(gameType, userId, intendedWin);
+    return paidCombined ? intendedWin : 0;
   }
 
   // Split-call helpers: bet endpoint records and may flag a forced loss; win endpoint applies it.
   async function recordBetAndCheckHighBet(gameType: string, userId: number, betAmount: number) {
-    await recordBet(gameType, betAmount);
+    await recordBet(gameType, userId, betAmount);
     lockedBetAmountMap.set(lossKey(userId, gameType), betAmount);
     const settings = await storage.getGameSettings(gameType);
     if (!settings) { lockedLossMap.delete(lossKey(userId, gameType)); return; }
@@ -193,9 +223,11 @@ export async function registerRoutes(
         }
       }
     }
-    await recordPayout(gameType, intendedWin);
+    // Atomic try-debit inside recordPayout decides affordability — voids
+    // the win if the manager pool can't cover it (eliminates TOCTOU race).
+    const paid = await recordPayout(gameType, userId, intendedWin);
     lockedBetAmountMap.delete(k);
-    return intendedWin;
+    return paid ? intendedWin : 0;
   }
 
   // === PER-USER GAME ENABLE / DISABLE (admin-controlled, cascades) ===
@@ -525,6 +557,87 @@ export async function registerRoutes(
     } catch (err) {
       res.status(400).json({ message: "Invalid input" });
     }
+  });
+
+  // === SUPER MANAGER: Manage their managers' casino pool & reports ===
+  // Helper: ensure the target user is a manager created by the requester.
+  async function loadOwnedManager(req: any, res: any): Promise<any | null> {
+    if (!req.isAuthenticated() || req.user.role !== 'super_manager') {
+      res.status(403).send("Forbidden"); return null;
+    }
+    const id = parseInt(req.params.id, 10);
+    if (!id) { res.status(400).json({ message: "Invalid manager id" }); return null; }
+    const mgr = await storage.getUser(id);
+    if (!mgr || mgr.role !== 'manager' || mgr.createdBy !== req.user.id) {
+      res.status(403).json({ message: "Not your manager" }); return null;
+    }
+    return mgr;
+  }
+
+  // Credit a manager's casino pool from the super-manager's wallet.
+  app.post("/api/super-manager/managers/:id/credit", async (req, res) => {
+    const mgr = await loadOwnedManager(req, res); if (!mgr) return;
+    try {
+      const { amount } = z.object({ amount: z.number().int().positive() }).parse(req.body);
+      const sm = await storage.getUser(req.user!.id);
+      if (!sm || sm.balance < amount) return res.status(400).json({ message: "Insufficient balance in your wallet" });
+      await storage.updateUserBalance(req.user!.id, -amount);
+      await storage.creditManagerPool(mgr.id, amount);
+      await storage.createTransaction({ userId: req.user!.id, amount: -amount, type: "manager_credit", description: `Credit to manager ${mgr.username} (#${mgr.id})` });
+      await storage.createTransaction({ userId: mgr.id, amount, type: "manager_credit", description: `Credited by super manager ${req.user!.username}` });
+      res.json({ ok: true });
+    } catch { res.status(400).json({ message: "Invalid input" }); }
+  });
+
+  // Withdraw profits from a manager's casino pool back to super-manager's wallet.
+  app.post("/api/super-manager/managers/:id/withdraw-profits", async (req, res) => {
+    const mgr = await loadOwnedManager(req, res); if (!mgr) return;
+    try {
+      const { amount } = z.object({ amount: z.number().int().positive() }).parse(req.body);
+      const pool = await storage.getManagerBankroll(mgr.id);
+      if (pool < amount) return res.status(400).json({ message: `Insufficient pool (UGX ${pool.toLocaleString()})` });
+      await storage.debitManagerPool(mgr.id, amount);
+      await storage.updateUserBalance(req.user!.id, amount);
+      await storage.createTransaction({ userId: mgr.id, amount: -amount, type: "manager_withdraw_profits", description: `Profits withdrawn by super manager ${req.user!.username}` });
+      await storage.createTransaction({ userId: req.user!.id, amount, type: "manager_withdraw_profits", description: `Withdrew profits from manager ${mgr.username} (#${mgr.id})` });
+      res.json({ ok: true });
+    } catch { res.status(400).json({ message: "Invalid input" }); }
+  });
+
+  // Direct +/- adjust to a manager's businessMoney (super manager bookkeeping).
+  // Does NOT move money to/from the super manager's wallet — purely a ledger
+  // edit on the manager's separate casino-money column.
+  app.post("/api/super-manager/managers/:id/adjust-business-money", async (req, res) => {
+    const mgr = await loadOwnedManager(req, res); if (!mgr) return;
+    try {
+      const { delta } = z.object({ delta: z.number().int() }).parse(req.body);
+      const updated = await storage.adjustManagerBusinessMoney(mgr.id, delta);
+      await storage.createTransaction({ userId: mgr.id, amount: delta, type: "business_money_adjust", description: `Business money adjusted by ${req.user!.username}` });
+      res.json({ ok: true, businessMoney: updated.businessMoney });
+    } catch { res.status(400).json({ message: "Invalid input" }); }
+  });
+
+  // Toggle whether the manager's casino pool is their wallet balance (false)
+  // or a separate businessMoney column (true).
+  app.patch("/api/super-manager/managers/:id/business-money-mode", async (req, res) => {
+    const mgr = await loadOwnedManager(req, res); if (!mgr) return;
+    try {
+      const { useSeparate } = z.object({ useSeparate: z.boolean() }).parse(req.body);
+      const updated = await storage.setManagerBusinessMoneyMode(mgr.id, useSeparate);
+      res.json({ ok: true, useSeparateBusinessMoney: updated.useSeparateBusinessMoney });
+    } catch { res.status(400).json({ message: "Invalid input" }); }
+  });
+
+  // Non-destructive report cutoff: stamp now() so the manager's future report
+  // queries hide everything before this moment. Pass `clear: true` to remove.
+  app.post("/api/super-manager/managers/:id/reset-reports", async (req, res) => {
+    const mgr = await loadOwnedManager(req, res); if (!mgr) return;
+    try {
+      const { clear } = z.object({ clear: z.boolean().optional() }).parse(req.body || {});
+      const ts = clear ? null : new Date();
+      const updated = await storage.setManagerReportSinceAt(mgr.id, ts);
+      res.json({ ok: true, reportSinceAt: updated.reportSinceAt });
+    } catch { res.status(400).json({ message: "Invalid input" }); }
   });
 
   // === MANAGER: Create users ===
@@ -1100,7 +1213,7 @@ export async function registerRoutes(
       // the game stay open; excessive payouts are still voided server-side.
       const dogUniversal = await storage.getUniversalHouseEdge().catch(() => null);
       if (!dogUniversal?.bypassDogRacingBankroll) {
-        const dogGuard = await checkBankrollFloorForBet(totBet * dogMaxOdds);
+        const dogGuard = await checkBankrollFloorForBet(req.user.id, totBet * dogMaxOdds);
         if (dogGuard.blocked) {
           return res.status(400).json({ message: "Bet too large — maximum possible payout exceeds the house bankroll. Please lower your bet.", bankrollBlocked: true });
         }
@@ -1199,7 +1312,7 @@ export async function registerRoutes(
       // payouts, which can show as "horse won but no payout").
       const h4Universal = await storage.getUniversalHouseEdge().catch(() => null);
       if (!h4Universal?.bypassHorse4Bankroll) {
-        const h4Guard = await checkBankrollFloorForBet(totBet * h4MaxOdds);
+        const h4Guard = await checkBankrollFloorForBet(req.user.id, totBet * h4MaxOdds);
         if (h4Guard.blocked) {
           return res.status(400).json({ message: "Bet too large — maximum possible payout exceeds the house bankroll. Please lower your bet.", bankrollBlocked: true });
         }
@@ -1792,7 +1905,7 @@ export async function registerRoutes(
       // Aviator can theoretically pay up to AVIATOR_CRASH_CAP (1000x). If even
       // a 1.01x cashout would breach the bankroll floor, force an insta-crash
       // so the player still gets to bet but can't win on this round.
-      const aviatorGuard = await checkBankrollFloorForBet(bet * AVIATOR_CRASH_CAP);
+      const aviatorGuard = await checkBankrollFloorForBet(req.user.id, bet * AVIATOR_CRASH_CAP);
 
       await storage.updateUserBalance(req.user.id, -bet);
       await storage.createTransaction({ userId: req.user.id, amount: -bet, type: "bet", description: `Aviator: bet placed (${bet} UGX)` });
@@ -1902,7 +2015,7 @@ export async function registerRoutes(
       const fjSettings = await storage.getGameSettings("fishjoy");
       const fjExtra = (() => { try { return fjSettings?.extraSettings ? JSON.parse(fjSettings.extraSettings) : {}; } catch { return {}; } })();
       const fjMaxOdds = Math.max(...((fjExtra.fishOdds as number[]) ?? [2, 4, 6, 10, 15, 25, 40, 60, 80, 100, 150, 300]));
-      const fjGuard = await checkBankrollFloorForBet(bet * fjMaxOdds);
+      const fjGuard = await checkBankrollFloorForBet(req.user.id, bet * fjMaxOdds);
       if (fjGuard.blocked) {
         return res.status(400).json({ message: "Shot too large — maximum possible payout exceeds the house bankroll. Please lower your bet.", bankrollBlocked: true });
       }
@@ -1985,7 +2098,7 @@ export async function registerRoutes(
       // pre-block so Classic Slots stays playable even below the floor.
       const csUniversal = await storage.getUniversalHouseEdge().catch(() => null);
       if (!csUniversal?.bypassClassicSlotsBankroll) {
-        const csGuard = await checkBankrollFloorForBet(amount * csMaxMult);
+        const csGuard = await checkBankrollFloorForBet(req.user.id, amount * csMaxMult);
         if (csGuard.blocked) {
           return res.status(400).json({ message: "Bet too large — maximum possible payout exceeds the house bankroll. Please lower your bet.", bankrollBlocked: true });
         }

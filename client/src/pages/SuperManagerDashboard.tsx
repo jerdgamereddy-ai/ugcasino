@@ -10,8 +10,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useState, useMemo } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { Shield, Plus, Users, UserCog, Loader2, Ban, CheckCircle, Megaphone, Calculator, Phone, KeyRound, BarChart3, TrendingUp, TrendingDown, Wallet, Trophy, ArrowDownCircle, ArrowUpCircle, DollarSign, RefreshCw, Filter } from "lucide-react";
-import { queryClient } from "@/lib/queryClient";
+import { Shield, Plus, Users, UserCog, Loader2, Ban, CheckCircle, Megaphone, Calculator, Phone, KeyRound, BarChart3, TrendingUp, TrendingDown, Wallet, Trophy, ArrowDownCircle, ArrowUpCircle, DollarSign, RefreshCw, Filter, Banknote, ArrowDownToLine, ArrowUpFromLine, Settings2, RotateCcw } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription } from "@/components/ui/dialog";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 import { User } from "@shared/schema";
 import { BroadcastBanner } from "@/components/BroadcastBanner";
 import { BroadcastSender } from "@/components/BroadcastSender";
@@ -62,6 +64,169 @@ interface ReportData {
   profit: number;
   playersCount: number;
   dailyStats: { date: string; bets: number; wins: number; deposits: number; withdrawals: number }[];
+}
+
+// Per-manager casino-pool controls: credit money in, withdraw profits out,
+// adjust the separate businessMoney column directly, toggle which column
+// acts as the pool, and stamp a non-destructive reports cutoff.
+function ManagerPoolControls({ mgr }: { mgr: User }) {
+  const { toast } = useToast();
+  const [creditAmt, setCreditAmt] = useState("");
+  const [withdrawAmt, setWithdrawAmt] = useState("");
+  const [adjustAmt, setAdjustAmt] = useState("");
+  const [creditOpen, setCreditOpen] = useState(false);
+  const [withdrawOpen, setWithdrawOpen] = useState(false);
+  const [adjustOpen, setAdjustOpen] = useState(false);
+
+  const refresh = () => queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
+
+  const callRoute = async (path: string, body: any, successMsg: string) => {
+    try {
+      await apiRequest("POST", `/api/super-manager/managers/${mgr.id}/${path}`, body);
+      toast({ title: successMsg, className: "bg-green-600 text-white" });
+      refresh();
+      return true;
+    } catch (e: any) {
+      toast({ title: "Error", description: e?.message || "Failed", variant: "destructive" });
+      return false;
+    }
+  };
+
+  const toggleMode = async (useSeparate: boolean) => {
+    try {
+      await apiRequest("PATCH", `/api/super-manager/managers/${mgr.id}/business-money-mode`, { useSeparate });
+      toast({ title: useSeparate ? "Switched to separate pool" : "Switched to wallet pool", className: "bg-green-600 text-white" });
+      refresh();
+    } catch (e: any) {
+      toast({ title: "Error", description: e?.message || "Failed", variant: "destructive" });
+    }
+  };
+
+  const resetReports = async () => {
+    if (!confirm(`Reset reports for ${mgr.username}? Activity before now will be hidden from their reports (non-destructive).`)) return;
+    await callRoute("reset-reports", {}, "Reports cutoff stamped");
+  };
+
+  return (
+    <div className="flex flex-wrap gap-1.5 items-center">
+      {/* Credit pool */}
+      <Dialog open={creditOpen} onOpenChange={setCreditOpen}>
+        <DialogTrigger asChild>
+          <Button size="sm" variant="outline" className="h-7 px-2 text-xs" data-testid={`button-credit-${mgr.id}`}>
+            <ArrowDownToLine className="w-3 h-3 mr-1" /> Credit
+          </Button>
+        </DialogTrigger>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Credit Pool of {mgr.username}</DialogTitle>
+            <DialogDescription>Move money from your wallet into this manager's casino pool.</DialogDescription>
+          </DialogHeader>
+          <Input
+            type="number"
+            placeholder="Amount (UGX)"
+            value={creditAmt}
+            onChange={(e) => setCreditAmt(e.target.value)}
+            data-testid={`input-credit-amount-${mgr.id}`}
+          />
+          <DialogFooter>
+            <Button onClick={async () => {
+              const n = parseInt(creditAmt, 10);
+              if (!Number.isFinite(n) || n <= 0) return;
+              const ok = await callRoute("credit", { amount: n }, "Credited");
+              if (ok) { setCreditAmt(""); setCreditOpen(false); }
+            }} data-testid={`button-confirm-credit-${mgr.id}`}>Credit</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Withdraw profits */}
+      <Dialog open={withdrawOpen} onOpenChange={setWithdrawOpen}>
+        <DialogTrigger asChild>
+          <Button size="sm" variant="outline" className="h-7 px-2 text-xs" data-testid={`button-withdraw-${mgr.id}`}>
+            <ArrowUpFromLine className="w-3 h-3 mr-1" /> Profits
+          </Button>
+        </DialogTrigger>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Withdraw Profits from {mgr.username}</DialogTitle>
+            <DialogDescription>Move money from this manager's casino pool back into your wallet.</DialogDescription>
+          </DialogHeader>
+          <Input
+            type="number"
+            placeholder="Amount (UGX)"
+            value={withdrawAmt}
+            onChange={(e) => setWithdrawAmt(e.target.value)}
+            data-testid={`input-withdraw-amount-${mgr.id}`}
+          />
+          <DialogFooter>
+            <Button onClick={async () => {
+              const n = parseInt(withdrawAmt, 10);
+              if (!Number.isFinite(n) || n <= 0) return;
+              const ok = await callRoute("withdraw-profits", { amount: n }, "Profits withdrawn");
+              if (ok) { setWithdrawAmt(""); setWithdrawOpen(false); }
+            }} data-testid={`button-confirm-withdraw-${mgr.id}`}>Withdraw</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Adjust businessMoney directly (only meaningful in separate-pool mode) */}
+      <Dialog open={adjustOpen} onOpenChange={setAdjustOpen}>
+        <DialogTrigger asChild>
+          <Button size="sm" variant="outline" className="h-7 px-2 text-xs" data-testid={`button-adjust-${mgr.id}`}>
+            <Settings2 className="w-3 h-3 mr-1" /> Adjust
+          </Button>
+        </DialogTrigger>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Adjust Business Money for {mgr.username}</DialogTitle>
+            <DialogDescription>
+              Direct +/- ledger edit to the separate businessMoney column. Does NOT touch your wallet.
+              Use a negative number to deduct.
+            </DialogDescription>
+          </DialogHeader>
+          <Input
+            type="number"
+            placeholder="Delta (e.g. 10000 or -5000)"
+            value={adjustAmt}
+            onChange={(e) => setAdjustAmt(e.target.value)}
+            data-testid={`input-adjust-amount-${mgr.id}`}
+          />
+          <DialogFooter>
+            <Button onClick={async () => {
+              const n = parseInt(adjustAmt, 10);
+              if (!Number.isFinite(n) || n === 0) return;
+              const ok = await callRoute("adjust-business-money", { delta: n }, "Adjusted");
+              if (ok) { setAdjustAmt(""); setAdjustOpen(false); }
+            }} data-testid={`button-confirm-adjust-${mgr.id}`}>Apply</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Toggle pool mode */}
+      <div className="flex items-center gap-1 px-1">
+        <Switch
+          checked={mgr.useSeparateBusinessMoney}
+          onCheckedChange={toggleMode}
+          data-testid={`switch-mode-${mgr.id}`}
+        />
+        <span className="text-[10px] text-muted-foreground" title="When ON, the casino pool is the separate businessMoney column instead of the wallet balance.">
+          <Banknote className="w-3 h-3 inline" />
+        </span>
+      </div>
+
+      {/* Reset reports cutoff */}
+      <Button
+        size="sm"
+        variant="outline"
+        className="h-7 px-2 text-xs"
+        onClick={resetReports}
+        data-testid={`button-reset-reports-${mgr.id}`}
+        title="Stamp now() as the reports start date for this manager (non-destructive)"
+      >
+        <RotateCcw className="w-3 h-3 mr-1" /> Reset Reports
+      </Button>
+    </div>
+  );
 }
 
 export default function SuperManagerDashboard() {
@@ -239,7 +404,10 @@ export default function SuperManagerDashboard() {
                         <TableHead>Username</TableHead>
                         <TableHead>Phone</TableHead>
                         <TableHead>Status</TableHead>
-                        <TableHead>Balance</TableHead>
+                        <TableHead>Wallet</TableHead>
+                        <TableHead>Casino Pool</TableHead>
+                        <TableHead>Reports Since</TableHead>
+                        <TableHead>Casino Pool Actions</TableHead>
                         <TableHead>Withdraw Code</TableHead>
                         <TableHead>Change Password</TableHead>
                       </TableRow>
@@ -266,6 +434,24 @@ export default function SuperManagerDashboard() {
                             )}
                           </TableCell>
                           <TableCell className="text-primary font-bold">UGX {mgr.balance.toLocaleString()}</TableCell>
+                          <TableCell>
+                            <div className="flex flex-col gap-1">
+                              <span className="font-bold text-amber-400" data-testid={`text-pool-${mgr.id}`}>
+                                UGX {(mgr.useSeparateBusinessMoney ? mgr.businessMoney : mgr.balance).toLocaleString()}
+                              </span>
+                              <span className="text-[10px] text-muted-foreground">
+                                {mgr.useSeparateBusinessMoney ? "Separate pool" : "= Wallet"}
+                              </span>
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <span className="text-xs text-muted-foreground" data-testid={`text-since-${mgr.id}`}>
+                              {mgr.reportSinceAt ? new Date(mgr.reportSinceAt).toLocaleString() : "All time"}
+                            </span>
+                          </TableCell>
+                          <TableCell>
+                            <ManagerPoolControls mgr={mgr} />
+                          </TableCell>
                           <TableCell>
                             <div className="flex gap-2 items-center">
                               {mgr.withdrawCode ? (

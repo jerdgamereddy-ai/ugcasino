@@ -19,6 +19,17 @@ export const users = pgTable("users", {
   withdrawCode: text("withdraw_code"),
   lastActive: timestamp("last_active"),
   createdAt: timestamp("created_at").defaultNow(),
+  // Per-manager casino pool (only meaningful for role='manager').
+  // When useSeparateBusinessMoney=false (default), the manager's regular
+  // balance acts as the casino bankroll for their players: bets credit it,
+  // wins debit it. When true, businessMoney becomes the dedicated bankroll
+  // and the manager's wallet `balance` is left alone.
+  businessMoney: integer("business_money").default(0).notNull(),
+  useSeparateBusinessMoney: boolean("use_separate_business_money").default(false).notNull(),
+  // Per-manager "reports start from" cutoff. Reporting endpoints filter out
+  // any activity dated before this timestamp for that manager's players.
+  // Null means "show everything" (default).
+  reportSinceAt: timestamp("report_since_at"),
 });
 
 export const adminSecurityAnswers = pgTable("admin_security_answers", {
@@ -42,7 +53,7 @@ export const transactions = pgTable("transactions", {
   id: serial("id").primaryKey(),
   userId: integer("user_id").notNull(),
   amount: integer("amount").notNull(),
-  type: text("type", { enum: ["deposit", "withdrawal", "bet", "win", "voucher_redemption"] }).notNull(),
+  type: text("type", { enum: ["deposit", "withdrawal", "bet", "win", "voucher_redemption", "manager_credit", "manager_withdraw_profits", "business_money_adjust"] }).notNull(),
   description: text("description"),
   createdAt: timestamp("created_at").defaultNow(),
 });
