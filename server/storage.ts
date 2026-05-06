@@ -67,6 +67,7 @@ export interface IStorage {
   // === MANAGER-OWNED CASINO POOL (decentralized bankroll) ===
   // Walks the createdBy chain to find the role='manager' ancestor of a player.
   getPlayerManagerId(userId: number): Promise<number | null>;
+  getPlayerOverrideOwnerId(userId: number): Promise<number | null>;
   // Returns the active casino bankroll for a manager: businessMoney if
   // useSeparateBusinessMoney=true, otherwise the manager's wallet balance.
   getManagerBankroll(managerId: number): Promise<number>;
@@ -448,6 +449,21 @@ export class DatabaseStorage implements IStorage {
     let hops = 0;
     while (current && hops < 6) {
       if (current.role === 'manager') return current.id;
+      if (current.createdBy == null) return null;
+      current = await this.getUser(current.createdBy);
+      hops++;
+    }
+    return null;
+  }
+
+  // Walk createdBy chain and return the nearest ancestor whose role is
+  // manager OR super_manager. Used for per-game overrides so super-managers
+  // can set overrides for their direct players (when no manager sits between).
+  async getPlayerOverrideOwnerId(userId: number): Promise<number | null> {
+    let current = await this.getUser(userId);
+    let hops = 0;
+    while (current && hops < 6) {
+      if (current.role === 'manager' || current.role === 'super_manager') return current.id;
       if (current.createdBy == null) return null;
       current = await this.getUser(current.createdBy);
       hops++;

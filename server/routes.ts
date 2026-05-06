@@ -104,9 +104,9 @@ export async function registerRoutes(
   async function getEffectiveGameSettings(userId: number, gameType: string): Promise<GameSetting | undefined> {
     const global = await storage.getGameSettings(gameType);
     if (!global) return undefined;
-    const mgrId = await storage.getPlayerManagerId(userId).catch(() => null);
-    if (mgrId == null) return global;
-    const ov = await storage.getManagerGameOverride(mgrId, gameType).catch(() => undefined);
+    const ownerId = await storage.getPlayerOverrideOwnerId(userId).catch(() => null);
+    if (ownerId == null) return global;
+    const ov = await storage.getManagerGameOverride(ownerId, gameType).catch(() => undefined);
     if (!ov) return global;
     return {
       ...global,
@@ -664,7 +664,7 @@ export async function registerRoutes(
   // the manager's override (null if inheriting). PUT upserts a single field
   // (winChance OR payoutMultiplier — null clears it). DELETE wipes the row.
   app.get("/api/manager/game-overrides", async (req, res) => {
-    if (!req.isAuthenticated() || req.user.role !== 'manager') return res.status(403).send("Forbidden");
+    if (!req.isAuthenticated() || (req.user.role !== 'manager' && req.user.role !== 'super_manager')) return res.status(403).send("Forbidden");
     try {
       const all = await storage.getAllGameSettings();
       const overrides = await storage.getManagerGameOverridesByManager(req.user.id);
@@ -686,7 +686,7 @@ export async function registerRoutes(
   });
 
   app.put("/api/manager/game-overrides/:gameType", async (req, res) => {
-    if (!req.isAuthenticated() || req.user.role !== 'manager') return res.status(403).send("Forbidden");
+    if (!req.isAuthenticated() || (req.user.role !== 'manager' && req.user.role !== 'super_manager')) return res.status(403).send("Forbidden");
     const gameType = req.params.gameType;
     if (!GAMES_REGISTRY.find(g => g.id === gameType)) return res.status(400).json({ message: "Unknown game" });
     try {
@@ -700,7 +700,7 @@ export async function registerRoutes(
   });
 
   app.delete("/api/manager/game-overrides/:gameType", async (req, res) => {
-    if (!req.isAuthenticated() || req.user.role !== 'manager') return res.status(403).send("Forbidden");
+    if (!req.isAuthenticated() || (req.user.role !== 'manager' && req.user.role !== 'super_manager')) return res.status(403).send("Forbidden");
     const gameType = req.params.gameType;
     if (!GAMES_REGISTRY.find(g => g.id === gameType)) return res.status(400).json({ message: "Unknown game" });
     await storage.clearManagerGameOverride(req.user.id, gameType);
