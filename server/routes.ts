@@ -804,6 +804,40 @@ export async function registerRoutes(
         withdrawals = await storage.getWithdrawalsByUserIdsAndDateRange(relevantUserIds, from, to);
       }
 
+      // Per-user "report-since" cutoff: when a manager has reportSinceAt
+      // stamped, that timestamp filters out any of THEIR players' (and
+      // their own) activity before it. Non-destructive — the rows still
+      // exist in the DB, they just don't show up in this report.
+      const allUsersForCutoff = await storage.getAllUsers();
+      const userById = new Map<number, any>(allUsersForCutoff.map(u => [u.id, u]));
+      const cutoffByUserId = new Map<number, number>(); // ms epoch
+      // Walk the createdBy chain (with cycle guard) until we find the
+      // nearest manager ancestor — that's the manager whose reportSinceAt
+      // governs this user's report visibility.
+      const findManagerAncestor = (start: any): any | null => {
+        let cur = start;
+        const seen = new Set<number>();
+        while (cur && !seen.has(cur.id)) {
+          if (cur.role === 'manager') return cur;
+          seen.add(cur.id);
+          cur = cur.createdBy != null ? userById.get(cur.createdBy) : null;
+        }
+        return null;
+      };
+      for (const u of allRelevantUsers) {
+        const mgr = findManagerAncestor(u);
+        if (mgr?.reportSinceAt) cutoffByUserId.set(u.id, new Date(mgr.reportSinceAt).getTime());
+      }
+      const passesCutoff = (userId: number, when: any): boolean => {
+        const cutoff = cutoffByUserId.get(userId);
+        if (cutoff == null) return true;
+        const t = when ? new Date(when).getTime() : 0;
+        return t >= cutoff;
+      };
+
+      txns = txns.filter((tx: any) => passesCutoff(tx.userId, tx.createdAt));
+      withdrawals = withdrawals.filter((w: any) => passesCutoff(w.userId, w.createdAt));
+
       const approvedWithdrawals = withdrawals.filter((w: any) => w.status === 'approved');
       const totalWithdrawn = approvedWithdrawals.reduce((sum: number, w: any) => sum + w.amount, 0);
 
