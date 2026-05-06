@@ -10,8 +10,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useState, useMemo } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { Shield, Plus, Users, Loader2, Ban, CheckCircle, Megaphone, Phone, Banknote, BarChart3, UserPlus, Ticket, TrendingUp, TrendingDown, Wallet, Trophy, ArrowDownCircle, ArrowUpCircle, DollarSign, RefreshCw, Filter, Copy, Printer, Sliders, Save, RotateCcw } from "lucide-react";
-import { apiRequest, queryClient } from "@/lib/queryClient";
+import { Shield, Plus, Users, Loader2, Ban, CheckCircle, Megaphone, Phone, Banknote, BarChart3, UserPlus, Ticket, TrendingUp, TrendingDown, Wallet, Trophy, ArrowDownCircle, ArrowUpCircle, DollarSign, RefreshCw, Filter, Copy, Printer } from "lucide-react";
+import { queryClient } from "@/lib/queryClient";
 import { User, Voucher } from "@shared/schema";
 import { BroadcastBanner } from "@/components/BroadcastBanner";
 import { BroadcastSender } from "@/components/BroadcastSender";
@@ -61,144 +61,6 @@ interface ReportData {
   profit: number;
   playersCount: number;
   dailyStats: { date: string; bets: number; wins: number; deposits: number; withdrawals: number }[];
-}
-
-type GameOverrideRow = {
-  gameType: string;
-  label: string;
-  globalWinChance: number | null;
-  globalPayoutMultiplier: number | null;
-  overrideWinChance: number | null;
-  overridePayoutMultiplier: number | null;
-};
-
-function ManagerGameOverridesTab() {
-  const { toast } = useToast();
-  const { data: rows, isLoading } = useQuery<GameOverrideRow[]>({ queryKey: ["/api/manager/game-overrides"] });
-  const [drafts, setDrafts] = useState<Record<string, { wc: string; pm: string }>>({});
-
-  const getDraft = (r: GameOverrideRow) => {
-    const d = drafts[r.gameType];
-    if (d) return d;
-    return {
-      wc: r.overrideWinChance != null ? String(r.overrideWinChance) : "",
-      pm: r.overridePayoutMultiplier != null ? String(r.overridePayoutMultiplier) : "",
-    };
-  };
-  const setDraft = (gameType: string, patch: Partial<{ wc: string; pm: string }>) => {
-    setDrafts(prev => ({ ...prev, [gameType]: { ...(prev[gameType] || { wc: "", pm: "" }), ...patch } }));
-  };
-
-  const saveMut = useMutation({
-    mutationFn: async (vars: { gameType: string; winChance: number | null; payoutMultiplier: number | null }) => {
-      const { gameType, ...body } = vars;
-      const res = await apiRequest("PUT", `/api/manager/game-overrides/${gameType}`, body);
-      return res.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/manager/game-overrides"] });
-      toast({ title: "Override saved" });
-    },
-    onError: () => toast({ title: "Save failed", variant: "destructive" }),
-  });
-
-  const clearMut = useMutation({
-    mutationFn: async (gameType: string) => {
-      const res = await apiRequest("DELETE", `/api/manager/game-overrides/${gameType}`);
-      return res.json();
-    },
-    onSuccess: (_d, gameType) => {
-      setDrafts(prev => { const { [gameType]: _, ...rest } = prev; return rest; });
-      queryClient.invalidateQueries({ queryKey: ["/api/manager/game-overrides"] });
-      toast({ title: "Override cleared — players inherit global" });
-    },
-  });
-
-  if (isLoading) return <div className="flex justify-center p-8"><Loader2 className="w-6 h-6 animate-spin" /></div>;
-
-  return (
-    <Card className="glass-card">
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2"><Sliders className="w-5 h-5" /> Per-Game Overrides for My Players</CardTitle>
-        <CardDescription>
-          Override win chance and payout multiplier for your players only. Leave blank to inherit the admin global value.
-          Other settings (house edge, bet limits, special multipliers) are still controlled by the admin.
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        <Table>
-          <TableHeader>
-            <TableRow className="border-white/10">
-              <TableHead>Game</TableHead>
-              <TableHead>Win Chance (0–1)</TableHead>
-              <TableHead>Payout Multiplier</TableHead>
-              <TableHead className="text-right">Actions</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {rows?.map(r => {
-              const d = getDraft(r);
-              const hasOverride = r.overrideWinChance != null || r.overridePayoutMultiplier != null;
-              return (
-                <TableRow key={r.gameType} className="border-white/10" data-testid={`row-override-${r.gameType}`}>
-                  <TableCell className="font-medium">
-                    <div>{r.label}</div>
-                    <div className="text-xs text-muted-foreground">
-                      Global: wc={r.globalWinChance ?? "—"} · ×{r.globalPayoutMultiplier ?? "—"}
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <Input
-                      type="number" step="0.01" min="0" max="1"
-                      placeholder={r.globalWinChance != null ? String(r.globalWinChance) : "inherit"}
-                      value={d.wc}
-                      onChange={e => setDraft(r.gameType, { wc: e.target.value })}
-                      className="w-28 bg-black/40"
-                      data-testid={`input-wc-${r.gameType}`}
-                    />
-                  </TableCell>
-                  <TableCell>
-                    <Input
-                      type="number" step="0.01" min="0.01"
-                      placeholder={r.globalPayoutMultiplier != null ? String(r.globalPayoutMultiplier) : "inherit"}
-                      value={d.pm}
-                      onChange={e => setDraft(r.gameType, { pm: e.target.value })}
-                      className="w-28 bg-black/40"
-                      data-testid={`input-pm-${r.gameType}`}
-                    />
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <div className="flex justify-end gap-2">
-                      <Button
-                        size="sm"
-                        onClick={() => saveMut.mutate({
-                          gameType: r.gameType,
-                          winChance: d.wc.trim() === "" ? null : Number(d.wc),
-                          payoutMultiplier: d.pm.trim() === "" ? null : Number(d.pm),
-                        })}
-                        disabled={saveMut.isPending}
-                        data-testid={`button-save-${r.gameType}`}
-                      >
-                        <Save className="w-3 h-3 mr-1" /> Save
-                      </Button>
-                      <Button
-                        size="sm" variant="outline"
-                        onClick={() => clearMut.mutate(r.gameType)}
-                        disabled={!hasOverride || clearMut.isPending}
-                        data-testid={`button-clear-${r.gameType}`}
-                      >
-                        <RotateCcw className="w-3 h-3 mr-1" /> Clear
-                      </Button>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              );
-            })}
-          </TableBody>
-        </Table>
-      </CardContent>
-    </Card>
-  );
 }
 
 export default function ManagerDashboard() {
@@ -490,7 +352,6 @@ export default function ManagerDashboard() {
             <TabsTrigger value="withdrawals" data-testid="tab-withdrawals"><Banknote className="w-3 h-3 mr-1" /> Withdrawals ({withdrawRequests?.length || 0})</TabsTrigger>
             <TabsTrigger value="broadcast" data-testid="tab-broadcast"><Megaphone className="w-3 h-3 mr-1" /> Broadcast</TabsTrigger>
             <TabsTrigger value="chat" data-testid="tab-chat"><MessageCircle className="w-3 h-3 mr-1" /> Chat</TabsTrigger>
-            <TabsTrigger value="game-overrides" data-testid="tab-game-overrides"><Sliders className="w-3 h-3 mr-1" /> Game Settings</TabsTrigger>
           </TabsList>
 
           <TabsContent value="users" className="mt-6">
@@ -909,10 +770,6 @@ export default function ManagerDashboard() {
 
           <TabsContent value="broadcast" className="mt-6">
             <BroadcastSender senderRole="manager" />
-          </TabsContent>
-
-          <TabsContent value="game-overrides" className="mt-6">
-            <ManagerGameOverridesTab />
           </TabsContent>
 
           <TabsContent value="chat" className="mt-6">

@@ -456,14 +456,15 @@ export class DatabaseStorage implements IStorage {
     return null;
   }
 
-  // Walk createdBy chain and return the nearest ancestor whose role is
-  // manager OR super_manager. Used for per-game overrides so super-managers
-  // can set overrides for their direct players (when no manager sits between).
+  // Walk createdBy chain and return the nearest super_manager ancestor.
+  // Per-game overrides live at the super-manager level so they apply
+  // uniformly to every player under that super-manager (regardless of which
+  // intermediate manager actually created the player).
   async getPlayerOverrideOwnerId(userId: number): Promise<number | null> {
     let current = await this.getUser(userId);
     let hops = 0;
     while (current && hops < 6) {
-      if (current.role === 'manager' || current.role === 'super_manager') return current.id;
+      if (current.role === 'super_manager') return current.id;
       if (current.createdBy == null) return null;
       current = await this.getUser(current.createdBy);
       hops++;
