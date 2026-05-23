@@ -520,7 +520,7 @@ export default function GameClassicSlots() {
         </div>
 
         <p className="text-center text-[10px] md:text-xs text-yellow-200/40 tracking-wider">
-          Min bet UGX {BET_AMOUNTS[0].toLocaleString()} · Win chance: {winOccurrence}%
+          Min bet UGX {BET_AMOUNTS[0].toLocaleString()}
         </p>
       </div>
 
