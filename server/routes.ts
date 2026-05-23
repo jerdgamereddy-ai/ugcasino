@@ -2247,8 +2247,28 @@ export async function registerRoutes(
     if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
     try {
       const settings = await getEffectiveGameSettings(req.user.id, "classic-slots");
-      res.json({ winOccurrence: Math.round((settings?.winChance ?? 0.4) * 100) });
+      const extra = (() => { try { return settings?.extraSettings ? JSON.parse(settings.extraSettings) : {}; } catch { return {}; } })();
+      res.json({
+        winOccurrence: Math.round((settings?.winChance ?? 0.4) * 100),
+        bgColor: typeof extra.bgColor === "string" ? extra.bgColor : null,
+      });
     } catch (err) { res.status(500).json({ message: "Internal Server Error" }); }
+  });
+
+  // Admin-only: update cosmetic settings (currently just bgColor) stored in extraSettings JSON.
+  app.post("/api/games/classic-slots/settings", async (req, res) => {
+    if (!req.isAuthenticated() || req.user.role !== "admin") return res.status(403).send("Forbidden");
+    try {
+      const { bgColor } = z.object({
+        bgColor: z.string().regex(/^#[0-9a-fA-F]{6}$/).nullable(),
+      }).parse(req.body);
+      const existing = await storage.getGameSettings("classic-slots");
+      const existingExtra = (() => { try { return existing?.extraSettings ? JSON.parse(existing.extraSettings) : {}; } catch { return {}; } })();
+      const next = { ...existingExtra, bgColor: bgColor ?? undefined };
+      if (bgColor === null) delete next.bgColor;
+      await storage.updateGameExtraSettings("classic-slots", JSON.stringify(next), req.user.id);
+      res.json({ success: true });
+    } catch { res.status(400).json({ message: "Invalid input" }); }
   });
 
   // Single authoritative spin: house-edge cross-check happens BEFORE the win

@@ -539,6 +539,7 @@ function GameSettingCard({ setting }: { setting: GameSetting }) {
   const isDogRacing = setting.gameType === "dog-racing";
   const isPlinko = setting.gameType === "plinko";
   const isWheel = setting.gameType === "wheel";
+  const isClassicSlots = setting.gameType === "classic-slots";
   const PLINKO_DEFAULTS = [0.2, 0.5, 1.2, 2, 5, 2, 1.2, 0.5, 0.2];
   const WHEEL_DEFAULTS = [0, 0.5, 0, 1, 0, 1.5, 0, 2, 0, 0.5, 0, 3, 0, 1, 5, 10];
   const extraParsed = (() => { try { return setting.extraSettings ? JSON.parse(setting.extraSettings) : {}; } catch { return {}; } })();
@@ -560,6 +561,30 @@ function GameSettingCard({ setting }: { setting: GameSetting }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [setting.extraSettings]);
   const [maxLaps, setMaxLaps] = useState<number>(extraParsed.maxLaps ?? 1);
+  const [slotsBgColor, setSlotsBgColor] = useState<string>(
+    typeof extraParsed.bgColor === "string" ? extraParsed.bgColor : "#1d0a05"
+  );
+  useEffect(() => {
+    if (isClassicSlots && typeof extraParsed.bgColor === "string") {
+      setSlotsBgColor(extraParsed.bgColor);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [setting.extraSettings]);
+  const slotsBgMutation = useMutation({
+    mutationFn: async (color: string | null) => {
+      const res = await fetch("/api/games/classic-slots/settings", {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ bgColor: color }),
+      });
+      if (!res.ok) throw new Error("Failed to update slots background");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [api.games.settings.get.path] });
+      queryClient.invalidateQueries({ queryKey: ["/api/games/classic-slots/settings"] });
+      toast({ title: "Classic Slots Updated", description: "Background color saved." });
+    },
+  });
   const defaultPlaceFor = (arr: number[]) => arr.map(o => Math.max(1.05, +(o * 0.45).toFixed(2)));
   const defaultShowFor = (arr: number[]) => arr.map(o => Math.max(1.02, +(o * 0.25).toFixed(2)));
   const horseJsDefault = [2.0, 2.5, 3.0, 3.5];
@@ -982,6 +1007,47 @@ function GameSettingCard({ setting }: { setting: GameSetting }) {
             >
               {rouletteMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save Roulette Odds"}
             </Button>
+          </div>
+        )}
+        {isClassicSlots && (
+          <div className="border-t border-white/10 pt-4 space-y-3">
+            <label className="text-xs text-muted-foreground font-semibold">Classic Slots Cabinet Background</label>
+            <div className="flex items-center gap-2">
+              <input
+                type="color"
+                value={slotsBgColor}
+                onChange={(e) => setSlotsBgColor(e.target.value)}
+                className="h-10 w-14 rounded border border-white/10 bg-transparent cursor-pointer"
+                data-testid="input-slots-bg-color"
+              />
+              <Input
+                type="text"
+                value={slotsBgColor}
+                onChange={(e) => setSlotsBgColor(e.target.value)}
+                className="font-mono text-sm bg-white/5 border-white/10 flex-1"
+                placeholder="#1d0a05"
+                data-testid="input-slots-bg-hex"
+              />
+            </div>
+            <p className="text-[10px] text-muted-foreground italic">Sets the slot machine cabinet's background. Leave at default to keep the original burgundy gradient.</p>
+            <div className="flex gap-2">
+              <Button
+                className="flex-1" size="sm" variant="secondary"
+                onClick={() => slotsBgMutation.mutate(slotsBgColor)}
+                disabled={slotsBgMutation.isPending || !/^#[0-9a-fA-F]{6}$/.test(slotsBgColor)}
+                data-testid="button-save-slots-bg"
+              >
+                {slotsBgMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save Background"}
+              </Button>
+              <Button
+                size="sm" variant="outline"
+                onClick={() => { setSlotsBgColor("#1d0a05"); slotsBgMutation.mutate(null); }}
+                disabled={slotsBgMutation.isPending}
+                data-testid="button-reset-slots-bg"
+              >
+                Reset
+              </Button>
+            </div>
           </div>
         )}
         {isPlinko && (

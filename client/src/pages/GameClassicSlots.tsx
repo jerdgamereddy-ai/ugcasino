@@ -154,7 +154,7 @@ function Reel({
                 src={sym.image}
                 alt={sym.label}
                 draggable={false}
-                className="relative z-10 w-[70%] h-[70%] object-contain select-none"
+                className="relative z-10 w-[95%] h-[95%] object-contain select-none"
                 style={{
                   filter: `drop-shadow(0 0 ${lit ? 18 : 6}px ${sym.glow}) drop-shadow(0 4px 6px rgba(0,0,0,0.6))`,
                   transform: lit ? "scale(1.08)" : undefined,
@@ -210,10 +210,10 @@ export default function GameClassicSlots() {
   }, []);
 
   const { data: user } = useQuery<User>({ queryKey: ["/api/user"] });
-  const { data: gameSettings } = useQuery<{ winOccurrence: number }>({
+  const { data: gameSettings } = useQuery<{ winOccurrence: number; bgColor: string | null }>({
     queryKey: ["/api/games/classic-slots/settings"],
   });
-  const winOccurrence = gameSettings?.winOccurrence ?? 30; // 0-100
+  const bgColor = gameSettings?.bgColor ?? null;
 
   const sound = useCallback((name: string, vol = 0.5) => {
     if (!muted) playSound(name, vol);
@@ -382,7 +382,11 @@ export default function GameClassicSlots() {
         </div>
 
         {/* Cabinet */}
-        <div className="relative bg-gradient-to-b from-[#3a1a0a] via-[#1d0a05] to-[#3a1a0a] rounded-2xl p-3 md:p-5 border-4 border-yellow-700 shadow-[0_0_60px_rgba(212,175,55,0.35),inset_0_0_30px_rgba(0,0,0,0.6)]">
+        <div
+          className={`relative ${bgColor ? "" : "bg-gradient-to-b from-[#3a1a0a] via-[#1d0a05] to-[#3a1a0a]"} rounded-2xl p-3 md:p-5 border-4 border-yellow-700 shadow-[0_0_60px_rgba(212,175,55,0.35),inset_0_0_30px_rgba(0,0,0,0.6)]`}
+          style={bgColor ? { backgroundColor: bgColor } : undefined}
+          data-testid="slots-cabinet"
+        >
           <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-gradient-to-b from-yellow-300 to-yellow-600 px-6 py-1 rounded-b-lg border-x-2 border-b-2 border-yellow-800 shadow-[0_4px_12px_rgba(0,0,0,0.5)]">
             <span className="font-display font-black text-black text-xs md:text-sm tracking-[0.25em]">JACKPOT</span>
           </div>
