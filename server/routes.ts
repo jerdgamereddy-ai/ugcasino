@@ -2176,12 +2176,152 @@ export async function registerRoutes(
   });
 
   // === CLASSIC SLOTS ===
+  // Layout / paytable mirror the client's visual constants exactly.
+  const CS_REELS = 5;
+  const CS_ROWS = 3;
+  // [1-match, 2-match, 3-match, 4-match, 5-match] credit values per symbol id.
+  const CS_PAYTABLE: Record<number, number[]> = {
+    1: [0, 0, 100, 150, 200], // Seven (top)
+    2: [0, 0, 50, 100, 150],  // Bar
+    3: [0, 10, 25, 50, 100],  // Bell
+    4: [0, 10, 25, 50, 100],  // Diamond
+    5: [0, 5, 15, 25, 50],    // Cherry
+    6: [0, 2, 10, 20, 35],    // Lemon
+    7: [0, 1, 5, 10, 15],     // Orange (low)
+  };
+  // Paylines: row index for each of the 5 reels.
+  const CS_PAYLINES: number[][] = [
+    [1, 1, 1, 1, 1],
+    [0, 0, 0, 0, 0],
+    [2, 2, 2, 2, 2],
+    [0, 1, 2, 1, 0],
+    [2, 1, 0, 1, 2],
+  ];
+
+  function csRandomSymbol(): number {
+    // Inverse weighting: low symbols common, high (jackpot) symbols rare.
+    const r = Math.random() * 28; // 1+2+...+7
+    let acc = 0;
+    for (let id = 7; id >= 1; id--) {
+      acc += id;
+      if (r < acc) return 8 - id;
+    }
+    return 7;
+  }
+  function csRandomGrid(): number[][] {
+    return Array.from({ length: CS_REELS }, () => Array.from({ length: CS_ROWS }, () => csRandomSymbol()));
+  }
+  // Strip any accidental wins (consecutive-from-left) so a losing outcome is truly a loss.
+  function csStripWins(grid: number[][]): number[][] {
+    const g = grid.map(col => [...col]);
+    for (const line of CS_PAYLINES) {
+      const firstRow = line[0]!;
+      const first = g[0]![firstRow]!;
+      // change reel 0 so no line starting with `first` can match a run
+      // (simplest safe fix: replace reel 0 cell with a symbol different from reel 1's same row)
+      const r1 = g[1]![line[1]!]!;
+      if (first === r1) {
+        g[0]![firstRow] = first === 7 ? 1 : first + 1;
+      }
+    }
+    return g;
+  }
+  // Build a grid with a winning line of length `matchLen` for the given symbol.
+  function csWinningGrid(lineIdx: number, matchLen: number, symbolId: number): number[][] {
+    const grid = csRandomGrid();
+    const line = CS_PAYLINES[lineIdx]!;
+    for (let r = 0; r < matchLen; r++) {
+      grid[r]![line[r]!] = symbolId;
+    }
+    // Ensure the (matchLen+1)th reel breaks the run.
+    if (matchLen < CS_REELS) {
+      const breakerRow = line[matchLen]!;
+      if (grid[matchLen]![breakerRow] === symbolId) {
+        grid[matchLen]![breakerRow] = symbolId === 7 ? 1 : symbolId + 1;
+      }
+    }
+    return grid;
+  }
+
   app.get("/api/games/classic-slots/settings", async (req, res) => {
     if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
     try {
       const settings = await getEffectiveGameSettings(req.user.id, "classic-slots");
       res.json({ winOccurrence: Math.round((settings?.winChance ?? 0.4) * 100) });
     } catch (err) { res.status(500).json({ message: "Internal Server Error" }); }
+  });
+
+  // Single authoritative spin: house-edge cross-check happens BEFORE the win
+  // is decided, mirroring the coinflip / hilo flow. The server owns the
+  // outcome — client only animates it.
+  app.post("/api/games/classic-slots/spin", async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    if (await gateGame(req, res, "classic-slots")) return;
+    try {
+      const { bet } = z.object({ bet: z.number().min(1) }).parse(req.body);
+      if (req.user.balance < bet) return res.status(400).json({ message: "Insufficient balance" });
+
+      // Per-game bypass guard still applies (see /bet endpoint above for parity).
+      const settings = await getEffectiveGameSettings(req.user.id, "classic-slots");
+      const winChance = settings?.winChance ?? 0.4;
+      const csMaxMult = Math.max(20, settings?.payoutMultiplier ?? 20); // top-line 5-match = 20× betPerLine
+      const csUniversal = await storage.getUniversalHouseEdge().catch(() => null);
+      if (!csUniversal?.bypassClassicSlotsBankroll) {
+        const csGuard = await checkBankrollFloorForBet(req.user.id, bet * csMaxMult);
+        if (csGuard.blocked) {
+          return res.status(400).json({ message: "Bet too large — maximum possible payout exceeds the house bankroll. Please lower your bet.", bankrollBlocked: true });
+        }
+      }
+
+      // 1) Deduct bet.
+      await storage.updateUserBalance(req.user.id, -bet);
+      await storage.createTransaction({ userId: req.user.id, amount: -bet, type: "bet", description: "Classic Slots bet" });
+
+      // 2) Decide intended outcome.
+      let won = Math.random() < winChance;
+      const betPerLine = Math.max(1, Math.floor(bet / CS_PAYLINES.length));
+
+      let lineIdx = -1, matchLen = 0, symbolId = 0, intendedPayout = 0;
+      if (won) {
+        lineIdx = Math.floor(Math.random() * CS_PAYLINES.length);
+        const r = Math.random();
+        matchLen = r < 0.65 ? 3 : r < 0.92 ? 4 : 5;
+        symbolId = matchLen === 5
+          ? 1 + Math.floor(Math.random() * 3)
+          : matchLen === 4
+            ? 2 + Math.floor(Math.random() * 4)
+            : 3 + Math.floor(Math.random() * 5);
+        const credits = CS_PAYTABLE[symbolId]![matchLen - 1]!;
+        intendedPayout = Math.round((credits / 10) * betPerLine);
+      }
+
+      // 3) Cross-check house edge / bankroll BEFORE confirming the win.
+      const allowedPayout = await processCombinedBetAndWin("classic-slots", req.user.id, bet, intendedPayout);
+      if (allowedPayout === 0) won = false;
+
+      // 4) Build the visual outcome to match the (possibly downgraded) decision.
+      const grid = won
+        ? csWinningGrid(lineIdx, matchLen, symbolId)
+        : csStripWins(csRandomGrid());
+
+      // 5) Credit the win.
+      const finalUser = allowedPayout > 0
+        ? await storage.updateUserBalance(req.user.id, allowedPayout)
+        : await storage.getUser(req.user.id);
+      if (allowedPayout > 0) {
+        await storage.createTransaction({ userId: req.user.id, amount: allowedPayout, type: "win", description: `Classic Slots win (+${allowedPayout})` });
+      }
+
+      res.json({
+        won,
+        payout: allowedPayout,
+        balance: finalUser?.balance ?? 0,
+        grid,
+        winningLineIndex: won ? lineIdx : null,
+      });
+    } catch (err) {
+      res.status(500).json({ message: "Internal Server Error" });
+    }
   });
 
   app.post("/api/games/classic-slots/bet", async (req, res) => {

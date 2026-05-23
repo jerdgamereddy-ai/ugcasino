@@ -67,65 +67,6 @@ function randomGrid(): number[][] {
   return Array.from({ length: REELS }, () => [randomSymbol(), randomSymbol(), randomSymbol()]);
 }
 
-// Build a grid that forces a winning line.
-function winningGrid(): { grid: number[][]; lineIdx: number; matchLen: number; symbolId: number } {
-  const lineIdx = Math.floor(Math.random() * PAYLINES.length);
-  const line = PAYLINES[lineIdx];
-  // Bias toward shorter matches more often (3 > 4 > 5).
-  const r = Math.random();
-  const matchLen = r < 0.65 ? 3 : r < 0.92 ? 4 : 5;
-  // Pick a symbol — bias toward lower-value symbols for shorter matches.
-  const symbolId = matchLen === 5
-    ? 1 + Math.floor(Math.random() * 3)   // 1-3 (premium)
-    : matchLen === 4
-      ? 2 + Math.floor(Math.random() * 4) // 2-5
-      : 3 + Math.floor(Math.random() * 5); // 3-7
-  const grid = randomGrid();
-  // Stamp the winning symbol onto matchLen reels along the chosen line,
-  // and ensure the (matchLen+1)th reel does NOT also match (so payout stays consistent).
-  for (let r = 0; r < matchLen; r++) {
-    grid[r][line.rows[r]] = symbolId;
-  }
-  if (matchLen < REELS) {
-    const breakerRow = line.rows[matchLen];
-    let breaker = grid[matchLen][breakerRow];
-    if (breaker === symbolId) {
-      breaker = symbolId === 7 ? 1 : symbolId + 1;
-      grid[matchLen][breakerRow] = breaker;
-    }
-  }
-  return { grid, lineIdx, matchLen, symbolId };
-}
-
-// Scan a grid for ALL winning lines (consecutive same-symbol matches starting reel 0).
-// Returns total payout (in "credits") and the list of winning line indices.
-function scanWins(grid: number[][], betPerLine: number): { totalPayout: number; lines: { lineIdx: number; symbolId: number; matchLen: number; payout: number }[] } {
-  const winningLines: { lineIdx: number; symbolId: number; matchLen: number; payout: number }[] = [];
-  let totalPayout = 0;
-  for (let li = 0; li < PAYLINES.length; li++) {
-    const line = PAYLINES[li];
-    const firstSym = grid[0][line.rows[0]];
-    let len = 1;
-    for (let r = 1; r < REELS; r++) {
-      if (grid[r][line.rows[r]] === firstSym) len++;
-      else break;
-    }
-    if (len >= 3) {
-      const sym = SYMBOLS.find(s => s.id === firstSym);
-      if (sym) {
-        const credits = sym.paytable[len - 1];
-        // Scale: credits/10 × per-line bet (so top 5-match = 20× lineBet)
-        const payout = Math.round((credits / 10) * betPerLine);
-        if (payout > 0) {
-          winningLines.push({ lineIdx: li, symbolId: firstSym, matchLen: len, payout });
-          totalPayout += payout;
-        }
-      }
-    }
-  }
-  return { totalPayout, lines: winningLines };
-}
-
 // One reel column with a continuous strip animation effect.
 function Reel({
   finalColumn,
@@ -248,7 +189,6 @@ export default function GameClassicSlots() {
 
   const [betIdx, setBetIdx] = useState(0); // index into BET_AMOUNTS
   const bet = BET_AMOUNTS[betIdx] ?? BET_AMOUNTS[0];
-  const betPerLine = Math.max(1, Math.floor(bet / PAYLINES.length));
 
   const [grid, setGrid] = useState<number[][]>(() => randomGrid());
   const [spinning, setSpinning] = useState(false);
@@ -279,18 +219,18 @@ export default function GameClassicSlots() {
     if (!muted) playSound(name, vol);
   }, [muted]);
 
-  const betMutation = useMutation({
-    mutationFn: async (data: { bet: number; totBet: number }) => {
-      const res = await apiRequest("POST", "/api/games/classic-slots/bet", data);
-      return res.json();
-    },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/user"] }),
-  });
-
-  const winMutation = useMutation({
-    mutationFn: async (data: { winAmount: number }) => {
-      const res = await apiRequest("POST", "/api/games/classic-slots/win", data);
-      return res.json() as Promise<{ balance: number; blocked?: boolean }>;
+  // Single authoritative spin: the server decides win/loss AFTER consulting
+  // the house edge (same flow as coinflip/hilo). The client only animates.
+  const spinMutation = useMutation({
+    mutationFn: async (data: { bet: number }) => {
+      const res = await apiRequest("POST", "/api/games/classic-slots/spin", data);
+      return res.json() as Promise<{
+        won: boolean;
+        payout: number;
+        balance: number;
+        grid: number[][];
+        winningLineIndex: number | null;
+      }>;
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/user"] }),
   });
@@ -306,15 +246,14 @@ export default function GameClassicSlots() {
     setHighlightLines([]);
     setLastWin(0);
 
-    // 1) Charge the bet on the server first.
-    let betOk = false;
+    // 1) Ask the server for the authoritative outcome.
+    let result: Awaited<ReturnType<typeof spinMutation.mutateAsync>>;
     try {
-      await betMutation.mutateAsync({ bet, totBet: bet });
-      betOk = true;
+      result = await spinMutation.mutateAsync({ bet });
     } catch (err: any) {
       const bankrollBlocked = /bankroll/i.test(err?.message || "");
       toast({
-        title: bankrollBlocked ? "Bet too large" : "Bet failed",
+        title: bankrollBlocked ? "Bet too large" : "Spin failed",
         description: bankrollBlocked
           ? "Maximum possible payout exceeds the house bankroll. Lower your bet."
           : "Could not place bet. Please try again.",
@@ -323,70 +262,33 @@ export default function GameClassicSlots() {
       setAutoSpin(false);
       return;
     }
-    if (!betOk) return;
 
-    // 2) Decide the visual outcome locally using admin's win occurrence.
+    // 2) Start animation; reels will land on the server-supplied grid.
     sound('spin', 0.6);
     setSpinning(true);
-    const shouldWin = Math.random() * 100 < winOccurrence;
-    const outcome = shouldWin ? winningGrid() : { grid: randomGrid(), lineIdx: -1, matchLen: 0, symbolId: 0 };
-    // Make sure a "random" grid didn't accidentally produce a win when we
-    // intended a loss — otherwise the player would see paylines light up for
-    // a loss-marked outcome.
-    if (!shouldWin) {
-      const scan = scanWins(outcome.grid, betPerLine);
-      if (scan.totalPayout > 0) {
-        // Break the leftmost match on every winning line.
-        scan.lines.forEach(l => {
-          const ln = PAYLINES[l.lineIdx];
-          const sym = outcome.grid[0][ln.rows[0]];
-          // change reel 0's cell to a different symbol
-          outcome.grid[0][ln.rows[0]] = sym === 7 ? 1 : sym + 1;
-        });
-      }
-    }
-    setGrid(outcome.grid);
+    setGrid(result.grid);
 
-    // 3) Wait for reel-stop animation, then settle.
+    // 3) After reel-stop animation, reveal win/loss exactly as the server decided.
     if (settleTimerRef.current) clearTimeout(settleTimerRef.current);
-    settleTimerRef.current = setTimeout(async () => {
+    settleTimerRef.current = setTimeout(() => {
       if (!mountedRef.current) return;
       setSpinning(false);
-      const { totalPayout, lines } = scanWins(outcome.grid, betPerLine);
-      if (totalPayout > 0) {
-        try {
-          const winResp = await winMutation.mutateAsync({ winAmount: totalPayout });
-          if (!mountedRef.current) return;
-          // server may have capped / blocked the payout (house bankroll / RTP)
-          const credited = winResp?.blocked ? 0 : totalPayout;
-          if (credited > 0) {
-            setLastWin(credited);
-            setHighlightLines(lines.map(l => l.lineIdx));
-            sound('jackpot', 0.7);
-            toast({
-              title: credited >= bet * 5 ? "BIG WIN!" : "You won!",
-              description: `+ UGX ${credited.toLocaleString()}`,
-              className: "bg-emerald-600 border-emerald-400 text-white font-black",
-            });
-          } else {
-            sound('lose', 0.3);
-          }
-        } catch {
-          // Win credit failed — stop auto-spin so player isn't silently bled.
-          if (mountedRef.current) {
-            setAutoSpin(false);
-            toast({
-              title: "Win credit failed",
-              description: "Please refresh and check your balance.",
-              variant: "destructive",
-            });
-          }
+      if (result.won && result.payout > 0) {
+        setLastWin(result.payout);
+        if (result.winningLineIndex !== null) {
+          setHighlightLines([result.winningLineIndex]);
         }
+        sound('jackpot', 0.7);
+        toast({
+          title: result.payout >= bet * 5 ? "BIG WIN!" : "You won!",
+          description: `+ UGX ${result.payout.toLocaleString()}`,
+          className: "bg-emerald-600 border-emerald-400 text-white font-black",
+        });
       } else {
         sound('lose', 0.3);
       }
     }, 1700);
-  }, [spinning, user, bet, betPerLine, winOccurrence, sound, betMutation, winMutation, toast]);
+  }, [spinning, user, bet, sound, spinMutation, toast]);
 
   // Auto-spin loop
   useEffect(() => {
