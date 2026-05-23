@@ -151,21 +151,22 @@ function Reel({
                   className="absolute inset-2 rounded-xl bg-yellow-300/20 ring-2 ring-yellow-300 shadow-[0_0_40px_rgba(255,215,0,0.85)]"
                 />
               )}
-              <img
-                src={sym.image}
-                alt={sym.label}
-                draggable={false}
-                className="relative z-10 w-[95%] h-[95%] object-contain select-none"
+              {/* Each symbol_*.png is a 280×140 sprite sheet with two frames
+                  side-by-side (left = crisp static, right = motion blur).
+                  We render only the LEFT frame by sizing the background to
+                  200% width and anchoring at left-center. */}
+              <div
+                role="img"
+                aria-label={sym.label}
+                className="relative z-10 w-[95%] h-[95%] select-none"
                 style={{
+                  backgroundImage: `url(${sym.image})`,
+                  backgroundRepeat: "no-repeat",
+                  backgroundPosition: "left center",
+                  backgroundSize: "200% 100%",
                   filter: `drop-shadow(0 0 ${lit ? 18 : 6}px ${sym.glow}) drop-shadow(0 4px 6px rgba(0,0,0,0.6))`,
                   transform: lit ? "scale(1.08)" : undefined,
                   transition: "transform 0.3s",
-                }}
-                onError={(e) => {
-                  const img = e.target as HTMLImageElement;
-                  img.style.display = "none";
-                  const span = img.nextElementSibling as HTMLElement | null;
-                  if (span) span.style.opacity = "1";
                 }}
               />
               {/* Letter fallback — invisible unless the sprite fails to load */}
