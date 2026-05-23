@@ -121,12 +121,13 @@ function Reel({
   return (
     <div
       className="relative flex-1 min-w-0 bg-gradient-to-b from-zinc-900 via-black to-zinc-900 rounded-xl border-2 border-yellow-700/40 overflow-hidden shadow-[inset_0_0_30px_rgba(0,0,0,0.95)]"
-      style={{ aspectRatio: "1 / 3" }}
+      style={{ aspectRatio: "1 / 2.4" }}
       data-testid="reel-column"
     >
       <div className="absolute inset-0 bg-gradient-to-b from-white/5 via-transparent to-white/5 pointer-events-none z-10" />
-      <div className="absolute top-0 left-0 right-0 h-8 bg-gradient-to-b from-black/80 to-transparent pointer-events-none z-20" />
-      <div className="absolute bottom-0 left-0 right-0 h-8 bg-gradient-to-t from-black/80 to-transparent pointer-events-none z-20" />
+      {/* Subtle edge fades — kept thin so the top/bottom sprites stay crisp. */}
+      <div className="absolute top-0 left-0 right-0 h-2 bg-gradient-to-b from-black/40 to-transparent pointer-events-none z-20" />
+      <div className="absolute bottom-0 left-0 right-0 h-2 bg-gradient-to-t from-black/40 to-transparent pointer-events-none z-20" />
 
       <motion.div
         animate={!stopped ? { y: [-0, -120] } : { y: 0 }}
@@ -340,7 +341,7 @@ export default function GameClassicSlots() {
   return (
     <div
       ref={containerRef}
-      className="relative min-h-screen bg-gradient-to-b from-[#1a0510] via-[#0a0307] to-black"
+      className="relative min-h-screen h-screen overflow-y-auto bg-gradient-to-b from-[#1a0510] via-[#0a0307] to-black"
       data-testid="page-classic-slots"
     >
       {/* Top bar */}
