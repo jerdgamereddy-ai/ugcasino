@@ -19,7 +19,7 @@ import GameHiLo from "@/pages/GameHiLo";
 import CoinFlip from "@/pages/CoinFlip";
 import GamePlinko from "@/pages/GamePlinko";
 import GameWheel from "@/pages/GameWheel";
-import GameFishJoy from "@/pages/GameFishJoy";
+import GameFishHunt from "@/pages/GameFishHunt";
 import GameDogRacing from "@/pages/GameDogRacing";
 import GameHorse4 from "@/pages/GameHorse4";
 import GameHorseJS from "@/pages/GameHorseJS";
@@ -48,7 +48,7 @@ function Router() {
       <Route path="/coinflip" component={CoinFlip} />
       <Route path="/plinko" component={GamePlinko} />
       <Route path="/wheel" component={GameWheel} />
-      <Route path="/fishhunt" component={GameFishJoy} />
+      <Route path="/fishhunt" component={GameFishHunt} />
       <Route path="/dog-racing" component={GameDogRacing} />
       <Route path="/horse4" component={GameHorse4} />
       <Route path="/horse-racing" component={GameHorseJS} />

@@ -1875,69 +1875,81 @@ export async function registerRoutes(
   });
 
   // === FISH HUNT GAME ===
+  // Single source of truth for the fish catalog. multiplier = payout multiple
+  // applied to the per-shot bet on a successful catch. difficulty (0..1)
+  // scales the configured winChance — bigger / rarer fish are harder to catch.
+  const FISH_CATALOG: { id: string; name: string; multiplier: number; difficulty: number }[] = [
+    { id: "small_fish",    name: "Clownfish",     multiplier: 2,  difficulty: 1.0 },
+    { id: "medium_fish",   name: "Tuna",          multiplier: 3,  difficulty: 0.85 },
+    { id: "turtle",        name: "Sea Turtle",    multiplier: 4,  difficulty: 0.75 },
+    { id: "pufferfish",    name: "Pufferfish",    multiplier: 5,  difficulty: 0.7 },
+    { id: "jellyfish",     name: "Jellyfish",     multiplier: 6,  difficulty: 0.6 },
+    { id: "octopus",       name: "Octopus",       multiplier: 8,  difficulty: 0.5 },
+    { id: "shark",         name: "Shark",         multiplier: 10, difficulty: 0.4 },
+    { id: "whale",         name: "Whale",         multiplier: 15, difficulty: 0.25 },
+    { id: "mermaid",       name: "Mermaid",       multiplier: 20, difficulty: 0.2 },
+    { id: "scorpion_king", name: "Scorpion King", multiplier: 50, difficulty: 0.08 },
+  ];
+  const FISH_IDS = FISH_CATALOG.map(f => f.id) as [string, ...string[]];
+  const FISH_BY_ID = new Map(FISH_CATALOG.map(f => [f.id, f]));
+
+  app.get("/api/games/fishhunt/catalog", async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    const settings = await getEffectiveGameSettings(req.user.id, "fishhunt");
+    res.json({
+      fish: FISH_CATALOG,
+      // baseWinChance is informational — actual server roll uses it × per-fish difficulty.
+      baseWinChance: Math.round((settings?.winChance ?? 0.45) * 100),
+    });
+  });
+
   app.post("/api/games/fishhunt/shoot", async (req, res) => {
     if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
     if (await gateGame(req, res, "fishhunt")) return;
 
     try {
-      const settings = await getEffectiveGameSettings(req.user.id, "fishhunt");
-      const winChance = settings?.winChance ?? 0.45;
-
       const { bet, fishType } = z.object({
         bet: z.number().min(1),
-        fishType: z.string()
+        fishType: z.enum(FISH_IDS),
       }).parse(req.body);
 
       if (req.user.balance < bet) {
         return res.status(400).json({ message: "Insufficient balance" });
       }
 
-      const FISH_MULTIPLIERS: Record<string, number> = {
-        small_fish: 2,
-        medium_fish: 3,
-        pufferfish: 5,
-        turtle: 4,
-        jellyfish: 6,
-        shark: 10,
-        octopus: 8,
-        whale: 15,
-        mermaid: 20,
-        scorpion_king: 50,
-      };
+      const settings = await getEffectiveGameSettings(req.user.id, "fishhunt");
+      const winChance = settings?.winChance ?? 0.45;
+      const fish = FISH_BY_ID.get(fishType)!;
 
-      const multiplier = FISH_MULTIPLIERS[fishType] || 2;
-
-      const catchDifficulty: Record<string, number> = {
-        small_fish: 1.0,
-        medium_fish: 0.85,
-        pufferfish: 0.7,
-        turtle: 0.75,
-        jellyfish: 0.6,
-        shark: 0.4,
-        octopus: 0.5,
-        whale: 0.25,
-        mermaid: 0.2,
-        scorpion_king: 0.08,
-      };
-
-      const difficulty = catchDifficulty[fishType] || 1.0;
-      const adjustedChance = winChance * difficulty;
-      let caught = Math.random() < adjustedChance;
-
+      // 1) Charge the bet first.
       await storage.updateUserBalance(req.user.id, -bet);
-      await storage.createTransaction({ userId: req.user.id, amount: -bet, type: "bet", description: `Fish Hunt: Shot at ${fishType}` });
+      await storage.createTransaction({ userId: req.user.id, amount: -bet, type: "bet", description: `Fish Hunt: Shot at ${fish.name}` });
 
-      let intendedPayout = caught ? Math.floor(bet * multiplier) : 0;
+      // 2) Decide intended outcome (winChance × per-fish difficulty).
+      let caught = Math.random() < (winChance * fish.difficulty);
+      const intendedPayout = caught ? Math.floor(bet * fish.multiplier) : 0;
+
+      // 3) Cross-check house edge / bankroll BEFORE confirming the catch
+      //    (same flow as coinflip / hilo / classic-slots).
       const allowedPayout = await processCombinedBetAndWin("fishhunt", req.user.id, bet, intendedPayout);
       if (allowedPayout === 0) caught = false;
-      const payout = allowedPayout;
-      if (payout > 0) {
-        await storage.updateUserBalance(req.user.id, payout);
-        await storage.createTransaction({ userId: req.user.id, amount: payout, type: "win", description: `Fish Hunt: Caught ${fishType} (x${multiplier})` });
+
+      // 4) Credit the win.
+      const finalUser = allowedPayout > 0
+        ? await storage.updateUserBalance(req.user.id, allowedPayout)
+        : await storage.getUser(req.user.id);
+      if (allowedPayout > 0) {
+        await storage.createTransaction({ userId: req.user.id, amount: allowedPayout, type: "win", description: `Fish Hunt: Caught ${fish.name} (×${fish.multiplier})` });
       }
 
-      const user = await storage.getUser(req.user.id);
-      res.json({ caught, payout, multiplier, fishType, balance: user?.balance ?? 0 });
+      res.json({
+        caught,
+        payout: allowedPayout,
+        multiplier: fish.multiplier,
+        fishType,
+        fishName: fish.name,
+        balance: finalUser?.balance ?? 0,
+      });
     } catch (err) {
       res.status(500).json({ message: "Internal Server Error" });
     }
