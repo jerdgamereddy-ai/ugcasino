@@ -12,21 +12,74 @@ import { useToast } from "@/hooks/use-toast";
 import type { User } from "@shared/schema";
 
 // === FISH CATALOG ===
-// Mirror of server FISH_CATALOG. Cosmetic-only fields (emoji, color, size)
+// Mirror of server FISH_CATALOG. Cosmetic-only fields (sprite, color, size)
 // live here; numeric truth (multiplier, difficulty) is fetched from server.
 type FishDef = { id: string; name: string; multiplier: number; difficulty: number };
-const FISH_COSMETICS: Record<string, { emoji: string; glow: string; sizePx: number }> = {
-  small_fish:    { emoji: "🐠", glow: "#fbbf24", sizePx: 44 },
-  medium_fish:   { emoji: "🐟", glow: "#60a5fa", sizePx: 54 },
-  turtle:        { emoji: "🐢", glow: "#22c55e", sizePx: 64 },
-  pufferfish:    { emoji: "🐡", glow: "#f472b6", sizePx: 56 },
-  jellyfish:     { emoji: "🪼", glow: "#a78bfa", sizePx: 60 },
-  octopus:       { emoji: "🐙", glow: "#fb7185", sizePx: 70 },
-  shark:         { emoji: "🦈", glow: "#94a3b8", sizePx: 84 },
-  whale:         { emoji: "🐳", glow: "#38bdf8", sizePx: 100 },
-  mermaid:       { emoji: "🧜‍♀️", glow: "#f0abfc", sizePx: 80 },
-  scorpion_king: { emoji: "🦂", glow: "#ef4444", sizePx: 90 },
+
+// Each fish sprite is a vertical strip of `frames` animation cells.
+// Source dimensions taken from the original fish-joy game assets.
+type FishCosmetic = {
+  sprite: string;     // public URL of the strip
+  frames: number;     // number of animation frames in the strip
+  aspect: number;     // single-frame aspect ratio (frameW / frameH)
+  displayW: number;   // rendered width in px
+  glow: string;       // halo color
+  fps: number;        // swim animation speed
 };
+const SPRITE_BASE = "/games/fish-joy/images";
+const FISH_COSMETICS: Record<string, FishCosmetic> = {
+  // small_fish: fish1  55×296  / 6  -> ~55×49
+  small_fish:    { sprite: `${SPRITE_BASE}/fish1.png`,  frames: 6,   aspect: 55 / (296 / 6),  displayW: 55,  glow: "#fbbf24", fps: 10 },
+  // medium_fish: fish2  78×512  / 16 -> ~78×32
+  medium_fish:   { sprite: `${SPRITE_BASE}/fish2.png`,  frames: 16,  aspect: 78 / (512 / 16), displayW: 70,  glow: "#60a5fa", fps: 14 },
+  // turtle: fish3  72×448  / 11 -> ~72×40.7
+  turtle:        { sprite: `${SPRITE_BASE}/fish3.png`,  frames: 11,  aspect: 72 / (448 / 11), displayW: 80,  glow: "#22c55e", fps: 10 },
+  // pufferfish: fish4  77×472  / 15 -> ~77×31.5
+  pufferfish:    { sprite: `${SPRITE_BASE}/fish4.png`,  frames: 15,  aspect: 77 / (472 / 15), displayW: 80,  glow: "#f472b6", fps: 12 },
+  // jellyfish: fish5  107×976 / 43 -> ~107×22.7
+  jellyfish:     { sprite: `${SPRITE_BASE}/fish5.png`,  frames: 43,  aspect: 107 / (976 / 43), displayW: 105, glow: "#a78bfa", fps: 18 },
+  // octopus: fish6  105×948 / 45 -> ~105×21
+  octopus:       { sprite: `${SPRITE_BASE}/fish6.png`,  frames: 45,  aspect: 105 / (948 / 45), displayW: 110, glow: "#fb7185", fps: 18 },
+  // shark: fish7  92×1510 / 80 -> ~92×18.9
+  shark:         { sprite: `${SPRITE_BASE}/fish7.png`,  frames: 80,  aspect: 92 / (1510 / 80), displayW: 120, glow: "#94a3b8", fps: 22 },
+  // whale: fish8  174×1512 / 100 -> ~174×15.1
+  whale:         { sprite: `${SPRITE_BASE}/fish8.png`,  frames: 100, aspect: 174 / (1512 / 100), displayW: 170, glow: "#38bdf8", fps: 24 },
+  // mermaid: fish9  166×2196 / 104 -> ~166×21.1
+  mermaid:       { sprite: `${SPRITE_BASE}/fish9.png`,  frames: 104, aspect: 166 / (2196 / 104), displayW: 150, glow: "#f0abfc", fps: 22 },
+  // scorpion_king: fish10  178×1870 / 121 -> ~178×15.5
+  scorpion_king: { sprite: `${SPRITE_BASE}/fish10.png`, frames: 121, aspect: 178 / (1870 / 121), displayW: 180, glow: "#ef4444", fps: 26 },
+};
+const ARENA_BG = `${SPRITE_BASE}/game_bg_2_hd.gif`;
+const CANNON_SPRITE = `${SPRITE_BASE}/cannon1.png`;  // 74×370, 11 frames
+const BULLET_SPRITE = `${SPRITE_BASE}/bullet1.png`;  // 24×26
+
+// Renders one animated fish frame using the vertical sprite strip.
+// Background height is set to `frames * 100%` and animated through steps()
+// so we cycle through every cell, showing one crisp frame at a time.
+function FishSprite({ cosm, flip }: { cosm: FishCosmetic; flip: boolean }) {
+  const w = cosm.displayW;
+  const h = w / cosm.aspect;
+  const dur = cosm.frames / cosm.fps;
+  // Keyframe `fishhunt-swim` (declared once in the page) shifts
+  // background-position-y from 0% → 100% in `steps(N)`, cycling through
+  // every frame of the vertical sprite strip.
+  return (
+    <div
+      style={{
+        width: w,
+        height: h,
+        backgroundImage: `url(${cosm.sprite})`,
+        backgroundRepeat: "no-repeat",
+        backgroundSize: `100% ${cosm.frames * 100}%`,
+        backgroundPosition: "0 0",
+        animation: `fishhunt-swim ${dur}s steps(${cosm.frames}) infinite`,
+        transform: flip ? "scaleX(-1)" : undefined,
+        filter: `drop-shadow(0 0 12px ${cosm.glow})`,
+        imageRendering: "auto",
+      }}
+    />
+  );
+}
 
 const BET_AMOUNTS = [100, 500, 1000, 2000, 5000, 10000];
 
@@ -325,6 +378,10 @@ export default function GameFishHunt() {
       className="relative min-h-screen h-screen overflow-y-auto bg-gradient-to-b from-[#012c4a] via-[#013a63] to-[#011d3d]"
       data-testid="page-fishhunt"
     >
+      {/* Sprite-strip keyframe used by every <FishSprite> instance.
+          One global rule works for any frame count because the steps()
+          divisor is set per-sprite in inline style. */}
+      <style>{`@keyframes fishhunt-swim { from { background-position-y: 0%; } to { background-position-y: 100%; } }`}</style>
       {/* Top bar */}
       <div className="flex items-center justify-between p-3 sticky top-0 z-40 backdrop-blur-md bg-black/40 border-b border-cyan-700/30">
         <Button variant="ghost" size="sm" onClick={() => navigate("/")} className="text-cyan-300 hover:text-cyan-100" data-testid="button-back-lobby">
@@ -364,13 +421,17 @@ export default function GameFishHunt() {
           onClick={handleArenaClick}
           className="relative w-full aspect-[16/10] rounded-2xl overflow-hidden border-4 border-cyan-700/60 cursor-crosshair select-none"
           style={{
-            background: "radial-gradient(ellipse at top, #0e7490 0%, #0c4a6e 40%, #082f49 100%)",
+            backgroundImage: `url(${ARENA_BG})`,
+            backgroundSize: "cover",
+            backgroundPosition: "center",
             boxShadow: "0 0 80px rgba(8,145,178,0.45), inset 0 0 60px rgba(0,0,0,0.55)",
           }}
           data-testid="fishhunt-arena"
         >
+          {/* Subtle dim overlay so fish read clearly over the busy GIF */}
+          <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-black/10 via-transparent to-black/30" />
           {/* Light rays */}
-          <div className="pointer-events-none absolute inset-0 opacity-30"
+          <div className="pointer-events-none absolute inset-0 opacity-25"
             style={{ background: "repeating-linear-gradient(105deg, transparent 0 60px, rgba(186,230,253,0.08) 60px 80px)" }} />
           {/* Bubbles */}
           {Array.from({ length: 14 }).map((_, i) => (
@@ -400,19 +461,11 @@ export default function GameFishHunt() {
                 initial={{ x: `${f.startX}%` }}
                 animate={{ x: `${f.endX}%` }}
                 transition={{ duration: f.duration, ease: "linear" }}
+                data-testid={`fish-${f.fishId}-${f.uid}`}
               >
-                <div
-                  className="flex flex-col items-center"
-                  style={{
-                    filter: `drop-shadow(0 0 12px ${cosm.glow})`,
-                    transform: f.flip ? "scaleX(-1)" : undefined,
-                  }}
-                >
-                  <span style={{ fontSize: cosm.sizePx, lineHeight: 1 }} data-testid={`fish-${f.fishId}-${f.uid}`}>
-                    {cosm.emoji}
-                  </span>
-                  <span className="text-[10px] md:text-xs font-mono font-bold text-yellow-200 bg-black/50 px-1.5 py-0.5 rounded mt-0.5"
-                    style={{ transform: f.flip ? "scaleX(-1)" : undefined }}>
+                <div className="flex flex-col items-center">
+                  <FishSprite cosm={cosm} flip={f.flip} />
+                  <span className="text-[10px] md:text-xs font-mono font-bold text-yellow-200 bg-black/60 px-1.5 py-0.5 rounded mt-0.5 border border-yellow-400/40">
                     ×{def.multiplier}
                   </span>
                 </div>
@@ -420,12 +473,20 @@ export default function GameFishHunt() {
             );
           })}
 
-          {/* Bullets */}
+          {/* Bullets — use real bullet sprite */}
           {bullets.map(b => (
             <motion.div
               key={b.uid}
-              className="absolute rounded-full bg-yellow-300 shadow-[0_0_12px_rgba(253,224,71,0.9)] pointer-events-none"
-              style={{ width: 10, height: 10, transform: "translate(-50%, -50%)" }}
+              className="absolute pointer-events-none"
+              style={{
+                width: 18, height: 20,
+                backgroundImage: `url(${BULLET_SPRITE})`,
+                backgroundSize: "contain",
+                backgroundRepeat: "no-repeat",
+                backgroundPosition: "center",
+                transform: "translate(-50%, -50%)",
+                filter: "drop-shadow(0 0 8px rgba(253,224,71,0.9))",
+              }}
               initial={{ left: `${b.fromX}%`, top: `${b.fromY}%`, scale: 1 }}
               animate={{ left: `${b.toX}%`, top: `${b.toY}%`, scale: 0.6 }}
               transition={{ duration: 0.32, ease: "easeOut" }}
@@ -466,18 +527,25 @@ export default function GameFishHunt() {
             <Crosshair className="w-10 h-10 text-red-400 drop-shadow-[0_0_8px_rgba(248,113,113,0.9)]" />
           </div>
 
-          {/* Cannon at bottom */}
+          {/* Cannon — real cannon1.png sprite (frame 1 only) at bottom-center */}
           <div
-            className="absolute pointer-events-none z-20 left-1/2 bottom-1"
-            style={{ transform: `translateX(-50%)` }}
+            className="absolute pointer-events-none z-20 left-1/2"
+            style={{ bottom: 4, transform: "translateX(-50%)" }}
           >
             <div
-              className="relative origin-bottom"
-              style={{ transform: `rotate(${cannonAngle - 90}deg)` }}
-            >
-              <div className="w-3 h-14 md:w-4 md:h-20 bg-gradient-to-t from-zinc-700 via-zinc-500 to-zinc-300 rounded-t-full mx-auto border border-black/40 shadow-[0_0_10px_rgba(0,0,0,0.7)]" />
-            </div>
-            <div className="w-16 h-6 md:w-20 md:h-7 -mt-2 bg-gradient-to-b from-zinc-600 via-zinc-800 to-black rounded-b-xl border-2 border-zinc-900 mx-auto shadow-[0_4px_12px_rgba(0,0,0,0.6)]" />
+              className="origin-bottom"
+              style={{
+                transform: `rotate(${cannonAngle - 90}deg)`,
+                width: 74,
+                height: 370 / 11,   // single frame height (~33.6px)
+                backgroundImage: `url(${CANNON_SPRITE})`,
+                backgroundSize: `100% ${11 * 100}%`,
+                backgroundPosition: "0 0",
+                backgroundRepeat: "no-repeat",
+                filter: "drop-shadow(0 4px 8px rgba(0,0,0,0.8))",
+              }}
+            />
+            <div className="w-20 h-6 -mt-1 bg-gradient-to-b from-zinc-600 via-zinc-800 to-black rounded-b-xl border-2 border-zinc-900 mx-auto shadow-[0_4px_12px_rgba(0,0,0,0.6)]" />
           </div>
 
           {/* Loading overlay until catalog arrives */}
@@ -552,7 +620,9 @@ export default function GameFishHunt() {
                   if (!cosm) return null;
                   return (
                     <div key={f.id} className="flex items-center gap-3 bg-black/40 rounded-lg p-2 border border-cyan-800/40" data-testid={`paytable-${f.id}`}>
-                      <span style={{ fontSize: 36, filter: `drop-shadow(0 0 6px ${cosm.glow})` }}>{cosm.emoji}</span>
+                      <div className="w-16 flex items-center justify-center">
+                        <FishSprite cosm={cosm} flip={false} />
+                      </div>
                       <div className="flex-1">
                         <div className="text-cyan-100 font-bold text-sm">{f.name}</div>
                         <div className="text-[10px] text-cyan-200/60">Catch rate: {Math.round(f.difficulty * 100)}%</div>
