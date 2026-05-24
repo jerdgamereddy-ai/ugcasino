@@ -1309,44 +1309,36 @@ export async function registerRoutes(
       const dogMaxOdds = Math.max(...((dogExtraPre.odds as number[]) ?? [3.7, 5.5, 2.2, 11.75, 17.25, 8.75]));
       const maxPotentialWin = Math.floor(totBet * dogMaxOdds);
 
-      // ─── PRE-FLIGHT HOUSE-EDGE CROSS-CHECK (same gates as /win) ───
-      // Race games can guarantee a win by dutching every runner, so we refuse
-      // the bet entirely if the WORST-CASE payout would breach any house-edge
-      // guard. This means the player never plays a round whose maximum win
-      // we'd have to void after the fact.
-
-      // 1) Universal house bankroll: combined admin+SM+manager bankroll floor.
-      const universalDecision = await checkUniversalForceLose(maxPotentialWin);
-      if (universalDecision === true) {
-        return res.status(400).json({
-          message: "Bet too large — maximum possible payout exceeds the house bankroll. Please lower your bet.",
-          bankrollBlocked: true,
-        });
-      }
-      // 2) Per-game RTP cap (only when universal is OFF).
-      if (universalDecision === null && dogSettingsPre) {
-        const targetRTP = 1 - (dogSettingsPre.houseEdgePct ?? 5) / 100;
-        if (dogSettingsPre.totalBet > 0 &&
-            (dogSettingsPre.totalPaid + maxPotentialWin) / dogSettingsPre.totalBet > targetRTP) {
-          return res.status(400).json({
-            message: "Bet too large — would exceed the current target RTP for this game. Please lower your bet.",
-            bankrollBlocked: true,
-          });
-        }
-      }
-      // 3) Manager-pool bankroll floor (decentralised pool floor for this player).
-      const dogGuard = await checkBankrollFloorForBet(req.user.id, maxPotentialWin);
-      if (dogGuard.blocked) {
-        return res.status(400).json({
-          message: "Bet too large — maximum possible payout exceeds the house bankroll. Please lower your bet.",
-          bankrollBlocked: true,
-        });
-      }
-
+      // Charge the bet and record it so house-edge counters are up to date
+      // before we run the pre-flight check below.
       await storage.updateUserBalance(req.user.id, -totBet);
       await storage.createTransaction({ userId: req.user.id, amount: -totBet, type: "bet", description: "Greyhound Racing bet" });
       await recordBetAndCheckHighBet("dog-racing", req.user.id, totBet);
-      const forceLose = await computeForceLose("dog-racing", req.user.id, maxPotentialWin);
+
+      // ─── PRE-FLIGHT HOUSE-EDGE CROSS-CHECK ───
+      // Race games can be dutched (player bets every runner), so the only
+      // reliable way to protect the house is to flag the round as a forced
+      // loss BEFORE the iframe runs the race. The race still plays out, the
+      // player just can't win. This matches the coinflip pattern: house edge
+      // is checked first, then the outcome is decided to honor it.
+      //
+      // A round is forced to lose when ANY of the following hold for the
+      // worst-case payout (totBet × maxOdds):
+      //   1) Universal house bankroll says block (admin floor + RTP cap).
+      //   2) Per-game RTP cap would be exceeded (only when universal is OFF).
+      //   3) The decentralised manager-pool floor would be breached.
+      //   4) High-bet wagering threshold not yet met (set by recordBetAndCheckHighBet).
+      let forceLose = await computeForceLose("dog-racing", req.user.id, maxPotentialWin);
+      if (!forceLose) {
+        const dogGuard = await checkBankrollFloorForBet(req.user.id, maxPotentialWin);
+        if (dogGuard.blocked) {
+          forceLose = true;
+          // Persist the decision so /win cannot accidentally credit a win
+          // even if the iframe ignores the forceLose hint.
+          lockedLossMap.set(lossKey(req.user.id, "dog-racing"), true);
+        }
+      }
+
       const roundId = newRoundId();
       pendingRoundsMap.set(roundId, { userId: req.user.id, gameType: "dog-racing", betAmount: totBet, maxOdds: dogMaxOdds, createdAt: Date.now() });
       const user = await storage.getUser(req.user.id);
