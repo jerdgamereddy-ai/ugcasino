@@ -1346,7 +1346,43 @@ export async function registerRoutes(
       }
       pendingRoundsMap.delete(roundId!);
       const cappedWin = Math.min(winAmount, Math.floor(round.betAmount * round.maxOdds));
-      const finalWin = await applyHouseEdgeForWin("dog-racing", req.user.id, cappedWin);
+
+      // ─── HOUSE-EDGE CROSS-CHECK (coinflip / hilo / classic-slots pattern) ───
+      // The bet was already recorded at /bet via recordBetAndCheckHighBet;
+      // here we mirror processCombinedBetAndWin's post-bet checks against
+      // the ACTUAL win amount before crediting anything.
+      const k = lossKey(req.user.id, "dog-racing");
+      let finalWin = cappedWin;
+
+      // 1) High-bet protection: /bet set this flag when wagering threshold not met.
+      if (lockedLossMap.get(k)) {
+        finalWin = 0;
+      } else if (finalWin > 0) {
+        // 2) Universal house bankroll (admin floor + RTP cap when enabled).
+        const universalDecision = await checkUniversalForceLose(finalWin);
+        if (universalDecision === true) {
+          finalWin = 0;
+        } else if (universalDecision === null) {
+          // 3) Per-game RTP cap (only when universal is OFF).
+          const settings = await getEffectiveGameSettings(req.user.id, "dog-racing");
+          if (settings) {
+            const targetRTP = 1 - (settings.houseEdgePct ?? 5) / 100;
+            if (settings.totalBet > 0 &&
+                (settings.totalPaid + finalWin) / settings.totalBet > targetRTP) {
+              finalWin = 0;
+            }
+          }
+        }
+        // 4) Atomic try-debit on the manager pool (bankroll floor enforcement).
+        if (finalWin > 0) {
+          const paid = await recordPayout("dog-racing", req.user.id, finalWin);
+          if (!paid) finalWin = 0;
+        }
+      }
+      // Clear the per-round force-lose flag now that this round is settled.
+      lockedLossMap.delete(k);
+      lockedBetAmountMap.delete(k);
+
       if (finalWin > 0) {
         await storage.updateUserBalance(req.user.id, finalWin);
         await storage.createTransaction({ userId: req.user.id, amount: finalWin, type: "win", description: "Greyhound Racing win" });
