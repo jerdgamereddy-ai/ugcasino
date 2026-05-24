@@ -1307,22 +1307,46 @@ export async function registerRoutes(
       const dogSettingsPre = await getEffectiveGameSettings(req.user.id, "dog-racing");
       const dogExtraPre = (() => { try { return dogSettingsPre?.extraSettings ? JSON.parse(dogSettingsPre.extraSettings) : {}; } catch { return {}; } })();
       const dogMaxOdds = Math.max(...((dogExtraPre.odds as number[]) ?? [3.7, 5.5, 2.2, 11.75, 17.25, 8.75]));
-      // Race games are the ONLY games where a player can guarantee a win by
-      // dutching across every runner — forceLose can't help if they covered
-      // all positions. So we hard-block here when the worst-case payout would
-      // breach the bankroll floor. Admin toggle bypassDogRacingBankroll lets
-      // the game stay open; excessive payouts are still voided server-side.
-      const dogUniversal = await storage.getUniversalHouseEdge().catch(() => null);
-      if (!dogUniversal?.bypassDogRacingBankroll) {
-        const dogGuard = await checkBankrollFloorForBet(req.user.id, totBet * dogMaxOdds);
-        if (dogGuard.blocked) {
-          return res.status(400).json({ message: "Bet too large — maximum possible payout exceeds the house bankroll. Please lower your bet.", bankrollBlocked: true });
+      const maxPotentialWin = Math.floor(totBet * dogMaxOdds);
+
+      // ─── PRE-FLIGHT HOUSE-EDGE CROSS-CHECK (same gates as /win) ───
+      // Race games can guarantee a win by dutching every runner, so we refuse
+      // the bet entirely if the WORST-CASE payout would breach any house-edge
+      // guard. This means the player never plays a round whose maximum win
+      // we'd have to void after the fact.
+
+      // 1) Universal house bankroll: combined admin+SM+manager bankroll floor.
+      const universalDecision = await checkUniversalForceLose(maxPotentialWin);
+      if (universalDecision === true) {
+        return res.status(400).json({
+          message: "Bet too large — maximum possible payout exceeds the house bankroll. Please lower your bet.",
+          bankrollBlocked: true,
+        });
+      }
+      // 2) Per-game RTP cap (only when universal is OFF).
+      if (universalDecision === null && dogSettingsPre) {
+        const targetRTP = 1 - (dogSettingsPre.houseEdgePct ?? 5) / 100;
+        if (dogSettingsPre.totalBet > 0 &&
+            (dogSettingsPre.totalPaid + maxPotentialWin) / dogSettingsPre.totalBet > targetRTP) {
+          return res.status(400).json({
+            message: "Bet too large — would exceed the current target RTP for this game. Please lower your bet.",
+            bankrollBlocked: true,
+          });
         }
       }
+      // 3) Manager-pool bankroll floor (decentralised pool floor for this player).
+      const dogGuard = await checkBankrollFloorForBet(req.user.id, maxPotentialWin);
+      if (dogGuard.blocked) {
+        return res.status(400).json({
+          message: "Bet too large — maximum possible payout exceeds the house bankroll. Please lower your bet.",
+          bankrollBlocked: true,
+        });
+      }
+
       await storage.updateUserBalance(req.user.id, -totBet);
       await storage.createTransaction({ userId: req.user.id, amount: -totBet, type: "bet", description: "Greyhound Racing bet" });
       await recordBetAndCheckHighBet("dog-racing", req.user.id, totBet);
-      const forceLose = await computeForceLose("dog-racing", req.user.id, totBet * dogMaxOdds);
+      const forceLose = await computeForceLose("dog-racing", req.user.id, maxPotentialWin);
       const roundId = newRoundId();
       pendingRoundsMap.set(roundId, { userId: req.user.id, gameType: "dog-racing", betAmount: totBet, maxOdds: dogMaxOdds, createdAt: Date.now() });
       const user = await storage.getUser(req.user.id);
